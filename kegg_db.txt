@@ -1,0 +1,1702 @@
+
+---- Compound: C03264
+ENTRY       C03264                      Compound
+NAME        D-2-Hydroxyisocaproate
+FORMULA     C6H12O3
+EXACT_MASS  132.0786
+MOL_WEIGHT  132.1577
+DBLINKS     CAS: 20312-37-2
+            PubChem: 6128
+            ChEBI: 55534
+            LIPIDMAPS: LMFA01050402
+            PDB-CCD: 2RH
+            NIKKAJI: J84.593K
+ATOM        9
+            1   C1c C    27.0606  -15.6602
+            2   C1b C    25.8587  -16.3571
+            3   C6a C    28.2689  -16.3571
+            4   O1a O    27.0606  -14.2665
+            5   C1c C    24.6569  -15.6602
+            6   O6a O    28.2945  -17.8083
+            7   O6a O    29.4709  -15.6537
+            8   C1a C    23.4484  -16.3571
+            9   C1a C    24.6569  -14.2665
+BOND        8
+            1     1   2 1
+            2     1   3 1
+            3     1   4 1 #Up
+            4     2   5 1
+            5     3   6 2
+            6     3   7 1
+            7     5   8 1
+            8     5   9 1
+///
+
+---- Compound: C03499
+ENTRY       C03499                      Compound
+NAME        Ethyl (R)-3-hydroxybutanoate
+FORMULA     C6H12O3
+EXACT_MASS  132.0786
+MOL_WEIGHT  132.1577
+DBLINKS     PubChem: 6311
+            ChEBI: 28707
+            NIKKAJI: J57.247K
+ATOM        9
+            1   C1b C    25.8539  -16.0517
+            2   C7a C    27.0710  -15.3500
+            3   C1c C    24.6435  -15.3500
+            4   O7a O    28.2813  -16.0517
+            5   O6a O    27.0710  -13.9527
+            6   C1a C    23.4329  -16.0517
+            7   O1a O    24.6435  -13.9527
+            8   C1b C    29.4924  -15.3300
+            9   C1a C    30.7049  -16.0300
+BOND        8
+            1     1   2 1
+            2     1   3 1
+            3     2   4 1
+            4     2   5 2
+            5     3   6 1
+            6     3   7 1 #Up
+            7     4   8 1
+            8     8   9 1
+///
+
+---- Compound: C06103
+ENTRY       C06103                      Compound
+NAME        6-Hydroxyhexanoic acid;
+            6-Hydroxyhexanoate
+FORMULA     C6H12O3
+EXACT_MASS  132.0786
+MOL_WEIGHT  132.1577
+REACTION    R03751 R05231 R05283
+PATHWAY     map00930  Caprolactam degradation
+            map01120  Microbial metabolism in diverse environments
+            map01220  Degradation of aromatic compounds
+ENZYME      1.1.1.2         1.1.1.258       3.1.1.17        3.1.1.83
+BRITE       Lipids [BR:br08002]
+             FA  Fatty acyls
+              FA01 Fatty Acids and Conjugates
+               FA0105 Hydroxy fatty acids
+                C06103  6-Hydroxyhexanoic acid
+DBLINKS     CAS: 1191-25-9
+            PubChem: 8367
+            ChEBI: 17869
+            LIPIDMAPS: LMFA01050015
+            LipidBank: DFA0281
+            3DMET: B00902
+            NIKKAJI: J262.001D
+ATOM        9
+            1   C1b C    29.4600  -17.2773
+            2   C1b C    30.6754  -17.9701
+            3   C1b C    28.2447  -17.9760
+            4   C6a C    31.8849  -17.2655
+            5   C1b C    27.0354  -17.2832
+            6   O6a O    33.1002  -17.9643
+            7   O6a O    31.8849  -15.8624
+            8   C1b C    25.8200  -17.9818
+            9   O1a O    24.6047  -17.2890
+BOND        8
+            1     1   2 1
+            2     1   3 1
+            3     2   4 1
+            4     3   5 1
+            5     4   6 1
+            6     4   7 2
+            7     5   8 1
+            8     8   9 1
+///
+
+---- Compound: C07834
+ENTRY       C07834                      Compound
+NAME        Paraldehyde
+FORMULA     C6H12O3
+EXACT_MASS  132.0786
+MOL_WEIGHT  132.1577
+REMARK      Same as: D00705
+BRITE       Anatomical Therapeutic Chemical (ATC) classification [BR:br08303]
+             N NERVOUS SYSTEM
+              N05 PSYCHOLEPTICS
+               N05C HYPNOTICS AND SEDATIVES
+                N05CC Aldehydes and derivatives
+                 N05CC05 Paraldehyde
+                  D00705  Paraldehyde (USP)
+DBLINKS     CAS: 123-63-7
+            PubChem: 10036
+            ChEBI: 27909
+            NIKKAJI: J5.543C
+ATOM        9
+            1   C1y C    25.0658  -20.7879
+            2   O2x O    23.8492  -20.0919
+            3   O2x O    26.2708  -20.0919
+            4   C1a C    25.0542  -22.1860
+            5   C1y C    23.8492  -18.6940
+            6   C1y C    26.2708  -18.6940
+            7   O2x O    25.0658  -17.9862
+            8   C1a C    22.6326  -17.9862
+            9   C1a C    27.4757  -17.9804
+BOND        9
+            1     1   2 1
+            2     1   3 1
+            3     1   4 1
+            4     2   5 1
+            5     3   6 1
+            6     5   7 1
+            7     5   8 1
+            8     6   9 1
+            9     6   7 1
+///
+
+---- Compound: C03264
+ENTRY       C03264                      Compound
+NAME        D-2-Hydroxyisocaproate
+FORMULA     C6H12O3
+EXACT_MASS  132.0786
+MOL_WEIGHT  132.1577
+DBLINKS     CAS: 20312-37-2
+            PubChem: 6128
+            ChEBI: 55534
+            LIPIDMAPS: LMFA01050402
+            PDB-CCD: 2RH
+            NIKKAJI: J84.593K
+ATOM        9
+            1   C1c C    27.0606  -15.6602
+            2   C1b C    25.8587  -16.3571
+            3   C6a C    28.2689  -16.3571
+            4   O1a O    27.0606  -14.2665
+            5   C1c C    24.6569  -15.6602
+            6   O6a O    28.2945  -17.8083
+            7   O6a O    29.4709  -15.6537
+            8   C1a C    23.4484  -16.3571
+            9   C1a C    24.6569  -14.2665
+BOND        8
+            1     1   2 1
+            2     1   3 1
+            3     1   4 1 #Up
+            4     2   5 1
+            5     3   6 2
+            6     3   7 1
+            7     5   8 1
+            8     5   9 1
+///
+
+---- Compound: C02560
+ENTRY       C02560                      Compound
+NAME        N-Acetylimidazole;
+            1-Acetyl-1H-imidazole
+FORMULA     C5H6N2O
+EXACT_MASS  110.048
+MOL_WEIGHT  110.1139
+REACTION    R03621
+ENZYME      2.3.1.2
+DBLINKS     CAS: 2466-76-4
+            PubChem: 5560
+            ChEBI: 16984
+            3DMET: B00459
+            NIKKAJI: J34.876G
+ATOM        8
+            1   N4y N    26.4600  -16.0533
+            2   C5a C    26.4600  -14.6601
+            3   C8x C    25.3232  -16.8753
+            4   C8x C    27.5910  -16.8753
+            5   C1a C    27.6725  -13.9605
+            6   O5a O    25.2532  -13.9605
+            7   C8x C    25.7547  -18.2104
+            8   N5x N    27.1596  -18.2104
+BOND        8
+            1     1   2 1
+            2     1   3 1
+            3     1   4 1
+            4     2   5 1
+            5     2   6 2
+            6     3   7 2
+            7     4   8 2
+            8     7   8 1
+///
+
+---- Compound: C05130
+ENTRY       C05130                      Compound
+NAME        Imidazole-4-acetaldehyde;
+            Imidazole acetaldehyde
+FORMULA     C5H6N2O
+EXACT_MASS  110.048
+MOL_WEIGHT  110.1139
+REACTION    R02150 R04065 R04874
+PATHWAY     map00340  Histidine metabolism
+ENZYME      1.2.1.3         1.4.3.22
+DBLINKS     CAS: 645-14-7
+            PubChem: 7550
+            ChEBI: 27398
+            3DMET: B00754
+            NIKKAJI: J417.577H
+ATOM        8
+            1   C8x C    21.0633  -17.7458
+            2   N5x N    21.4600  -19.0884
+            3   C8y C    22.8596  -19.1259
+            4   C8x C    23.3277  -17.8065
+            5   N4x N    22.2176  -16.9536
+            6   C1b C    24.1024  -19.8100
+            7   C4a C    25.3149  -19.1100
+            8   O4a O    26.5273  -19.8100
+BOND        8
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     1   5 1
+            6     3   6 1
+            7     6   7 1
+            8     7   8 2
+///
+
+---- Compound: C05130
+ENTRY       C05130                      Compound
+NAME        Imidazole-4-acetaldehyde;
+            Imidazole acetaldehyde
+FORMULA     C5H6N2O
+EXACT_MASS  110.048
+MOL_WEIGHT  110.1139
+REACTION    R02150 R04065 R04874
+PATHWAY     map00340  Histidine metabolism
+ENZYME      1.2.1.3         1.4.3.22
+DBLINKS     CAS: 645-14-7
+            PubChem: 7550
+            ChEBI: 27398
+            3DMET: B00754
+            NIKKAJI: J417.577H
+ATOM        8
+            1   C8x C    21.0633  -17.7458
+            2   N5x N    21.4600  -19.0884
+            3   C8y C    22.8596  -19.1259
+            4   C8x C    23.3277  -17.8065
+            5   N4x N    22.2176  -16.9536
+            6   C1b C    24.1024  -19.8100
+            7   C4a C    25.3149  -19.1100
+            8   O4a O    26.5273  -19.8100
+BOND        8
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     1   5 1
+            6     3   6 1
+            7     6   7 1
+            8     7   8 2
+///
+
+---- Compound: C00785
+ENTRY       C00785                      Compound
+NAME        Urocanate;
+            Urocanic acid
+FORMULA     C6H6N2O2
+EXACT_MASS  138.0429
+MOL_WEIGHT  138.124
+REACTION    R01168 R02914 R10330
+PATHWAY     map00340  Histidine metabolism
+            map01100  Metabolic pathways
+MODULE      M00045  Histidine degradation, histidine => N-formiminoglutamate => glutamate
+ENZYME      1.3.99.33       4.2.1.49        4.3.1.3
+DBLINKS     CAS: 104-98-3
+            PubChem: 4043
+            ChEBI: 27247 30817
+            PDB-CCD: URO
+            3DMET: B01329
+            NIKKAJI: J5.039C
+ATOM        10
+            1   C8x C    17.8355  -16.5228
+            2   N5x N    18.2674  -17.8545
+            3   C8y C    19.6674  -17.8553
+            4   C8x C    20.1008  -16.5241
+            5   N4x N    18.9686  -15.7006
+            6   C2b C    20.8824  -18.5500
+            7   C2b C    22.0949  -17.8500
+            8   C6a C    23.3073  -18.5500
+            9   O6a O    24.5197  -17.8500
+            10  O6a O    23.3073  -19.9500
+BOND        10
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     1   5 1
+            6     3   6 1
+            7     6   7 2
+            8     7   8 1
+            9     8   9 1
+            10    8  10 2
+///
+
+---- Compound: C02126
+ENTRY       C02126                      Compound
+NAME        4-Nitroaniline;
+            p-Nitroaniline;
+            4-Nitrobenzeneamine
+FORMULA     C6H6N2O2
+EXACT_MASS  138.0429
+MOL_WEIGHT  138.124
+REACTION    R04113 R04367
+ENZYME      3.5.1.72        4.3.3.1
+DBLINKS     CAS: 100-01-6
+            PubChem: 5205
+            ChEBI: 17064
+            PDB-CCD: NIT
+            NIKKAJI: J4.000B
+ATOM        10
+            1   C8y C    18.4100  -15.8310
+            2   N2b N    18.4037  -17.2208 #+
+            3   C8x C    17.2058  -15.1200
+            4   C8x C    19.6333  -15.1200
+            5   O3a O    19.6014  -18.2119
+            6   O3a O    17.1995  -18.2054 #-
+            7   C8x C    17.2058  -13.7109
+            8   C8x C    19.6333  -13.7109
+            9   C8y C    18.4100  -13.0127
+            10  N1a N    18.4037  -11.6227
+BOND        10
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 2
+            5     2   6 1
+            6     3   7 1
+            7     4   8 2
+            8     7   9 2
+            9     9  10 1
+            10    8   9 1
+///
+
+---- Compound: C00785
+ENTRY       C00785                      Compound
+NAME        Urocanate;
+            Urocanic acid
+FORMULA     C6H6N2O2
+EXACT_MASS  138.0429
+MOL_WEIGHT  138.124
+REACTION    R01168 R02914 R10330
+PATHWAY     map00340  Histidine metabolism
+            map01100  Metabolic pathways
+MODULE      M00045  Histidine degradation, histidine => N-formiminoglutamate => glutamate
+ENZYME      1.3.99.33       4.2.1.49        4.3.1.3
+DBLINKS     CAS: 104-98-3
+            PubChem: 4043
+            ChEBI: 27247 30817
+            PDB-CCD: URO
+            3DMET: B01329
+            NIKKAJI: J5.039C
+ATOM        10
+            1   C8x C    17.8355  -16.5228
+            2   N5x N    18.2674  -17.8545
+            3   C8y C    19.6674  -17.8553
+            4   C8x C    20.1008  -16.5241
+            5   N4x N    18.9686  -15.7006
+            6   C2b C    20.8824  -18.5500
+            7   C2b C    22.0949  -17.8500
+            8   C6a C    23.3073  -18.5500
+            9   O6a O    24.5197  -17.8500
+            10  O6a O    23.3073  -19.9500
+BOND        10
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     1   5 1
+            6     3   6 1
+            7     6   7 2
+            8     7   8 1
+            9     8   9 1
+            10    8  10 2
+///
+
+---- Compound: C17512
+ENTRY       C17512                      Compound
+NAME        N-Methylanthranilamide;
+            N-Methyl-2-aminobenzamide
+FORMULA     C8H10N2O
+EXACT_MASS  150.0793
+MOL_WEIGHT  150.1778
+DBLINKS     PubChem: 96023857
+            ChEBI: 81147
+            NIKKAJI: J1.374.332K
+ATOM        11
+            1   C8y C    35.4900  -23.6600
+            2   C8x C    34.3000  -24.3600
+            3   C8y C    36.6800  -24.3600
+            4   C5a C    35.4900  -22.2600
+            5   C8x C    34.3000  -25.7600
+            6   C8x C    36.6800  -25.7600
+            7   N1b N    36.6800  -21.5600
+            8   O5a O    34.3000  -21.5600
+            9   C8x C    35.4900  -26.3900
+            10  C1a C    37.8981  -22.2501
+            11  N1a N    37.8953  -23.6649
+BOND        11
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 2
+            5     3   6 1
+            6     4   7 1
+            7     4   8 2
+            8     5   9 1
+            9     6   9 2
+            10    7  10 1
+            11    3  11 1
+///
+
+---- Compound: C00604
+ENTRY       C00604                      Compound
+NAME        1,10-Phenanthroline;
+            o-Phenanthroline
+FORMULA     C12H8N2
+EXACT_MASS  180.0687
+MOL_WEIGHT  180.2053
+DBLINKS     CAS: 66-71-7
+            PubChem: 3879
+            ChEBI: 44975
+            PDB-CCD: PHN
+            NIKKAJI: J4.844E
+ATOM        14
+            1   C8y C    26.8654  -18.9570
+            2   C8y C    28.0740  -18.2547
+            3   C8y C    26.8654  -20.3493
+            4   N5x N    25.6630  -18.2736
+            5   C8y C    29.3591  -18.9507
+            6   N5x N    28.0614  -16.8435
+            7   C8x C    28.0804  -21.0516
+            8   C8x C    25.6630  -21.0516
+            9   C8x C    24.4671  -18.9570
+            10  C8x C    29.3017  -20.3555
+            11  C8x C    30.5103  -18.2420
+            12  C8x C    29.2828  -16.1347
+            13  C8x C    24.4671  -20.3493
+            14  C8x C    30.5168  -16.8308
+BOND        16
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 2
+            5     2   6 1
+            6     3   7 1
+            7     3   8 1
+            8     4   9 2
+            9     5  10 1
+            10    5  11 1
+            11    6  12 2
+            12    8  13 2
+            13   11  14 2
+            14    7  10 2
+            15    9  13 1
+            16   12  14 1
+///
+
+---- Compound: C11224
+ENTRY       C11224                      Compound
+NAME        Fenuron
+FORMULA     C9H12N2O
+EXACT_MASS  164.095
+MOL_WEIGHT  164.2044
+BRITE       Pesticides [BR:br08007]
+             Obsolete pesticides
+              Herbicides
+               Phenylurea herbicides
+                C11224  Fenuron
+DBLINKS     CAS: 101-42-8
+            PubChem: 13403
+            ChEBI: 5013
+            NIKKAJI: J8.623A
+ATOM        12
+            1   C8x C    24.7399  -19.3604
+            2   C8x C    24.7399  -17.9611
+            3   C8x C    25.9557  -17.2581
+            4   C8y C    27.1641  -17.9611
+            5   C8x C    27.1641  -19.3604
+            6   C8x C    25.9557  -20.0637
+            7   N1b N    28.3682  -17.2581
+            8   C5a C    29.5777  -17.9682
+            9   N1c N    30.7870  -17.2721
+            10  C1a C    30.7801  -15.8658
+            11  O5a O    29.6408  -19.3675
+            12  C1a C    32.0019  -17.9645
+BOND        12
+            1     6   1 1
+            2     4   7 1
+            3     1   2 2
+            4     7   8 1
+            5     2   3 1
+            6     8   9 1
+            7     3   4 2
+            8     9  10 1
+            9     4   5 1
+            10    5   6 2
+            11    8  11 2
+            12    9  12 1
+///
+
+---- Compound: C01056
+ENTRY       C01056                      Compound
+NAME        (S)-6-Hydroxynicotine
+FORMULA     C10H14N2O
+EXACT_MASS  178.1106
+MOL_WEIGHT  178.231
+REACTION    R02860 R03202 R11048
+PATHWAY     map00760  Nicotinate and nicotinamide metabolism
+            map01120  Microbial metabolism in diverse environments
+MODULE      M00810  Nicotine degradation, pyridine pathway, nicotine => 2,6-dihydroxypyridine/succinate semialdehyde
+ENZYME      1.5.3.5         1.5.99.4
+DBLINKS     PubChem: 4296
+            ChEBI: 17532
+            PDB-CCD: HNL
+            3DMET: B01372
+            NIKKAJI: J38.661H
+ATOM        13
+            1   C1y C    23.4084  -15.6545
+            2   C8y C    22.2400  -16.3381
+            3   N1y N    24.6512  -16.2076
+            4   C1x C    23.4643  -14.2625
+            5   C8x C    21.0531  -15.6608
+            6   C8x C    22.2400  -17.7054
+            7   C1x C    25.5462  -15.1946
+            8   C1a C    25.2263  -17.8512
+            9   C1x C    24.8750  -14.0325
+            10  C8x C    19.8847  -16.3381
+            11  N5x N    21.0531  -18.3951
+            12  C8y C    19.8847  -17.7054
+            13  O1a O    18.7103  -18.3766
+BOND        14
+            1     1   2 1 #Down
+            2     1   3 1
+            3     1   4 1
+            4     2   5 1
+            5     2   6 2
+            6     3   7 1
+            7     3   8 1
+            8     4   9 1
+            9     5  10 2
+            10    6  11 1
+            11   10  12 1
+            12   12  13 1
+            13    7   9 1
+            14   11  12 2
+///
+
+---- Compound: C03043
+ENTRY       C03043                      Compound
+NAME        (R)-6-Hydroxynicotine
+FORMULA     C10H14N2O
+EXACT_MASS  178.1106
+MOL_WEIGHT  178.231
+REACTION    R07170 R07946 R11050
+PATHWAY     map00760  Nicotinate and nicotinamide metabolism
+            map01120  Microbial metabolism in diverse environments
+MODULE      M00810  Nicotine degradation, pyridine pathway, nicotine => 2,6-dihydroxypyridine/succinate semialdehyde
+ENZYME      1.5.3.6         1.5.99.4
+DBLINKS     PubChem: 5946
+            ChEBI: 18226
+            PDB-CCD: HNK
+            3DMET: B01624
+            NIKKAJI: J2.226.867H
+ATOM        13
+            1   C1y C    26.1415  -16.9947
+            2   C8y C    25.0636  -17.8256
+            3   N1y N    27.4434  -17.3839
+            4   C1x C    26.1172  -15.5808
+            5   C8x C    23.8664  -17.1484
+            6   C8x C    25.0636  -19.1987
+            7   C1x C    28.2034  -16.2580
+            8   C1a C    28.2921  -19.0448
+            9   C1x C    27.3899  -15.1914
+            10  C8x C    22.6939  -17.8256
+            11  N5x N    23.8664  -19.8876
+            12  C8y C    22.6939  -19.1987
+            13  O1a O    21.5155  -19.8642
+BOND        14
+            1     1   2 1 #Up
+            2     1   3 1
+            3     1   4 1
+            4     2   5 1
+            5     2   6 2
+            6     3   7 1
+            7     3   8 1
+            8     4   9 1
+            9     5  10 2
+            10    6  11 1
+            11   10  12 1
+            12   12  13 1
+            13    7   9 1
+            14   11  12 2
+///
+
+---- Compound: C16569
+ENTRY       C16569                      Compound
+NAME        Glycinexylidide;
+            GX
+FORMULA     C10H14N2O
+EXACT_MASS  178.1106
+MOL_WEIGHT  178.231
+REACTION    R08296 R08299
+PATHWAY     map00982  Drug metabolism - cytochrome P450
+DBLINKS     CAS: 18865-38-8
+            PubChem: 51090898
+            ChEBI: 357241
+            NIKKAJI: J401.554A
+ATOM        13
+            1   C8y C    23.9376  -17.2069
+            2   N1b N    25.1548  -17.9107
+            3   C8y C    22.7260  -17.9165
+            4   C8y C    23.9376  -15.8049
+            5   C8x C    21.5144  -17.2069
+            6   C1a C    22.7318  -19.3128
+            7   C8x C    22.7260  -15.1068
+            8   C1a C    25.1433  -15.1068
+            9   C8x C    21.5144  -15.8049
+            10  C5a C    26.3916  -17.1983
+            11  C1b C    27.5713  -17.8809
+            12  O5a O    26.3935  -15.7770
+            13  N1a N    28.7704  -17.1900
+BOND        13
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     3   5 1
+            5     3   6 1
+            6     4   7 2
+            7     4   8 1
+            8     5   9 2
+            9     7   9 1
+            10    2  10 1
+            11   10  11 1
+            12   10  12 2
+            13   11  13 1
+///
+
+---- Compound: C10963
+ENTRY       C10963                      Compound
+NAME        Terbacil
+FORMULA     C9H13ClN2O2
+EXACT_MASS  216.0666
+MOL_WEIGHT  216.6647
+BRITE       Pesticides [BR:br08007]
+             Pesticides
+              Herbicides
+               Uracil herbicides
+                C10963  Terbacil
+DBLINKS     CAS: 5902-51-2
+            PubChem: 13146
+            ChEBI: 9447
+            NIKKAJI: J3.079A
+ATOM        14
+            1   N4y N    28.1387  -25.0059
+            2   C8y C    28.1387  -26.3973
+            3   N4x N    29.3528  -27.0966
+            4   C8y C    30.5527  -26.3973
+            5   C8y C    30.5527  -25.0059
+            6   C8y C    29.3528  -24.3136
+            7   O5x O    29.3545  -22.9221
+            8   O5x O    26.9349  -27.0973
+            9   C1a C    31.7573  -27.0957
+            10  X   Cl   31.7573  -24.3146
+            11  C1d C    26.9349  -24.3131
+            12  C1a C    26.9356  -22.9215
+            13  C1a C    25.7305  -25.0045
+            14  C1a C    25.6852  -23.4658
+BOND        14
+            1     6   7 2
+            2     1   2 1
+            3     2   8 2
+            4     2   3 1
+            5     4   9 1
+            6     3   4 1
+            7     5  10 1
+            8     4   5 2
+            9     1  11 1
+            10    5   6 1
+            11   11  12 1
+            12    6   1 1
+            13   11  13 1
+            14   11  14 1
+///
+
+---- Compound: C05636
+ENTRY       C05636                      Compound
+NAME        3-Hydroxykynurenamine
+FORMULA     C9H12N2O2
+EXACT_MASS  180.0899
+MOL_WEIGHT  180.2038
+REACTION    R04172 R04907
+PATHWAY     map00380  Tryptophan metabolism
+ENZYME      1.4.3.4         4.1.1.-
+DBLINKS     PubChem: 7947
+            ChEBI: 27421
+            3DMET: B00816
+            NIKKAJI: J2.069.296K
+ATOM        13
+            1   C8y C    23.9132  -16.5052
+            2   C8y C    23.9132  -17.9071
+            3   C5a C    25.1207  -15.7992
+            4   C8x C    22.7023  -15.8060
+            5   C8y C    22.7023  -18.6063
+            6   C1b C    26.3349  -16.5018
+            7   O5a O    25.1172  -14.3973
+            8   C8x C    21.4915  -16.5052
+            9   C8x C    21.4915  -17.9071
+            10  O1a O    22.6955  -20.0081
+            11  C1b C    27.5457  -15.7957
+            12  N1a N    28.7566  -16.4984
+            13  N1a N    25.1513  -18.6219
+BOND        13
+            1     1   2 1
+            2     1   3 1
+            3     1   4 2
+            4     2   5 2
+            5     3   6 1
+            6     3   7 2
+            7     4   8 1
+            8     5   9 1
+            9     5  10 1
+            10    6  11 1
+            11   11  12 1
+            12    8   9 2
+            13    2  13 1
+///
+
+---- Compound: C05638
+ENTRY       C05638                      Compound
+NAME        5-Hydroxykynurenamine
+FORMULA     C9H12N2O2
+EXACT_MASS  180.0899
+MOL_WEIGHT  180.2038
+REACTION    R04908 R04909
+PATHWAY     map00380  Tryptophan metabolism
+ENZYME      1.4.3.4         4.1.1.28
+DBLINKS     PubChem: 7949
+            ChEBI: 28715
+            3DMET: B00818
+            NIKKAJI: J2.367.443B
+ATOM        13
+            1   C8y C    -0.1655    0.0931
+            2   C5a C     0.5517    0.5138
+            3   C8y C    -0.1655   -0.7345
+            4   C8x C    -0.8828    0.5103
+            5   C1b C     1.2655    0.0966
+            6   O5a O     0.5483    1.3379
+            7   C8x C    -0.8828   -1.1448
+            8   N1a N     0.5483   -1.1483
+            9   C8y C    -1.5931    0.0931
+            10  C1b C     1.9828    0.5103
+            11  C8x C    -1.5931   -0.7345
+            12  O1a O    -2.3103    0.5103
+            13  N1a N     2.6931    0.1000
+BOND        13
+            1     1   2 1
+            2     1   3 1
+            3     1   4 2
+            4     2   5 1
+            5     2   6 2
+            6     3   7 2
+            7     3   8 1
+            8     4   9 1
+            9     5  10 1
+            10    7  11 1
+            11    9  12 1
+            12   10  13 1
+            13    9  11 2
+///
+
+---- Compound: C12033
+ENTRY       C12033                      Compound
+NAME        4-Aminophenylalanine;
+            p-Aminophenylalanine
+FORMULA     C9H12N2O2
+EXACT_MASS  180.0899
+MOL_WEIGHT  180.2038
+DBLINKS     CAS: 2410-24-4
+            PubChem: 14188
+            ChEBI: 29737
+            PDB-CCD: HOX
+            NIKKAJI: J310.961E
+ATOM        13
+            1   C8y C    24.9900  -20.9300
+            2   N1a N    23.8000  -21.6300
+            3   C8x C    26.2500  -21.6300
+            4   C8x C    24.9900  -19.5300
+            5   C8x C    27.4400  -20.9300
+            6   C8x C    26.2500  -18.8300
+            7   C8y C    27.4400  -19.5300
+            8   C1b C    28.6300  -18.8300
+            9   C1c C    29.8900  -19.5300
+            10  C6a C    31.0800  -18.8300
+            11  N1a N    29.8900  -20.9300
+            12  O6a O    32.2700  -19.5300
+            13  O6a O    31.0800  -17.4300
+BOND        13
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     3   5 1
+            5     4   6 2
+            6     5   7 2
+            7     7   8 1
+            8     8   9 1
+            9     9  10 1
+            10    9  11 1 #Up
+            11   10  12 1
+            12   10  13 2
+            13    6   7 1
+///
+
+---- Compound: C05638
+ENTRY       C05638                      Compound
+NAME        5-Hydroxykynurenamine
+FORMULA     C9H12N2O2
+EXACT_MASS  180.0899
+MOL_WEIGHT  180.2038
+REACTION    R04908 R04909
+PATHWAY     map00380  Tryptophan metabolism
+ENZYME      1.4.3.4         4.1.1.28
+DBLINKS     PubChem: 7949
+            ChEBI: 28715
+            3DMET: B00818
+            NIKKAJI: J2.367.443B
+ATOM        13
+            1   C8y C    -0.1655    0.0931
+            2   C5a C     0.5517    0.5138
+            3   C8y C    -0.1655   -0.7345
+            4   C8x C    -0.8828    0.5103
+            5   C1b C     1.2655    0.0966
+            6   O5a O     0.5483    1.3379
+            7   C8x C    -0.8828   -1.1448
+            8   N1a N     0.5483   -1.1483
+            9   C8y C    -1.5931    0.0931
+            10  C1b C     1.9828    0.5103
+            11  C8x C    -1.5931   -0.7345
+            12  O1a O    -2.3103    0.5103
+            13  N1a N     2.6931    0.1000
+BOND        13
+            1     1   2 1
+            2     1   3 1
+            3     1   4 2
+            4     2   5 1
+            5     2   6 2
+            6     3   7 2
+            7     3   8 1
+            8     4   9 1
+            9     5  10 1
+            10    7  11 1
+            11    9  12 1
+            12   10  13 1
+            13    9  11 2
+///
+
+---- Compound: C06537
+ENTRY       C06537                      Compound
+NAME        Harmalol
+FORMULA     C12H12N2O
+EXACT_MASS  200.095
+MOL_WEIGHT  200.2365
+DBLINKS     CAS: 525-57-5
+            PubChem: 8767
+            ChEBI: 27943
+            3DMET: B02060
+            NIKKAJI: J22.052C
+ATOM        15
+            1   C8y C    28.5854  -17.2921
+            2   C8y C    29.9161  -17.7200
+            3   C8y C    28.5912  -15.8907
+            4   C8x C    27.3835  -17.9956
+            5   C8y C    30.7428  -16.5943
+            6   C1x C    30.4791  -18.9981
+            7   N4x N    29.9279  -15.4628
+            8   C8x C    27.3835  -15.1872
+            9   C8x C    26.1639  -17.2921
+            10  C2y C    32.1324  -16.7468
+            11  C1x C    31.8685  -19.1563
+            12  C8y C    26.1639  -15.8907
+            13  N2x N    32.6951  -18.0308
+            14  C1a C    32.9648  -15.6153
+            15  O1a O    24.9503  -15.1872
+BOND        17
+            1     1   2 1
+            2     1   3 1
+            3     1   4 2
+            4     2   5 2
+            5     2   6 1
+            6     3   7 1
+            7     3   8 2
+            8     4   9 1
+            9     5  10 1
+            10    6  11 1
+            11    8  12 1
+            12   10  13 2
+            13   10  14 1
+            14   12  15 1
+            15    5   7 1
+            16    9  12 2
+            17   11  13 1
+///
+
+---- Compound: C14742
+ENTRY       C14742                      Compound
+NAME        N-Nitrosodiphenylamine
+FORMULA     C12H10N2O
+EXACT_MASS  198.0793
+MOL_WEIGHT  198.2206
+BRITE       Carcinogens [BR:br08008]
+             Group 3: Not classifiable as to its carcinogenicity to humans
+              Compounds
+               C14742  N-Nitrosodiphenylamine
+DBLINKS     CAS: 86-30-6
+            PubChem: 17395740
+            ChEBI: 34875
+            NIKKAJI: J3.893H
+ATOM        15
+            1   C8x C    16.1000  -18.3400
+            2   C8x C    16.1000  -19.7400
+            3   C8x C    17.3124  -20.4400
+            4   C8x C    18.5249  -19.7400
+            5   C8y C    18.5249  -18.3400
+            6   C8x C    17.3124  -17.6400
+            7   N1c N    19.7560  -17.6290
+            8   C8y C    20.9612  -18.3247
+            9   C8x C    20.9616  -19.7396
+            10  C8x C    22.1742  -20.4393
+            11  C8x C    23.3865  -19.7389
+            12  C8x C    23.3860  -18.3239
+            13  C8x C    22.1734  -17.6243
+            14  N2b N    19.7557  -16.2401
+            15  O3a O    18.5314  -15.5334
+BOND        16
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     5   6 2
+            6     1   6 1
+            7     5   7 1
+            8     7   8 1
+            9     8   9 2
+            10    9  10 1
+            11   10  11 2
+            12   11  12 1
+            13   12  13 2
+            14    8  13 1
+            15    7  14 1
+            16   14  15 2
+///
+
+---- Compound: C15042
+ENTRY       C15042                      Compound
+NAME        4-(2-Pyrazinylethenyl)phenol
+FORMULA     C12H10N2O
+EXACT_MASS  198.0793
+MOL_WEIGHT  198.2206
+DBLINKS     CAS: 5444-92-8
+            PubChem: 17396039
+            ChEBI: 79562
+            NIKKAJI: J2.791.765H
+ATOM        15
+            1   C8x C     9.4500  -17.1500
+            2   C8x C     9.4500  -18.5500
+            3   N5x N    10.6400  -19.2500
+            4   C8x C    11.9000  -18.5500
+            5   C8y C    11.9000  -17.1500
+            6   N5x N    10.6400  -16.4500
+            7   C2b C    13.0900  -16.4500
+            8   C2b C    14.2800  -17.1500
+            9   C8y C    15.4700  -16.4500
+            10  C8x C    16.6600  -17.1500
+            11  C8x C    17.9200  -16.4500
+            12  C8y C    17.9200  -15.0500
+            13  C8x C    16.7300  -14.3500
+            14  C8x C    15.4700  -15.0500
+            15  O1a O    19.1100  -14.3500
+BOND        16
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     5   6 2
+            6     1   6 1
+            7     5   7 1
+            8     7   8 2
+            9     8   9 1
+            10    9  10 2
+            11   10  11 1
+            12   11  12 2
+            13   12  13 1
+            14   13  14 2
+            15    9  14 1
+            16   12  15 1
+///
+
+---- Compound: C01748
+ENTRY       C01748                      Compound
+NAME        Pyocyanine;
+            Pyocyanin;
+            5-Methylphenazin-5-ium-1-olate;
+            5-Methylphenazin-1(5H)-one
+FORMULA     C13H10N2O
+EXACT_MASS  210.0793
+MOL_WEIGHT  210.2313
+REACTION    R11346
+ENZYME      1.14.13.218
+DBLINKS     CAS: 85-66-5
+            PubChem: 4882
+            ChEBI: 8653
+            PDB-CCD: 3J8
+            NIKKAJI: J11.662I
+ATOM        16
+            1   C8y C    19.8933  -16.8247
+            2   C8y C    19.8933  -15.4270
+            3   N5y N    18.6674  -17.5296 #+
+            4   C8x C    21.1004  -17.5296
+            5   N5x N    18.6802  -14.7156
+            6   C8y C    21.1004  -14.7410
+            7   C8y C    17.4477  -16.8309
+            8   C1a C    18.6736  -18.9081
+            9   C8x C    22.3009  -16.8247
+            10  C8y C    17.4605  -15.4208
+            11  C8x C    22.3009  -15.4270
+            12  O1a O    21.0362  -13.4969 #-
+            13  C8x C    16.2091  -17.5296
+            14  C8x C    16.2408  -14.6966
+            15  C8x C    14.9831  -16.8182
+            16  C8x C    14.9640  -15.3255
+BOND        18
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 2
+            5     2   6 1
+            6     3   7 1
+            7     3   8 1
+            8     4   9 2
+            9     5  10 1
+            10    6  11 2
+            11    6  12 1
+            12    7  13 1
+            13   10  14 1
+            14   13  15 2
+            15   14  16 2
+            16    7  10 2
+            17    9  11 1
+            18   15  16 1
+///
+
+---- Compound: C06538
+ENTRY       C06538                      Compound
+NAME        Harmine
+FORMULA     C13H12N2O
+EXACT_MASS  212.095
+MOL_WEIGHT  212.2472
+REACTION    R08485
+PATHWAY     map01063  Biosynthesis of alkaloids derived from shikimate pathway
+ENZYME      1.3.-.-
+BRITE       Phytochemical compounds [BR:br08003]
+             Alkaloids
+              Alkaloids derived from tryptophan and anthranilic acid
+               Indole alkaloids
+                C06538  Harmine
+DBLINKS     CAS: 442-51-3
+            PubChem: 8768
+            ChEBI: 28121
+            KNApSAcK: C00001737
+            PDB-CCD: HRM
+            3DMET: B02061
+            NIKKAJI: J11.378F
+ATOM        16
+            1   C8y C    27.1822  -16.3787
+            2   C8y C    25.8573  -15.9508
+            3   C8y C    28.0146  -15.2531
+            4   C8x C    27.7449  -17.6627
+            5   C8y C    25.8630  -14.5495
+            6   C8x C    24.6554  -16.6543
+            7   N4x N    27.1939  -14.1274
+            8   C8y C    29.4041  -15.4113
+            9   C8x C    29.1343  -17.8150
+            10  C8x C    24.6554  -13.8460
+            11  C8x C    23.4359  -15.9508
+            12  N5x N    29.9669  -16.6894
+            13  C1a C    30.2365  -14.2799
+            14  C8y C    23.4359  -14.5495
+            15  O2a O    22.2223  -13.8460
+            16  C1a C    21.0030  -14.5495
+BOND        18
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 1
+            5     2   6 2
+            6     3   7 1
+            7     3   8 1
+            8     4   9 2
+            9     5  10 2
+            10    6  11 1
+            11    8  12 2
+            12    8  13 1
+            13   10  14 1
+            14   14  15 1
+            15   15  16 1
+            16    5   7 1
+            17    9  12 1
+            18   11  14 2
+///
+
+---- Compound: C13311
+ENTRY       C13311                      Compound
+NAME        Fasoracetam;
+            NS 105
+FORMULA     C10H16N2O2
+EXACT_MASS  196.1212
+MOL_WEIGHT  196.2462
+DBLINKS     CAS: 110958-19-5
+            PubChem: 586055
+            ChEBI: 31592
+            NIKKAJI: J875.806I
+ATOM        14
+            1   C1x C    19.3252  -17.3878
+            2   C1x C    19.3252  -18.7885
+            3   C1x C    20.5411  -19.4887
+            4   C1x C    21.7498  -18.7885
+            5   N1y N    21.7498  -17.3878
+            6   C1x C    20.5411  -16.6874
+            7   C5a C    22.9541  -16.6946
+            8   C1y C    24.1638  -17.3948
+            9   N1x N    24.3113  -18.7921
+            10  C5x C    25.6783  -19.0845
+            11  C1x C    26.3785  -17.7814
+            12  C1x C    25.4446  -16.8348
+            13  O5x O    26.2465  -20.3646
+            14  O5a O    22.9558  -15.2939
+BOND        15
+            1     5   7 1
+            2     8   7 1 #Up
+            3     1   2 1
+            4     2   3 1
+            5     3   4 1
+            6     4   5 1
+            7     8   9 1
+            8     9  10 1
+            9    10  11 1
+            10   11  12 1
+            11   12   8 1
+            12    5   6 1
+            13   10  13 2
+            14    6   1 1
+            15    7  14 2
+///
+
+---- Compound: C14274
+ENTRY       C14274                      Compound
+NAME        4-Heptyloxybenzoic acid
+FORMULA     C14H20O3
+EXACT_MASS  236.1412
+MOL_WEIGHT  236.3068
+DBLINKS     CAS: 15872-42-1
+            PubChem: 17395274
+            ChEBI: 34405
+            NIKKAJI: J26.907G
+ATOM        17
+            1   C1a C    20.8055  -18.1460
+            2   C8x C    31.6666  -20.2482
+            3   C8x C    32.9278  -18.2161
+            4   C8x C    30.4753  -19.5474
+            5   C8x C    31.7366  -17.4453
+            6   C1b C    21.9967  -17.4453
+            7   C1b C    23.1879  -18.1460
+            8   C1b C    24.4492  -17.4453
+            9   C1b C    25.6404  -18.1460
+            10  C1b C    26.8316  -17.4453
+            11  C1b C    28.0929  -18.1460
+            12  C8y C    32.9278  -19.6175
+            13  C8y C    30.4753  -18.1460
+            14  C6a C    34.1190  -20.3182
+            15  O6a O    35.3103  -19.6175
+            16  O6a O    34.1190  -21.7196
+            17  O2a O    29.2841  -17.4453
+BOND        17
+            1     1   6 1
+            2     2   4 2
+            3     2  12 1
+            4     3   5 1
+            5     3  12 2
+            6     4  13 1
+            7     5  13 2
+            8     6   7 1
+            9     7   8 1
+            10    8   9 1
+            11    9  10 1
+            12   10  11 1
+            13   11  17 1
+            14   12  14 1
+            15   13  17 1
+            16   14  15 1
+            17   14  16 2
+///
+
+---- Compound: C14718
+ENTRY       C14718                      Compound
+NAME        Heptyl p-hydroxybenzoate;
+            Heptylparaben
+FORMULA     C14H20O3
+EXACT_MASS  236.1412
+MOL_WEIGHT  236.3068
+DBLINKS     CAS: 1085-12-7
+            PubChem: 17395717
+            ChEBI: 34788
+            NIKKAJI: J87.217B
+ATOM        17
+            1   C8x C    13.1600  -16.7300
+            2   C8y C    13.1600  -18.1300
+            3   C8x C    14.3724  -18.8300
+            4   C8x C    15.5849  -18.1300
+            5   C8y C    15.5849  -16.7300
+            6   C8x C    14.3724  -16.0300
+            7   O1a O    11.9476  -18.8300
+            8   C7a C    16.8160  -16.0190
+            9   O7a O    18.0212  -16.7147
+            10  O6a O    16.8157  -14.6301
+            11  C1b C    19.2035  -16.0319
+            12  C1b C    20.3975  -16.7212
+            13  C1b C    21.5854  -16.0352
+            14  C1b C    22.7765  -16.7229
+            15  C1b C    23.9659  -16.0361
+            16  C1b C    25.1562  -16.7234
+            17  C1a C    26.3461  -16.0363
+BOND        17
+            1     1   2 2
+            2     2   3 1
+            3     3   4 2
+            4     4   5 1
+            5     5   6 2
+            6     1   6 1
+            7     2   7 1
+            8     5   8 1
+            9     8   9 1
+            10    8  10 2
+            11    9  11 1
+            12   11  12 1
+            13   12  13 1
+            14   13  14 1
+            15   14  15 1
+            16   15  16 1
+            17   16  17 1
+///
+
+---- Compound: C11082
+ENTRY       C11082                      Compound
+NAME        2-N-Undecyltetrahydrothiophene;
+            UTHT
+FORMULA     C15H30S
+EXACT_MASS  242.2068
+MOL_WEIGHT  242.4637
+DBLINKS     CAS: 85438-98-8
+            PubChem: 13264
+            ChEBI: 1221
+            NIKKAJI: J2.788.528D
+ATOM        16
+            1   C1x C    22.0539  -20.6675
+            2   C1y C    22.4944  -19.3364
+            3   S2x S    21.3574  -18.5076
+            4   C1x C    20.2204  -19.3364
+            5   C1x C    20.6538  -20.6675
+            6   C1b C    23.7001  -18.6271
+            7   C1b C    24.9031  -19.3307
+            8   C1b C    26.1133  -18.6271
+            9   C1b C    27.3232  -19.3307
+            10  C1b C    28.5333  -18.6271
+            11  C1b C    29.7434  -19.3307
+            12  C1b C    30.9534  -18.6271
+            13  C1b C    32.1635  -19.3307
+            14  C1b C    33.3736  -18.6271
+            15  C1b C    34.5766  -19.3307
+            16  C1a C    35.7866  -18.6271
+BOND        16
+            1     7   8 1
+            2     3   4 1
+            3     8   9 1
+            4     4   5 1
+            5     9  10 1
+            6     5   1 1
+            7    10  11 1
+            8    11  12 1
+            9     2   6 1
+            10   12  13 1
+            11    1   2 1
+            12   13  14 1
+            13    6   7 1
+            14   14  15 1
+            15    2   3 1
+            16   15  16 1
+///
+
+---- Compound: C07499
+ENTRY       C07499                      Compound
+NAME        Phenylethylmalonamide;
+            2-Phenyl-2-ethylmalondiamide;
+            PEMA
+FORMULA     C11H14N2O2
+EXACT_MASS  206.1055
+MOL_WEIGHT  206.2411
+PATHWAY     map07033  Anticonvulsants
+DBLINKS     CAS: 7206-76-0
+            PubChem: 9702
+            ChEBI: 8097
+            NIKKAJI: J125.795A
+ATOM        15
+            1   C1d C    17.8641  -16.4174
+            2   C8y C    19.0652  -15.7209
+            3   C5a C    17.1678  -15.2104
+            4   C5a C    17.1736  -17.6244
+            5   C1b C    18.9201  -17.2588
+            6   C8x C    20.2721  -16.3999
+            7   C8x C    19.0477  -14.3167
+            8   O5a O    17.8583  -14.0034
+            9   N1a N    15.7750  -15.2165
+            10  O5a O    17.8697  -18.8313
+            11  N1a N    15.7810  -17.6244
+            12  C1a C    20.4579  -17.2588
+            13  C8x C    21.4733  -15.6978
+            14  C8x C    20.2489  -13.6087
+            15  C8x C    21.4616  -14.2994
+BOND        15
+            1     1   2 1
+            2     1   3 1
+            3     1   4 1
+            4     1   5 1
+            5     2   6 2
+            6     2   7 1
+            7     3   8 2
+            8     3   9 1
+            9     4  10 2
+            10    4  11 1
+            11    5  12 1
+            12    6  13 1
+            13    7  14 2
+            14   13  15 2
+            15   14  15 1
+///
+
+---- Compound: C12590
+ENTRY       C12590                      Compound
+NAME        Pheneturide;
+            Ethylphenacemide
+FORMULA     C11H14N2O2
+EXACT_MASS  206.1055
+MOL_WEIGHT  206.2411
+REMARK      Same as: D01190
+BRITE       Anatomical Therapeutic Chemical (ATC) classification [BR:br08303]
+             N NERVOUS SYSTEM
+              N03 ANTIEPILEPTICS
+               N03A ANTIEPILEPTICS
+                N03AX Other antiepileptics
+                 N03AX13 Pheneturide
+                  D01190  Ethylphenacemide (JAN)
+DBLINKS     CAS: 90-49-3
+            PubChem: 582980
+            ChEBI: 31989
+            NIKKAJI: J4.320F
+ATOM        15
+            1   C8x C    20.3777  -17.4031
+            2   C8x C    20.3777  -18.8039
+            3   C8x C    21.5938  -19.5043
+            4   C8y C    22.8027  -18.8039
+            5   C8x C    22.8027  -17.4031
+            6   C8x C    21.5938  -16.7026
+            7   C1c C    24.0164  -19.5035
+            8   C5a C    25.2241  -18.7968
+            9   N1b N    26.4339  -19.4972
+            10  C5a C    27.6437  -18.7968
+            11  N1a N    28.8535  -19.4972
+            12  C1b C    24.0210  -20.9043
+            13  C1a C    25.2364  -21.6006
+            14  O5a O    25.2208  -17.3959
+            15  O5a O    27.6437  -17.3959
+BOND        15
+            1     1   2 2
+            2     7   8 1
+            3     2   3 1
+            4     8   9 1
+            5     3   4 2
+            6     9  10 1
+            7     4   5 1
+            8    10  11 1
+            9     5   6 2
+            10    7  12 1
+            11    6   1 1
+            12   12  13 1
+            13    8  14 2
+            14    4   7 1
+            15   10  15 2
+///
+
+---- Compound: C05761
+ENTRY       C05761                      Compound
+NAME        Tetradecanoyl-[acp];
+            Tetradecanoyl-[acyl-carrier protein];
+            Myristoyl-[acyl-carrier protein]
+FORMULA     C14H27OSR
+COMMENT     Generic compound in reaction hierarchy
+REACTION    R04966 R04967 R04968 R05075 R08159
+PATHWAY     map00061  Fatty acid biosynthesis
+            map00540  Lipopolysaccharide biosynthesis
+            map01100  Metabolic pathways
+            map01212  Fatty acid metabolism
+ENZYME      1.3.1.9         1.3.1.10        1.3.1.39        1.3.1.104       
+            2.3.1.41        2.3.1.85        2.3.1.86        2.3.1.179       
+            2.3.1.243       2.3.1.-         3.1.2.14
+BRITE       Lipids [BR:br08002]
+             FA  Fatty acyls
+              FA07 Fatty esters
+               FA0706 Fatty acyl ACPs
+                C05761  Tetradecanoyl-[acp]
+DBLINKS     PubChem: 8056
+            ChEBI: 50651
+ATOM        17
+            1   C1b C    27.4816  -24.2142
+            2   C1b C    28.6895  -23.5140
+            3   C1b C    26.2738  -23.5140
+            4   C1b C    29.9030  -24.2085
+            5   C1b C    25.0600  -24.2142
+            6   C5a C    31.1166  -23.5024
+            7   C1b C    23.8464  -23.5257
+            8   S2a S    32.3304  -24.2026
+            9   O5a O    31.1751  -22.1019
+            10  C1b C    22.6328  -24.2259
+            11  R   R    33.7249  -24.2026
+            12  C1b C    21.4250  -23.5257
+            13  C1b C    20.2054  -24.2142
+            14  C1b C    18.9917  -23.5140
+            15  C1b C    17.7721  -24.2085
+            16  C1b C    16.5528  -23.5024
+            17  C1a C    15.3390  -24.2026
+BOND        16
+            1     1   2 1
+            2     1   3 1
+            3     2   4 1
+            4     3   5 1
+            5     4   6 1
+            6     5   7 1
+            7     6   8 1
+            8     6   9 2
+            9     7  10 1
+            10    8  11 1
+            11   10  12 1
+            12   12  13 1
+            13   13  14 1
+            14   14  15 1
+            15   15  16 1
+            16   16  17 1
+///
+
+---- Compound: C00647
+ENTRY       C00647                      Compound
+NAME        Pyridoxamine phosphate;
+            Pyridoxamine 5-phosphate;
+            Pyridoxamine 5'-phosphate
+FORMULA     C8H13N2O5P
+EXACT_MASS  248.0562
+MOL_WEIGHT  248.173
+REACTION    R00277 R01147 R01580 R02493 R02494
+PATHWAY     map00750  Vitamin B6 metabolism
+            map01100  Metabolic pathways
+            map04977  Vitamin digestion and absorption
+ENZYME      1.4.3.5         2.6.1.54        2.7.1.35        3.1.3.74
+DBLINKS     CAS: 529-96-4
+            PubChem: 3919
+            ChEBI: 18335
+            KNApSAcK: C00007506
+            PDB-CCD: PMP
+            3DMET: B00154
+            NIKKAJI: J11.364F
+ATOM        16
+            1   C8y C    21.3541  -16.5137
+            2   C8y C    20.1356  -15.8208
+            3   C8x C    21.3541  -17.9248
+            4   C1b C    22.5664  -15.8145
+            5   C8y C    18.9232  -16.5137
+            6   C1b C    20.1291  -14.4225
+            7   N5x N    20.1356  -18.6366
+            8   O2b O    23.7788  -16.5072
+            9   C8y C    18.9232  -17.9248
+            10  O1a O    17.7174  -15.8208
+            11  N1a N    21.3350  -13.7233
+            12  P1b P    25.1957  -16.5263
+            13  C1a C    17.7809  -18.6175
+            14  O1c O    26.5753  -16.5137
+            15  O1c O    25.2279  -18.0519
+            16  O1c O    25.2279  -14.9818
+BOND        16
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 2
+            5     2   6 1
+            6     3   7 1
+            7     4   8 1
+            8     5   9 1
+            9     5  10 1
+            10    6  11 1
+            11    8  12 1
+            12    9  13 1
+            13   12  14 1
+            14   12  15 1
+            15   12  16 2
+            16    7   9 2
+///
+
+---- Compound: C00647
+ENTRY       C00647                      Compound
+NAME        Pyridoxamine phosphate;
+            Pyridoxamine 5-phosphate;
+            Pyridoxamine 5'-phosphate
+FORMULA     C8H13N2O5P
+EXACT_MASS  248.0562
+MOL_WEIGHT  248.173
+REACTION    R00277 R01147 R01580 R02493 R02494
+PATHWAY     map00750  Vitamin B6 metabolism
+            map01100  Metabolic pathways
+            map04977  Vitamin digestion and absorption
+ENZYME      1.4.3.5         2.6.1.54        2.7.1.35        3.1.3.74
+DBLINKS     CAS: 529-96-4
+            PubChem: 3919
+            ChEBI: 18335
+            KNApSAcK: C00007506
+            PDB-CCD: PMP
+            3DMET: B00154
+            NIKKAJI: J11.364F
+ATOM        16
+            1   C8y C    21.3541  -16.5137
+            2   C8y C    20.1356  -15.8208
+            3   C8x C    21.3541  -17.9248
+            4   C1b C    22.5664  -15.8145
+            5   C8y C    18.9232  -16.5137
+            6   C1b C    20.1291  -14.4225
+            7   N5x N    20.1356  -18.6366
+            8   O2b O    23.7788  -16.5072
+            9   C8y C    18.9232  -17.9248
+            10  O1a O    17.7174  -15.8208
+            11  N1a N    21.3350  -13.7233
+            12  P1b P    25.1957  -16.5263
+            13  C1a C    17.7809  -18.6175
+            14  O1c O    26.5753  -16.5137
+            15  O1c O    25.2279  -18.0519
+            16  O1c O    25.2279  -14.9818
+BOND        16
+            1     1   2 1
+            2     1   3 2
+            3     1   4 1
+            4     2   5 2
+            5     2   6 1
+            6     3   7 1
+            7     4   8 1
+            8     5   9 1
+            9     5  10 1
+            10    6  11 1
+            11    8  12 1
+            12    9  13 1
+            13   12  14 1
+            14   12  15 1
+            15   12  16 2
+            16    7   9 2
+///
+
+---- Compound: C07826
+ENTRY       C07826                      Compound
+NAME        Aprobarbital
+FORMULA     C10H14N2O3
+EXACT_MASS  210.1004
+MOL_WEIGHT  210.2298
+REMARK      Same as: D00698
+BRITE       Anatomical Therapeutic Chemical (ATC) classification [BR:br08303]
+             N NERVOUS SYSTEM
+              N05 PSYCHOLEPTICS
+               N05C HYPNOTICS AND SEDATIVES
+                N05CA Barbiturates, plain
+                 N05CA05 Aprobarbital
+                  D00698  Aprobarbital  (INN)
+DBLINKS     CAS: 77-02-1
+            PubChem: 10028
+            ChEBI: 2791
+            NIKKAJI: J38.379A
+ATOM        15
+            1   C1z C    21.9683  -18.0308
+            2   C5x C    21.9683  -19.4312
+            3   C5x C    20.7547  -17.3306
+            4   C1b C    21.9626  -16.6363
+            5   C1c C    23.3570  -18.0308
+            6   N1x N    20.7547  -20.1373
+            7   O5x O    23.1821  -20.1373
+            8   N1x N    19.5352  -18.0308
+            9   O5x O    20.7547  -15.9304
+            10  C2b C    23.1761  -15.9361
+            11  C1a C    24.0455  -16.8230
+            12  C1a C    24.0572  -19.2445
+            13  C5x C    19.5352  -19.4312
+            14  C2a C    23.1761  -14.5417
+            15  O5x O    18.3217  -20.1373
+BOND        15
+            1     1   2 1
+            2     1   3 1
+            3     1   4 1
+            4     1   5 1
+            5     2   6 1
+            6     2   7 2
+            7     3   8 1
+            8     3   9 2
+            9     4  10 1
+            10    5  11 1
+            11    5  12 1
+            12    6  13 1
+            13   10  14 2
+            14   13  15 2
+            15    8  13 1
+///
+
+---- Compound: C15986
+ENTRY       C15986                      Compound
+NAME        2,6-Dihydroxypseudooxynicotine;
+            1-(2,6-Dihydroxypyridin-3-yl)-4-(methylamino)butan-1-one
+FORMULA     C10H14N2O3
+EXACT_MASS  210.1004
+MOL_WEIGHT  210.2298
+REACTION    R07514 R07515 R07947
+PATHWAY     map00760  Nicotinate and nicotinamide metabolism
+            map01120  Microbial metabolism in diverse environments
+MODULE      M00810  Nicotine degradation, pyridine pathway, nicotine => 2,6-dihydroxypyridine/succinate semialdehyde
+ENZYME      1.5.99.14       3.7.1.19
+DBLINKS     PubChem: 47205299
+            ChEBI: 28220
+            NIKKAJI: J1.264.111G
+ATOM        15
+            1   C8y C    39.2273  -22.1678
+            2   C5a C    38.0377  -21.4783
+            3   C8x C    40.4292  -21.4718
+            4   C8y C    39.2273  -23.5535
+            5   C1b C    36.8420  -22.1678
+            6   O5a O    38.0377  -20.3205
+            7   C8x C    41.6252  -22.1616
+            8   N5x N    40.4292  -24.2558
+            9   C1b C    35.6525  -21.4783
+            10  C8y C    41.6252  -23.5535
+            11  C1b C    34.4629  -22.2395
+            12  O1a O    42.8209  -24.2305
+            13  N1b N    32.8412  -21.4150
+            14  C1a C    31.6455  -22.1047
+            15  O1a O    38.0076  -24.2536
+BOND        15
+            1     1   2 1
+            2     1   3 1
+            3     1   4 2
+            4     2   5 1
+            5     2   6 2
+            6     3   7 2
+            7     4   8 1
+            8     5   9 1
+            9     7  10 1
+            10    9  11 1
+            11   10  12 1
+            12   11  13 1
+            13   13  14 1
+            14    8  10 2
+            15    4  15 1
+///
