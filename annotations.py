@@ -280,8 +280,17 @@ def annotate_compound(compound_id, trace=False, kegg_db=None):
     result.append(in_plants)
     return tuple(result)
 
+class _count_compounds(object):
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.count = 0
+    def inc(self, n=1):
+        self.count += n
+    def get_count(self):
+        return self.count
 
-def annotate_all(peak, trace=False, kegg_db=None):
+def annotate_all(peak, c_counter, trace=False, kegg_db=None):
     """Create Pandas Series with compound class annotations."""
     
     data = [[], [], [], [], [], [], []]
@@ -289,6 +298,8 @@ def annotate_all(peak, trace=False, kegg_db=None):
     if trace:
         print('\n++++++++ PEAK +++++++++++++')
     for compound_id in peak.split('#'):
+        c_counter.inc()
+        
         d_compound = annotate_compound(compound_id, trace, kegg_db)
         
         for d, i in zip(data, d_compound):
@@ -327,7 +338,13 @@ def annotate_df(df, trace=False, local_kegg_db=None):
     """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
     progress.reset(total=len(df['raw_mass']))
-    return pd.concat([df, df['KEGG_cid'].apply(annotate_all, args=(trace, local_kegg_db))], axis=1)
+    c_counter = _count_compounds()
+    df = pd.concat([df, df['KEGG_cid'].apply(annotate_all, 
+                                             args=(c_counter, 
+                                             trace,
+                                             local_kegg_db))], axis=1)
+    print('\nDone! {} ids processed.'.format(c_counter.get_count()))
+    return df
 
 
 # Object to report progress of annotations.
