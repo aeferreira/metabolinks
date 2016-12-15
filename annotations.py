@@ -34,7 +34,7 @@ def get_kegg_section(k_record, sname):
     return '\n'.join(sectionlines)
 
 
-def get_kegg_records(db_fname):
+def load_local_kegg_db(db_fname):
     """Load Kegg compound records from a local text DB."""
     
     kegg = {}
@@ -125,15 +125,17 @@ def get_trans_id_table(fname):
 
 class Progress(object):
     """A progress reporter of % done for a maximum (int) of self.total"""
-    def __init__(self, n_total=1):
-        self.total = n_total
-        self.count = 0
+    def __init__(self, total=1):
+        self.reset(total)
     def tick(self):
         self.count +=1
         print(str(round((1-((self.total-self.count)/self.total))*100)) + "% done")
+    def reset(self, total=1):
+        self.total = total
+        self.count = 0
 
 
-def classes_from_brite(krecord):
+def classes_from_brite(krecord, trace=False):
     """Parses classes from the BRITE section of a kegg record."""
     classes = [[], [], [], []]
 
@@ -171,13 +173,15 @@ def classes_from_brite(krecord):
             classes[3].append(x[4:])
 
     classes = ['#'.join(c) for c in classes]
-    print ('from BRITE:')
-    print(tuple(classes))
+    if trace:
+        print ('from BRITE:')
+        print(tuple(classes))
     return tuple(classes)
 
 
-def classes_from_lipidmaps(lm_id):
-    print('LIPIDMAPS id: {}'.format(lm_id))
+def classes_from_lipidmaps(lm_id, trace=False):
+    if trace:
+        print('LIPIDMAPS id: {}'.format(lm_id))
     f = requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
     s = json.loads(f)
     if f == '[]':
@@ -187,12 +191,14 @@ def classes_from_lipidmaps(lm_id):
     ss = s['main_class'] if s['main_class'] is not None else 'null'
     tt = s['sub_class'] if s['sub_class'] is not None else 'null'
     a = (mm, cc, ss, tt)
-    print(a)
+    if trace:
+        print(a)
     return a 
 
 
-def annotate_compound(compound_id):
-    print('\n---- compound: {}'.format(compound_id), end=" ")
+def annotate_compound(compound_id, trace=False, kegg_db=None):
+    if trace:
+        print('\n---- compound: {}'.format(compound_id), end=" ")
     c_id = None
     lm_id = None
     hmdb_id = None
@@ -232,7 +238,7 @@ def annotate_compound(compound_id):
     # find if there is a LIPIMAPS Xref in DBLINKS section
     
     if c_id is not None:        
-        krecord = get_kegg_record(c_id, localdict = kegg_db)
+        krecord = get_kegg_record(c_id, localdict=kegg_db)
     
         brite = get_kegg_section(krecord, 'BRITE')
         dblinks = get_kegg_section(krecord, 'DBLINKS')
@@ -251,13 +257,14 @@ def annotate_compound(compound_id):
     # get compound classification hierarchy
     # first from BRITE section
     if (c_id is not None) and len(brite) > 0:
-        classes = classes_from_brite(krecord)
+        classes = classes_from_brite(krecord, trace)
     # then from LIPIDMAPS
     elif (lm_id is not None):
-        classes = classes_from_lipidmaps(lm_id)
+        classes = classes_from_lipidmaps(lm_id, trace)
     else:
         classes = ('', '', '', '')
-        print ('No BRITE, no LIPIDMAPS')
+        if trace:
+            print ('No BRITE, no LIPIDMAPS')
     
     # find if present in plants
     in_plants = ''
@@ -265,7 +272,8 @@ def annotate_compound(compound_id):
         r = requests.post('http://kanaya.naist.jp/knapsack_jsp/information.jsp?sname=C_ID&word=' + ks_id)
         if 'Plantae' in r.text:
             in_plants = 'Plantae'
-            print(in_plants)
+            if trace:
+                print(in_plants)
     
     result = [trans_kegg, trans_lipidmaps]
     result.extend(list(classes))
@@ -273,14 +281,15 @@ def annotate_compound(compound_id):
     return tuple(result)
 
 
-def annotate_all(peak):
+def annotate_all(peak, trace=False, kegg_db=None):
     """Create Pandas Series with compound class annotations."""
     
     data = [[], [], [], [], [], [], []]
     
-    print('\n++++++++ PEAK +++++++++++++')
+    if trace:
+        print('\n++++++++ PEAK +++++++++++++')
     for compound_id in peak.split('#'):
-        d_compound = annotate_compound(compound_id)
+        d_compound = annotate_compound(compound_id, trace, kegg_db)
         
         for d, i in zip(data, d_compound):
             if len(i) > 0: # don't include empty strings
@@ -306,19 +315,23 @@ def annotate_all(peak):
                  'KNApSAcK']
     
     
-    print('\nDATA:')
-    for n, d in zip(col_names, hash_data):
-        print('{:25s} : {}'.format(n, d))
+    if trace:
+        print('\nDATA:')
+        for n, d in zip(col_names, hash_data):
+            print('{:25s} : {}'.format(n, d))
     
     return pd.Series(hash_data, index=col_names)
 
 
-def annotate_df(df):
-    """Apply annotate_all to create 7 new columns."""
+def annotate_df(df, trace=False, local_kegg_db=None):
+    """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
-    return pd.concat([df, df['KEGG_cid'].apply(annotate_all)], axis=1)
+    progress.reset(total=len(df['raw_mass']))
+    return pd.concat([df, df['KEGG_cid'].apply(annotate_all, args=(trace, local_kegg_db))], axis=1)
 
-kegg_db = get_kegg_records('kegg_db.txt')
+
+# Object to report progress of annotations.
+progress = Progress()
 
 hmdb2kegg_dict = get_trans_id_table('trans_hmdb2kegg.txt')
 lipidmaps2kegg_dict = get_trans_id_table('trans_lipidmaps2kegg.txt')
@@ -344,12 +357,12 @@ if __name__ == '__main__':
     # check result
     df.info() # assert that there are 15 entries and 24 - 12 = 12 columns
     #print(df.head(2))
-    
-    # Object to report progress of annotations.
-    progress = Progress(n_total=len(df['raw_mass']))
 
+    # Use a local Kegg DB.
+    kegg_db = load_local_kegg_db('kegg_db.txt')
+    
     # Call the main driver function.
-    df = annotate_df(df)
+    df = annotate_df(df, local_kegg_db=kegg_db, trace=True)
 
     elapsed_time = time.time() - start_time
     m, s = divmod(elapsed_time, 60)
