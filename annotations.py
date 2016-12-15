@@ -196,9 +196,8 @@ def classes_from_lipidmaps(lm_id, trace=False):
     return a 
 
 
-def annotate_compound(compound_id, trace=False, kegg_db=None):
-    if trace:
-        print('\n---- compound: {}'.format(compound_id), end=" ")
+def annotate_compound(compound_id, c_counter, already_fetched, 
+                      trace=False, kegg_db=None):
     c_id = None
     lm_id = None
     hmdb_id = None
@@ -235,15 +234,28 @@ def annotate_compound(compound_id, trace=False, kegg_db=None):
     else:
         pass # does MASSTrix use any other DBs for IDs?
     
-    # find if there is a LIPIMAPS Xref in DBLINKS section
+    if trace:
+        print('\n---- compound: {} ({}, {})'.format(compound_id, 
+                                             trans_kegg, 
+                                             trans_lipidmaps))
     
-    if c_id is not None:        
+    if c_id in already_fetched or lm_id in already_fetched:
+        if trace:
+            print('already looked up')
+        return (trans_kegg, trans_lipidmaps, '', '', '', '', '')
+        
+    if c_id is not None:
         krecord = get_kegg_record(c_id, localdict=kegg_db)
+        if trace:
+            print('(look up {})'.format(c_id))
+        c_counter.inc_looks()
+        already_fetched.append(c_id)
     
         brite = get_kegg_section(krecord, 'BRITE')
         dblinks = get_kegg_section(krecord, 'DBLINKS')
         
         if len(dblinks) > 0:
+            # find if there are LIPIMAPS or KNApSAcK Xrefs in DBLINKS section
             if 'LIPIDMAPS:' in dblinks:
                 for line in dblinks.splitlines():
                     if 'LIPIDMAPS:' in line:
@@ -258,9 +270,16 @@ def annotate_compound(compound_id, trace=False, kegg_db=None):
     # first from BRITE section
     if (c_id is not None) and len(brite) > 0:
         classes = classes_from_brite(krecord, trace)
+    
     # then from LIPIDMAPS
     elif (lm_id is not None):
+        if trace:
+            print('(look up {})'.format(lm_id))
         classes = classes_from_lipidmaps(lm_id, trace)
+        c_counter.inc_looks()
+        already_fetched.append(lm_id)
+
+
     else:
         classes = ('', '', '', '')
         if trace:
@@ -270,6 +289,7 @@ def annotate_compound(compound_id, trace=False, kegg_db=None):
     in_plants = ''
     if ks_id is not None:
         r = requests.post('http://kanaya.naist.jp/knapsack_jsp/information.jsp?sname=C_ID&word=' + ks_id)
+        c_counter.inc_looks()
         if 'Plantae' in r.text:
             in_plants = 'Plantae'
             if trace:
@@ -285,10 +305,16 @@ class _count_compounds(object):
         self.reset()
     def reset(self):
         self.count = 0
+        self.looks_count = 0
     def inc(self, n=1):
         self.count += n
+    def inc_looks(self, n=1):
+        self.looks_count += n
     def get_count(self):
         return self.count
+    def get_looks_count(self):
+        return self.looks_count
+
 
 def annotate_all(peak, c_counter, trace=False, kegg_db=None):
     """Create Pandas Series with compound class annotations."""
@@ -297,10 +323,16 @@ def annotate_all(peak, c_counter, trace=False, kegg_db=None):
     
     if trace:
         print('\n++++++++ PEAK +++++++++++++')
+    
+    already_fetched = []
+    
     for compound_id in peak.split('#'):
         c_counter.inc()
         
-        d_compound = annotate_compound(compound_id, trace, kegg_db)
+        d_compound = annotate_compound(compound_id, 
+                                       c_counter, 
+                                       already_fetched, 
+                                       trace, kegg_db)
         
         for d, i in zip(data, d_compound):
             if len(i) > 0: # don't include empty strings
@@ -343,7 +375,7 @@ def annotate_df(df, trace=False, local_kegg_db=None):
                                              args=(c_counter, 
                                              trace,
                                              local_kegg_db))], axis=1)
-    print('\nDone! {} ids processed.'.format(c_counter.get_count()))
+    print('\nDone! {} ids processed. {} DB lookups'.format(c_counter.get_count(), c_counter.get_looks_count()))
     return df
 
 
@@ -374,6 +406,8 @@ if __name__ == '__main__':
     # check result
     df.info() # assert that there are 15 entries and 24 - 12 = 12 columns
     #print(df.head(2))
+
+    print ('\nStarting annotations...')
 
     # Use a local Kegg DB.
     kegg_db = load_local_kegg_db('kegg_db.txt')
