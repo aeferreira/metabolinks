@@ -9,7 +9,7 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog
 
-from six import StringIO
+from masstrix import read_MassTRIX
 
 # ------------- Code related to Kegg compound records -------------------
 
@@ -85,27 +85,6 @@ def get_filename_using_tk():
     fname = filedialog.askopenfilename(filetypes = [("TSV","*.tsv")])
     print ('Selected file {}'.format(fname))
     return fname
-
-
-def readMassTRIX(fname):
-    """Reads a MassTRIX file into a Pandas DataFrame object.
-       
-       On the process, the last line is moved to the beginning and
-       becomes the header."""
-    
-    # store lines in a list
-    with open(fname) as f:
-        lines = [line.strip() for line in f]
-    
-    # move the last line to the beginning
-    moved_list = [lines[-1]]
-    moved_list.extend(lines[:-1]) # last line is not included
-
-    # create a Pandas DataFrame, reading from the list of strings in memory
-    mem_string = StringIO('\n'.join(moved_list))
-    df = pd.read_table(mem_string)
-    return df
-
 
 # Load ID translation tables as dicts
 # IMPORTANT: Use local files, (fetched by fetch_dbs.py)
@@ -396,7 +375,7 @@ if __name__ == '__main__':
 
     testfile_name = 'example_data/MassTRIX_output.tsv'
 
-    df = readMassTRIX(testfile_name)
+    df = read_MassTRIX(testfile_name)
     print ("File {} was read".format(testfile_name))
 
     # Retira as colunas 9 a 20, que não são necessárias
