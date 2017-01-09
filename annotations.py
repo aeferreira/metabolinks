@@ -207,7 +207,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
             c_id = hmdb2kegg_dict[hmdb_id]
             trans_kegg = c_id
             if c_id in kegg2lipidmaps_dict:
-                lm_id = hmdb2kegg_dict[c_id]
+                lm_id = kegg2lipidmaps_dict[c_id]
                 trans_lipidmaps = lm_id
 
     else:
