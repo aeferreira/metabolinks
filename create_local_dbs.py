@@ -52,26 +52,28 @@ def get_lm_metafields(record):
         result[key.strip()] = value.strip()
     return result
         
-all_lipids_file = 'LMSDFAll.sdf'
+all_lipids_file = 'metabo_dbs/LMSDFAll.sdf'
 
-out_lm_file = 'lm_metadata.txt'
+out_lm_file = 'dbs/lm_metadata.txt'
 
 fields = ('CATEGORY', 'FORMULA', 'HMDBID', 'CHEBI_ID', 'KEGG_ID',
           'MAIN_CLASS', 'SUB_CLASS', 'SYSTEMATIC_NAME')
 
 print ('processing {} ...'.format(all_lipids_file))
-count = 0
+
 with open(out_lm_file, 'w') as outfile:
+    count = 0
     print('LM_ID\t'+'\t'.join(fields), file=outfile)
     
     for record in get_lm_records(all_lipids_file):
-        metas = get_lm_metafields(record)
-        print(metas['LM_ID'])
-        line = [metas['LM_ID']]
+        metadata = get_lm_metafields(record)
+        lm_id = metadata['LM_ID']
+        print(lm_id)
+        line = [lm_id]
         
         for field in fields:
-            if field in metas:
-                line.append(metas[field])
+            if field in metadata:
+                line.append(metadata[field])
             else:
                 line.append('')
         
@@ -82,9 +84,8 @@ print('{} records processed in {}'.format(count, all_lipids_file))
 print('File {} generated'.format(out_lm_file))
 
 # Extract information from HMDB
-
 #expname = 'HMDB00010.xml'
-all_mets_file = 'hmdb_metabolites.zip'
+all_mets_file = 'metabo_dbs/hmdb_metabolites.zip'
 print('\n------------------------------------------\n')
 print ('Creating conversions HMDB->KeGGId...')
 
@@ -98,6 +99,7 @@ with zipfile.ZipFile(all_mets_file) as zip:
         
         tree = ET.parse(StringIO(record))
         root = tree.getroot()
+        
         accession_tag = root.find('accession')
         acc = accession_tag.text.strip()
         
@@ -110,9 +112,9 @@ with zipfile.ZipFile(all_mets_file) as zip:
 
 n_mets = len(zip.namelist())
 n_trans = len(conv)
-print('{} compounds in HMDB. {} had a KeGGId'.format(n_mets, n_trans))
+print('{} compounds in HMDB. {} have a KeGGId'.format(n_mets, n_trans))
 
-out_filename = 'trans_hmdb2kegg.txt'
+out_filename = 'dbs/trans_hmdb2kegg.txt'
 
 # try to follow KeGG format for Id translation.
 line_frmt = 'hmdb:{}\tcpd:{}\tequivalent'.format

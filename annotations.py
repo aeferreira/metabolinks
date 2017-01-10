@@ -57,6 +57,10 @@ def load_local_kegg_db(db_fname):
     db.close()
     return kegg
 
+def load_local_lipidmaps_db(db_fname):
+    """Load LIPIDMAPS records from a local text DB."""
+    df = pd.read_table(db_fname, index_col=0, dtype={'CHEBI_ID':str})
+    return df
 
 def get_dblinks_brite_sections(k_record):
     """Get sections DBLINKS and BRITE from a kegg compound record.
@@ -68,13 +72,10 @@ def get_dblinks_brite_sections(k_record):
     return {'DBLINKS':dblinks, 'BRITE':brite}
 
 
-def get_kegg_record(c_id, localdict=None):
+def request_kegg_record(c_id, localdict=None):
     if localdict is not None:
         return localdict[c_id]
     return requests.get('http://rest.kegg.jp/get/' + c_id).text
-
-def get_lipidmaps_record(lm_id):
-    return requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
 
 
 # Helper. No used in example code (file names are hard coded).
@@ -161,15 +162,20 @@ def classes_from_brite(krecord, trace=False):
 def classes_from_lipidmaps(lm_id, trace=False):
     if trace:
         print('LIPIDMAPS id: {}'.format(lm_id))
-    f = requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
-    s = json.loads(f)
-    if f == '[]':
-        return 'null', 'null', 'null', 'null'
-    mm = 'Lipids [LM]'
-    cc = s['core'] if s['core'] is not None else 'null'
-    ss = s['main_class'] if s['main_class'] is not None else 'null'
-    tt = s['sub_class'] if s['sub_class'] is not None else 'null'
-    a = (mm, cc, ss, tt)
+    # print(lm_df.loc[lm_id])
+##     f = requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
+##     s = json.loads(f)
+##     if f == '[]':
+##         return 'null', 'null', 'null', 'null'
+##     mm = 'Lipids [LM]'
+##     cc = s['core'] if s['core'] is not None else 'null'
+##     ss = s['main_class'] if s['main_class'] is not None else 'null'
+##     tt = s['sub_class'] if s['sub_class'] is not None else 'null'
+    record = lm_df.loc[lm_id]
+    cc = ['Lipids [LM]']
+    for field in 'CATEGORY', 'MAIN_CLASS', 'SUB_CLASS':
+        cc.append(record[field] if pd.notnull(record[field]) else 'null')
+    a = tuple(cc)
     if trace:
         print(a)
     return a 
@@ -224,7 +230,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         return (trans_kegg, trans_lipidmaps, '', '', '', '', '')
         
     if c_id is not None:
-        krecord = get_kegg_record(c_id, localdict=kegg_db)
+        krecord = request_kegg_record(c_id, localdict=kegg_db)
         if trace:
             print('(look up {})'.format(c_id))
         c_counter.inc_looks()
@@ -257,7 +263,6 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         classes = classes_from_lipidmaps(lm_id, trace)
         c_counter.inc_looks()
         already_fetched.append(lm_id)
-
 
     else:
         classes = ('', '', '', '')
@@ -361,16 +366,26 @@ def annotate_df(df, trace=False, local_kegg_db=None):
 # Object to report progress of annotations.
 progress = Progress()
 
-hmdb2kegg_dict = get_trans_id_table('trans_hmdb2kegg.txt')
-lipidmaps2kegg_dict = get_trans_id_table('trans_lipidmaps2kegg.txt')
+hmdb2kegg_dict = get_trans_id_table('dbs/trans_hmdb2kegg.txt')
+#lipidmaps2kegg_dict = get_trans_id_table('trans_lipidmaps2kegg.txt')
+
+_lm_db_fname = 'dbs/lm_metadata.txt'
+print ('\nLoading LIPIDMAPS data from {}\n'.format(_lm_db_fname))
+lm_df = load_local_lipidmaps_db(_lm_db_fname)    
+
+lipidmaps2kegg_dict = lm_df['KEGG_ID'].dropna().to_dict()
+# print(len(trans_table))
+# for k, v in trans_table.items():
+    # print(k, '->', v)
 
 kegg2lipidmaps_dict = {}
 for k, v in lipidmaps2kegg_dict.items():
     kegg2lipidmaps_dict[v] = k
 
-
 if __name__ == '__main__':
-    print ('Starting...\n')
+        
+    print ('\nStarting...\n')
+
     start_time = time.time()
 
     testfile_name = 'example_data/MassTRIX_output.tsv'
@@ -383,13 +398,13 @@ if __name__ == '__main__':
     df.drop(df.columns[[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]], axis=1, inplace=True)
 
     # check result
-    df.info() # assert that there are 15 entries and 24 - 12 = 12 columns
+    # df.info() # assert that there are 15 entries and 24 - 12 = 12 columns
     #print(df.head(2))
 
     print ('\nStarting annotations...')
 
     # Use a local Kegg DB.
-    kegg_db = load_local_kegg_db('kegg_db.txt')
+    kegg_db = load_local_kegg_db('dbs/kegg_db.txt')
     
     # Call the main driver function.
     df = annotate_df(df, local_kegg_db=kegg_db, trace=True)
