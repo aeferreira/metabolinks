@@ -1,9 +1,16 @@
 from __future__ import print_function
+from six import StringIO, string_types, integer_types
+
 import time
+
 from numpy import nan
 import pandas as pd
 
-from six import StringIO, string_types, integer_types
+"""Functions related to the analysis of MassTRIX results files."""
+
+# ----------------------------------------
+# I/O functions
+# ----------------------------------------
 
 def read_MassTRIX(fname):
     """Reads a MassTRIX file into a Pandas DataFrame object.
@@ -22,7 +29,20 @@ def read_MassTRIX(fname):
     # create a Pandas DataFrame, reading from the list of strings in memory
     mem_string = StringIO('\n'.join(moved_list))
     df = pd.read_table(mem_string)
+    df = MassTRIXResults(df)
     return df
+
+# ----------------------------------------
+# Unfold functions
+#
+# these relate to the two MassTRIX formats:
+#
+# - compact: one peak per line, several putative compounds
+#   are separated by #
+#
+# - unfolded: one putative compound per line
+# 
+# ----------------------------------------
 
 def _clean_value(v):
     if not isinstance(v, string_types):
@@ -32,14 +52,18 @@ def _clean_value(v):
     except:
         pass
     return v.strip('').strip(';')
-    
-def unfold_MassTRIX_df(df):
+
+
+def unfold(df):
     """Unfold a MassTRIX DataFrame.
     
-       "Unfolding" means splitting each "peak" line in "compound" lines.
-       The # separator is used in the split. The number of Ids found in
+       "Unfolding" means splitting each "peak" line into several
+       "compound" lines. # is the split separator.
+       
+       The number of Ids found in
        column "KEGG_cid" is used as the number of putative compounds in
-       each peak."""
+       each peak.
+    """
     
     # split by #, if possible, using str accessor of Pandas Series.
     for c in df.columns:
@@ -70,26 +94,73 @@ def unfold_MassTRIX_df(df):
     for k in unfold_dict:
         unfold_dict[k] = [_clean_value(v) for v in unfold_dict[k]]
     
-    return pd.DataFrame(unfold_dict, columns=df.columns)
+    return MassTRIXResults(unfold_dict, columns=df.columns)
 
+# ----------------------------------------
+# Clean up functions
+# ----------------------------------------
+
+def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
+    """Removes the 'uniqueID' and the 'isotope presence' columns."""
+    col_names = []
+    if uniqueID:
+        col_names.append('uniqueID')
+    if isotopes:
+        iso_names = ('C13','O18','N15', 'S34', 'Mg25', 'Mg26', 'Fe54',
+                     'Fe57', 'Ca44', 'Cl37', 'K41')
+        col_names.extend(iso_names)
+    if columns is not None:
+        col_names.extend(columns)
+    #df.drop(col_names, axis=1, inplace=True)
+    return df.drop(col_names, axis=1)
+    
+# ----------------------------------------
+# MassTRIXResults
+# ----------------------------------------
+
+class MassTRIXResults(pd.DataFrame):
+    """A subclass of Pandas DataFrame.
+    
+       Created to facilitate method chaining.
+    """
+    @property
+    def _constructor(self):
+        return MassTRIXResults    
+    
+##     def __init__(self, other):
+##         # Copy attributes only if other is of good type
+##         if isinstance(other, pd.DataFrame):
+##             self.__dict__  = other.__dict__.copy()
+
+    def cleanup_cols(self, **kwargs):
+        return cleanup_cols(self, **kwargs)
+    
+    def unfold(self, **kwargs):
+        return unfold(self, **kwargs)
+
+# ----------------------------------------
+# Testing code
+# ----------------------------------------
 
 if __name__ == '__main__':
 
     testfile_name = 'example_data/masses.annotated.reformat.tsv'
 
-    df = read_MassTRIX(testfile_name)
-    print("File {} was read".format(testfile_name))
-
-    df.info()
+    results = read_MassTRIX(testfile_name).cleanup_cols()
+    
+    print("File {} was read\n".format(testfile_name))
+    
+    results.info()
 
     print('\n+++++++++++++++++++++++++++++++')
 
-    df = unfold_MassTRIX_df(df)
+    results = results.unfold()
 
     print('Unfolded dataframe:\n')
-    df.info()
+    print('is of type', type(results))
+    results.info()
 
     print('---------------------')
-    print(df.head(10))
+    print(results.head(10))
     
     

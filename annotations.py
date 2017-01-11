@@ -350,7 +350,7 @@ def annotate_all(peak, c_counter, trace=False, kegg_db=None):
     return pd.Series(hash_data, index=col_names)
 
 
-def annotate_df(df, trace=False, local_kegg_db=None):
+def insert_taxonomy(df, trace=False, local_kegg_db=None):
     """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
     progress.reset(total=len(df['raw_mass']))
@@ -390,16 +390,17 @@ if __name__ == '__main__':
 
     testfile_name = 'example_data/MassTRIX_output.tsv'
 
-    df = read_MassTRIX(testfile_name)
-    print ("File {} was read".format(testfile_name))
+    results = read_MassTRIX(testfile_name)
+    print ("File {} was read\n".format(testfile_name))
 
-    # Retira as colunas 9 a 20, que não são necessárias
-    # Exprimentei df.drop(df.columns[['nome', 'nome 2', ..., 'nome n']], axis=1, inplace=True) mas não resulta
-    df.drop(df.columns[[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]], axis=1, inplace=True)
+    # Clean up uniqueId and "isotope" cols
+    results = results.cleanup_cols()
 
     # check result
-    # df.info() # assert that there are 15 entries and 24 - 12 = 12 columns
-    #print(df.head(2))
+    results.info()
+    assert len(results.columns) == 12 # there are 24 - 12 = 12 columns
+    assert len(results.index) == 15 # there are still 15 peaks
+    #print(results.head(2))
 
     print ('\nStarting annotations...')
 
@@ -407,17 +408,20 @@ if __name__ == '__main__':
     kegg_db = load_local_kegg_db('dbs/kegg_db.txt')
     
     # Call the main driver function.
-    df = annotate_df(df, local_kegg_db=kegg_db, trace=True)
+    results = insert_taxonomy(results, local_kegg_db=kegg_db, trace=True)
 
     elapsed_time = time.time() - start_time
     m, s = divmod(elapsed_time, 60)
-    print('------------------------------------')
     print ("Finished in " + "%02dm%02ds" % (m, s))
+    print('------------------------------------')
 
+    # results
+    results.info()
+    # print(results.head())
+    
     # Export the annotated dataframe into a MS-Excel file
     # Name it with the same name as the .tsv, replacing tail with '_raw.xlsx'
+    
     out_fname = testfile_name[:-4]+'_raw.xlsx'
-    writer = pd.ExcelWriter(out_fname)
-    df.to_excel(writer, header=True, index=False)
-    writer.save()
+    results.to_excel(out_fname, header=True, index=False)
     print ("File {} written".format(out_fname))
