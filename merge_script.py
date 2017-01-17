@@ -69,25 +69,29 @@ def merge(file, sheet, error):
     
     return dfp
 
-root = tk.Tk()
-root.withdraw()
-file = filedialog.askopenfilename(filetypes = [("EXCEL","*.xlsx")])
-print ('Opening file:\n'+file.split('/')[-1])
+if __name__=='__main__':
+##     root = tk.Tk()
+##     root.withdraw()
+##     file = filedialog.askopenfilename(filetypes = [("EXCEL","*.xlsx")])
+##     print ('Opening file:\n'+file.split('/')[-1])
+    
+    exp_filename = "merge_example_data/1 - Cabernet Sauvignon_Fev2016.xlsx"
 
 
-xl = pd.ExcelFile(file)
-l = xl.sheet_names
-print ('\nStarting alingment...\n')
+    xl = pd.ExcelFile(exp_filename)
+    l = xl.sheet_names
+    print ('\nStarting alingment of file {}...\n'.format(exp_filename))
 
 
-writer = pd.ExcelWriter(file[:-5]+'_aligned.xlsx')
-for x in l:
-    merge(file, x, 1).to_excel(writer, index=True, header=True, index_label='m/z', sheet_name=x)
-    print (x +' aligned')
-writer.save()
+    writer = pd.ExcelWriter(exp_filename[:-5]+'_aligned.xlsx')
+    for x in l:
+        merge(exp_filename, x, 1).to_excel(writer, index=True, header=True, 
+                                           index_label='m/z', sheet_name=x)
+        print (x +' aligned')
+    writer.save()
 
 
-print('\nAll done!')
+    print('\nAll done!')
 
 
 
