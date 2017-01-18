@@ -37,7 +37,7 @@ def concat_peaks(base_dfs, verbose=True):
     mdf.index = list(range(len(mdf)))
     
     if verbose:
-        print('done, {} peaks before merging'.format(mdf.shape[0]))
+        print('done, {} peaks before alignment'.format(mdf.shape[0]))
     return mdf
 
 
@@ -53,10 +53,10 @@ def are_near(d1,d2, ppmtol):
     return False
 
 
-def group_peaks(df, sample_ids, ppmtol=1.0, verbose=True):
+def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=None, verbose=True):
     """Inserts a new column with integers indicating if entries belong to the same compound."""
     if verbose:
-        print ('- Merging...', end=' ')
+        print ('- Aligning...', end=' ')
     glabel = 0
     start = 0
     glabels = [0]
@@ -102,10 +102,24 @@ def group_peaks(df, sample_ids, ppmtol=1.0, verbose=True):
             intensities[s].append(i)
     
     result = pd.DataFrame(intensities, columns=colnames)
-    if verbose:
-        print('done, {} peaks after merging'.format(len(result)))
-    return result
+    n_non_discarded = len(result)
 
+    if verbose:
+        print('done, {} aligned peaks'.format(n_non_discarded))
+    
+    if min_samples is not None:
+        result = result[result['#samples'] >= min_samples]
+    
+    if verbose:
+        if min_samples is not None:
+            n_discarded = n_non_discarded - len(result)
+            print('- {} peaks were discarded (#samples < {})'.format(n_discarded, min_samples))
+        print('  {:3d} total aligned peaks'.format(len(result)))
+
+        counts_table = result['#samples'].value_counts().sort_index()
+        for n, c in counts_table.iteritems():
+            print ('{:5d} peaks in {} samples'.format(c,n))
+    return result
 
 def save_to_excel(out_name, outdict, aligned_dir=True):
     print ('\n- writing to Excel workbook...', end=' ')    
@@ -139,28 +153,22 @@ def save_to_excel(out_name, outdict, aligned_dir=True):
         # Create table of replica counts
         worksheet.write_string(1, ncols+2, '#samples')
         
-        possible_counts = range(1, ncols-1)
-        worksheet.write_column(2, ncols+2, possible_counts)
+        counts_table = results['#samples'].value_counts().sort_index()
+        worksheet.write_column(2, ncols+2, counts_table.index)
         
         counts_col = xl_col_to_name(ncols+2)
         replicas_col = xl_col_to_name(ncols)
-        formula = '=COUNTIF(${}$3:${}${},{}{})'
-        count_formulas = [formula.format(replicas_col, 
-                                         replicas_col, 
-                                         n_compounds+2, 
-                                         counts_col, 
-                                         i+2) for i in possible_counts]
-        worksheet.write_column(2, ncols+3, count_formulas)
+        worksheet.write_column(2, ncols+3, counts_table.values)
 
         worksheet.write_string(ncols, ncols+2, 'total')
+        worksheet.write_number(ncols, ncols+3, len(results))
+        
         counts_col = xl_col_to_name(ncols+3)
         counts_range = '${}$3:${}${}'.format(counts_col, counts_col, ncols)
-        worksheet.write_formula(ncols, ncols+3, '=SUM({})'.format(counts_range))
 
         # Add pie chart of replica counts
         chart = workbook.add_chart({'type': 'pie'})
         chart.add_series({'values': "='{}'!{}".format(k, counts_range), 'name':'#samples'})
-        # chart.add_series({'values': '={}'.format(counts_range), 'name':'# replicas'})
         chart.set_size({'width': 380, 'height': 288})
         worksheet.insert_chart(7, ncols+1, chart)
 
@@ -168,21 +176,31 @@ def save_to_excel(out_name, outdict, aligned_dir=True):
     print('done.\nCreated file "{}"'.format(out_name))
 
 
-def workflow(excel_in_name, excel_out_name, sheetsnames, locs, 
-             ppmtol, skiprows=1, aligned_dir=True):
+def align_spectra(spectra, samplenames,
+                  ppmtol=1.0, 
+                  min_samples=None):
+    mdf = concat_peaks(spectra)
+    results = group_peaks(mdf, samplenames,
+                          ppmtol=ppmtol,
+                          min_samples=min_samples)
+    
+    return results
+
+def align_spectra_in_excel(excel_in_name, 
+                  excel_out_name, 
+                  sheetsnames, 
+                  locs,
+                  ppmtol=1, 
+                  min_samples=None,
+                  skiprows=1,
+                  aligned_dir=True):
+    
     outdfs = {}
     for s in sheetsnames:
         dfs = read_spectra_from_xcel(excel_in_name, s, locs, skiprows=skiprows)
-        mdf = concat_peaks(dfs)
-        results = group_peaks(mdf, list(dfs.keys()), ppmtol=ppmtol)
-        for n, c in results['#samples'].value_counts().iteritems():
-            print('{} peaks in {} samples'.format(c,n))
-
-
-        #print ('\nAligned data:')
-        #print(results.head(10))
-
-        outdfs[s] = results
+        outdfs[s] = align_spectra(dfs, list(dfs.keys()), 
+                                  ppmtol=ppmtol, min_samples=None)
+    
     save_to_excel(excel_out_name, outdfs, aligned_dir)    
 
 if __name__ == '__main__':
@@ -198,5 +216,8 @@ if __name__ == '__main__':
     for fname in infiles:
         excel_in_name = indir + fname
         excel_out_name = indir + 'aligned_' + fname
-        workflow(excel_in_name, excel_out_name, 
-                 snames, locs, ppmtol, aligned_dir=False)
+        align_spectra_in_excel(excel_in_name, excel_out_name,
+                               snames, locs, 
+                               ppmtol=ppmtol,
+                               min_samples=None,
+                               aligned_dir=False)
