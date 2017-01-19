@@ -1,44 +1,103 @@
 from __future__ import print_function
 
+from collections import OrderedDict
+from numpy import nan
+
 import pandas as pd
 from xlsxwriter.utility import xl_rowcol_to_cell, xl_col_to_name
 
-def read_spectra_from_xcel(book_name, sheet_name, locs, skiprows=1):
-    dfs = {}
-    for k in locs:
-        df = pd.read_excel(book_name, skiprows=skiprows, 
-                           parse_cols=locs[k], 
-                           sheetname=sheet_name)
-        dfs[k] = df.dropna()
-        dfs[k].columns = ['m/z', 'I'] # Force these column labels
+def read_spectra_from_xcel(file_name,
+                           sample_names=None,
+                           samples_row=None, 
+                           header_row=1,
+                           verbose=True):
     
-    print ('\nProcessing')
-    print ('- file "{}":'.format(book_name))
-    print ('- sheet "{}":'.format(sheet_name))
-    for k in dfs:
-        print ('{:5d} peaks in sample {}'.format(dfs[k].shape[0], k))
-    return dfs
+    spectra_table = OrderedDict()
 
-
-def concat_peaks(base_dfs, verbose=True):
+    wb = pd.ExcelFile(file_name).book
+    header = header_row - 1
+    
     if verbose:
-        print ('- Joining data...', end=' ')
-    dfs = {}
+        print ('------ Reading MS-Excel file -------\n{}'.format(file_name))
+
+    for sheetname in wb.sheet_names():
+        if verbose:
+            print ('- reading sheet "{}"...'.format(sheetname))
+
+        # use sample_names from function argument if present
+        # otherwise read row with sample names, if present
+        snames = []
+        if sample_names is not None:
+            snames = sample_names
+        elif samples_row is not None:
+            sh = wb.sheet_by_name(sheetname)
+            snames = sh.row_values(samples_row-1)
+            snames = [s for s in snames if len(s.strip()) > 0]
+            header = samples_row
+
+        # read data (and discard empty Xcel columns
+        df = pd.read_excel(file_name, 
+                           sheetname=sheetname,
+                           header=header)
+        df = df.dropna(axis=1, how='all')
+
+##         df.info()
+##         print('============================================')
+##         print(df.head())
+        
+        # if there is not a row with sample names, or the function argument,
+        # use "2nd columns" headers as sample names
+        if len(snames) > 0:
+            sample_names = snames
+        else:
+            sample_names = df.columns[1::2]
+        
+##         print('============================================')
+##         print('Sample names:', sample_names)
+        
+        # split in groups of two (each group is a spectrum)
+        results = []
+        j = 0
+        for i in range(0, len(df.columns), 2):
+            spectrum = df.iloc[:, i:i+2]
+            spectrum.index = range(len(spectrum))
+            spectrum = spectrum.dropna()
+            spectrum.columns = ['m/z', 'I'] # force these column labels
+            results.append((sample_names[j], spectrum))
+
+##             print('============================================')
+##             print(snames_row[j])
+##             print('-------------------------------')
+##             print(spectrum.head(10))
+            j = j + 1
+
+        if verbose:
+            for name, spectrum in results:
+                print ('{:5d} peaks in sample {}'.format(spectrum.shape[0], name))
+        spectra_table[sheetname] = results
+
+    return spectra_table
+
+
+def concat_peaks(spectra, verbose=True):
+    if verbose:
+        print ('- Joining data...')
+    dfs = []
     # tag with sample names, concat vertically and sort by m/z
-    for k in base_dfs:
-        newdf = base_dfs[k].copy()
-        newcol = pd.Series(k, index=newdf.index, name='_sample')
+    for samplename, spectrum in spectra:
+        newdf = spectrum.copy()
+        newcol = pd.Series(samplename, index=newdf.index, name='_sample')
         newdf = pd.concat([newdf, newcol], axis=1)
         
-        dfs[k] = newdf
-    mdf = pd.concat([dfs[d] for d in dfs])
-    mdf = mdf.sort_values(by='m/z')
+        dfs.append(newdf)
+    cdf = pd.concat(dfs)
+    cdf = cdf.sort_values(by='m/z')
     #reindex with increasing integers
-    mdf.index = list(range(len(mdf)))
+    cdf.index = list(range(len(cdf)))
     
     if verbose:
-        print('done, {} peaks before alignment'.format(mdf.shape[0]))
-    return mdf
+        print('  done, {} peaks in {} samples'.format(cdf.shape[0], len(spectra)))
+    return cdf
 
 
 def are_near(d1,d2, ppmtol):
@@ -53,10 +112,14 @@ def are_near(d1,d2, ppmtol):
     return False
 
 
-def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=None, verbose=True):
-    """Inserts a new column with integers indicating if entries belong to the same compound."""
+def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=1, verbose=True):
+    """Group peaks from different samples.
+
+       Peaks are grouped if their relative mass difference is below
+       a mass difference tolerance, in ppm."""
+    
     if verbose:
-        print ('- Aligning...', end=' ')
+        print ('- Aligning...')
     glabel = 0
     start = 0
     glabels = [0]
@@ -75,8 +138,7 @@ def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=None, verbose=True):
 
         glabels.append(glabel)
     
-    result = pd.concat([df, 
-                        pd.Series(glabels, index=df.index, name='_group')], 
+    result = pd.concat([df, pd.Series(glabels, index=df.index, name='_group')], 
                         axis=1)
     grouped = result.groupby('_group')
 
@@ -98,126 +160,136 @@ def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=None, verbose=True):
         intensities['#samples'].append(len(tagged))
         
         for s in sample_ids:
-            i = int(tagged.loc[s, 'I']) if s in tagged.index else 0
+            i = int(tagged.loc[s, 'I']) if s in tagged.index else nan
             intensities[s].append(i)
     
     result = pd.DataFrame(intensities, columns=colnames)
     n_non_discarded = len(result)
 
     if verbose:
-        print('done, {} aligned peaks'.format(n_non_discarded))
+        print('  done, {} aligned peaks'.format(n_non_discarded))
     
-    if min_samples is not None:
+    if min_samples > 1:
         result = result[result['#samples'] >= min_samples]
     
     if verbose:
-        if min_samples is not None:
+        if min_samples > 1:
             n_discarded = n_non_discarded - len(result)
             print('- {} peaks were discarded (#samples < {})'.format(n_discarded, min_samples))
-        print('  {:3d} total aligned peaks'.format(len(result)))
 
         counts_table = result['#samples'].value_counts().sort_index()
         for n, c in counts_table.iteritems():
-            print ('{:5d} peaks in {} samples'.format(c,n))
+            print ('{:5d} peaks in {} samples'.format(c, n))
+        print('  {:3d} total'.format(len(result)))
+
     return result
 
-def save_to_excel(out_name, outdict, aligned_dir=True):
-    print ('\n- writing to Excel workbook...', end=' ')    
-    if aligned_dir:
-        out_name = 'aligned/' + out_name
-    writer = pd.ExcelWriter(out_name, engine='xlsxwriter')
+def save_aligned_to_excel(fname, outdict):
+    print ('\n------ writing results to MS-Excel file ------')    
+    writer = pd.ExcelWriter(fname, engine='xlsxwriter')
     
-    for k in outdict:
-        results = outdict[k]
+    for sname in outdict:
+        results = outdict[sname]
         n_compounds, ncols = results.shape
-        #print 'CONTROL: n compounds =', n_compounds
 
-        results.to_excel(writer, sheet_name=k, index=False, startrow=1, startcol=1)
+        # write Pandas DataFrame
+        results.to_excel(writer, sheet_name=sname, 
+                         index=False, startrow=1, startcol=1)
 
         workbook  = writer.book
-        worksheet = writer.sheets[k]
+        sh = writer.sheets[sname]
 
-        # Center '# replicas' column
+        # center '#samples' column
         format = workbook.add_format({'align': 'center'})
-        worksheet.set_column(ncols, ncols, None, format)
+        sh.set_column(ncols, ncols, None, format)
 
-        # Change displayed precision in 'm/z' column
+        # change displayed precision in 'm/z' column
         format2 = workbook.add_format({'num_format': '#.00000'})
-        worksheet.set_column(1,1, None, format2)
+        sh.set_column(1, 1, None, format2)
 
-        # Change widths
-        worksheet.set_column(2, ncols-1, 25)
-        worksheet.set_column(1,1, 15)
-        worksheet.set_column(ncols,ncols, 15)
+        # change widths
+        sh.set_column(2, ncols-1, 25)
+        sh.set_column(1, 1, 15)
+        sh.set_column(ncols, ncols, 15)
 
         # Create table of replica counts
-        worksheet.write_string(1, ncols+2, '#samples')
-        
-        counts_table = results['#samples'].value_counts().sort_index()
-        worksheet.write_column(2, ncols+2, counts_table.index)
-        
-        counts_col = xl_col_to_name(ncols+2)
-        replicas_col = xl_col_to_name(ncols)
-        worksheet.write_column(2, ncols+3, counts_table.values)
+        sh.write_string(1, ncols+2, '#samples')
+        counts = results['#samples'].value_counts().sort_index()
+        sh.write_column(2, ncols+2, counts.index)
+        sh.write_column(2, ncols+3, counts.values)
 
-        worksheet.write_string(ncols, ncols+2, 'total')
-        worksheet.write_number(ncols, ncols+3, len(results))
+        sh.write_string(2+len(counts), ncols+2, 'total')
+        sh.write_number(2+len(counts), ncols+3, len(results))
         
-        counts_col = xl_col_to_name(ncols+3)
-        counts_range = '${}$3:${}${}'.format(counts_col, counts_col, ncols)
-
         # Add pie chart of replica counts
         chart = workbook.add_chart({'type': 'pie'})
-        chart.add_series({'values': "='{}'!{}".format(k, counts_range), 'name':'#samples'})
+        chart.add_series({'values': [sname, 2, ncols+3, 1+len(counts), ncols+3],
+                          'categories': [sname, 2, ncols+2, 1+len(counts), ncols+2],
+                          'name':'#samples'})
         chart.set_size({'width': 380, 'height': 288})
-        worksheet.insert_chart(7, ncols+1, chart)
+        sh.insert_chart(7, ncols+1, chart)
 
     writer.save()
-    print('done.\nCreated file "{}"'.format(out_name))
+    print('Created file\n{}'.format(fname))
 
 
-def align_spectra(spectra, samplenames,
+def align_spectra(spectra,
                   ppmtol=1.0, 
-                  min_samples=None):
-    mdf = concat_peaks(spectra)
-    results = group_peaks(mdf, samplenames,
-                          ppmtol=ppmtol,
-                          min_samples=min_samples)
+                  min_samples=1,
+                  verbose=True):
     
-    return results
+    samplenames = [name for name, df in spectra]
+    mdf = concat_peaks(spectra, verbose=verbose)
+    return group_peaks(mdf, samplenames,
+                       ppmtol=ppmtol,
+                       min_samples=min_samples, 
+                       verbose=verbose)
 
-def align_spectra_in_excel(excel_in_name, 
-                  excel_out_name, 
-                  sheetsnames, 
-                  locs,
-                  ppmtol=1, 
-                  min_samples=None,
-                  skiprows=1,
-                  aligned_dir=True):
+def align_spectra_in_excel(fname, save_to_excel=None, 
+                           ppmtol=1.0, 
+                           min_samples=1,
+                           sample_names=None,
+                           samples_row=None, 
+                           header_row=1,
+                           verbose=True):
     
-    outdfs = {}
-    for s in sheetsnames:
-        dfs = read_spectra_from_xcel(excel_in_name, s, locs, skiprows=skiprows)
-        outdfs[s] = align_spectra(dfs, list(dfs.keys()), 
-                                  ppmtol=ppmtol, min_samples=None)
+    spectra_table = read_spectra_from_xcel(fname, 
+                                           sample_names=sample_names,
+                                           samples_row=samples_row,
+                                           header_row=header_row,
+                                           verbose=verbose)
+    if verbose:
+        print ('\n------ Aligning spectra ------')
+
+    outspectra = OrderedDict()
+    for sheetname, spectra in spectra_table.items():
+        if verbose:
+            print ('\n-- sheet "{}"'.format(sheetname))
+        outspectra[sheetname] = align_spectra(spectra,
+                                              ppmtol=ppmtol,
+                                              min_samples=min_samples,
+                                              verbose=verbose)
+    if save_to_excel is not None:
+        save_aligned_to_excel(save_to_excel, outspectra)    
+
+    return outspectra
     
-    save_to_excel(excel_out_name, outdfs, aligned_dir)    
 
 if __name__ == '__main__':
     ppmtol = 1.0
+    min_samples = 1
+        
+    fname = 'vitis_fractions/ESIneg_replicates_vitis_feb2016_recal.xlsx'
+    out_fname = 'vitis_fractions/aligned_ESIneg_replicates_vitis_feb2016_recal.xlsx'
     
-    indir = "vitis_fractions/"
-    infiles = ['ESIneg_replicates_vitis_feb2016_recal.xlsx'] 
-    #, 'ESIpos_replicates_vitis_feb2016.xlsx']
+    header_row = 2
+    samples_row = 1
+    sample_names = ['23', '24', '25']
+    sample_names = None
     
-    snames = ['ACN', 'H2O', 'MeOH', 'Org']
-    locs = {'23': 'B,C', '24': 'E,F', '25': 'H,I'}
-    
-    for fname in infiles:
-        excel_in_name = indir + fname
-        excel_out_name = indir + 'aligned_' + fname
-        align_spectra_in_excel(excel_in_name, excel_out_name,
-                               snames, locs, 
-                               ppmtol=ppmtol,
-                               min_samples=None,
-                               aligned_dir=False)
+    align_spectra_in_excel(fname, save_to_excel=out_fname,
+                           ppmtol=ppmtol,
+                           min_samples=min_samples,
+                           header_row=header_row,
+                           samples_row=samples_row,
+                           sample_names=sample_names)
