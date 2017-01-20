@@ -1,5 +1,6 @@
 from __future__ import print_function
 import time
+import os
 
 import json
 import requests
@@ -9,7 +10,9 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog
 
-from masstrix import read_MassTRIX
+from metabolinks.masstrix import read_MassTRIX
+
+DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
 
 # ------------- Code related to Kegg compound records -------------------
 
@@ -366,10 +369,9 @@ def insert_taxonomy(df, trace=False, local_kegg_db=None):
 # Object to report progress of annotations.
 progress = Progress()
 
-hmdb2kegg_dict = get_trans_id_table('dbs/trans_hmdb2kegg.txt')
+hmdb2kegg_dict = get_trans_id_table(os.path.join(DB_DIR, 'trans_hmdb2kegg.txt'))
 #lipidmaps2kegg_dict = get_trans_id_table('trans_lipidmaps2kegg.txt')
-
-_lm_db_fname = 'dbs/lm_metadata.txt'
+_lm_db_fname = (os.path.join(DB_DIR, 'lm_metadata.txt'))
 print ('\nLoading LIPIDMAPS data from {}\n'.format(_lm_db_fname))
 lm_df = load_local_lipidmaps_db(_lm_db_fname)    
 

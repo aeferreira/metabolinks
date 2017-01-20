@@ -3,12 +3,11 @@ from __future__ import print_function
 from collections import OrderedDict
 from numpy import nan
 
+import six
 import pandas as pd
-from xlsxwriter.utility import xl_rowcol_to_cell, xl_col_to_name
 
 def read_spectra_from_xcel(file_name,
                            sample_names=None,
-                           samples_row=None, 
                            header_row=1,
                            verbose=True):
     
@@ -24,18 +23,20 @@ def read_spectra_from_xcel(file_name,
         if verbose:
             print ('- reading sheet "{}"...'.format(sheetname))
 
-        # use sample_names from function argument if present
-        # otherwise read row with sample names, if present
+        # if sample_names argument if present (not None) then
+        # if an integer, read row with sample names,
+        # otherwise sample_names must a list of names for samples
         snames = []
         if sample_names is not None:
-            snames = sample_names
-        elif samples_row is not None:
-            sh = wb.sheet_by_name(sheetname)
-            snames = sh.row_values(samples_row-1)
-            snames = [s for s in snames if len(s.strip()) > 0]
-            header = samples_row
+            if isinstance(sample_names, six.integer_types):
+                sh = wb.sheet_by_name(sheetname)
+                snames = sh.row_values(sample_names-1)
+                snames = [s for s in snames if len(s.strip()) > 0]
+                header = sample_names
+            else:
+                snames = sample_names
 
-        # read data (and discard empty Xcel columns
+        # read data (and discard empty xl columns)
         df = pd.read_excel(file_name, 
                            sheetname=sheetname,
                            header=header)
@@ -45,7 +46,7 @@ def read_spectra_from_xcel(file_name,
 ##         print('============================================')
 ##         print(df.head())
         
-        # if there is not a row with sample names, or the function argument,
+        # if sample names were not set yet then
         # use "2nd columns" headers as sample names
         if len(snames) > 0:
             sample_names = snames
@@ -249,13 +250,11 @@ def align_spectra_in_excel(fname, save_to_excel=None,
                            ppmtol=1.0, 
                            min_samples=1,
                            sample_names=None,
-                           samples_row=None, 
                            header_row=1,
                            verbose=True):
     
     spectra_table = read_spectra_from_xcel(fname, 
                                            sample_names=sample_names,
-                                           samples_row=samples_row,
                                            header_row=header_row,
                                            verbose=verbose)
     if verbose:
@@ -279,17 +278,15 @@ if __name__ == '__main__':
     ppmtol = 1.0
     min_samples = 1
         
-    fname = 'vitis_fractions/ESIneg_replicates_vitis_feb2016_recal.xlsx'
-    out_fname = 'vitis_fractions/aligned_ESIneg_replicates_vitis_feb2016_recal.xlsx'
+    fname = 'example_data/data_to_align.xlsx'
+    out_fname = 'example_data/aligned_data.xlsx'
     
     header_row = 2
-    samples_row = 1
-    sample_names = ['23', '24', '25']
-    sample_names = None
+    sample_names = ['S1', 'S2', 'S3']
+    #sample_names = 1
     
     align_spectra_in_excel(fname, save_to_excel=out_fname,
                            ppmtol=ppmtol,
                            min_samples=min_samples,
                            header_row=header_row,
-                           samples_row=samples_row,
                            sample_names=sample_names)
