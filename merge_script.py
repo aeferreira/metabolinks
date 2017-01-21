@@ -37,8 +37,19 @@ def merge(file, sheet, error):
         if index == 0:
             last = row.Mass
             d[row.Tubo] = row.Intensity
-            mass.append(row.Mass)        
-            continue
+            mass.append(row.Mass)
+        elif index==len(t)-1:
+            c = sum(mass)/len(mass)
+            df_temp = pd.DataFrame(d, index=[c])
+            dfp = pd.concat([dfp,df_temp])
+            mass = []
+            d = {}
+            last=row.Mass
+            d[row.Tubo] = row.Intensity
+            mass.append(row.Mass)
+            c = sum(mass)/len(mass)
+            df_temp = pd.DataFrame(d, index=[c])
+            dfp = pd.concat([dfp,df_temp])
         elif row.Tubo in d:
             c = sum(mass)/len(mass)
             df_temp = pd.DataFrame(d, index=[c])
