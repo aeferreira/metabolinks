@@ -278,8 +278,8 @@ if __name__ == '__main__':
     ppmtol = 1.0
     min_samples = 1
         
-    fname = 'example_data/data_to_align.xlsx'
-    out_fname = 'example_data/aligned_data.xlsx'
+    fname = '../example_data/data_to_align.xlsx'
+    out_fname = '../example_data/aligned_data.xlsx'
     
     header_row = 2
     sample_names = ['S1', 'S2', 'S3']

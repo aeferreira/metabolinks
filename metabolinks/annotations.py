@@ -10,8 +10,6 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog
 
-from metabolinks.masstrix import read_MassTRIX
-
 DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
 
 # ------------- Code related to Kegg compound records -------------------
@@ -303,7 +301,7 @@ class _count_compounds(object):
         return self.looks_count
 
 
-def annotate_all(peak, c_counter, trace=False, kegg_db=None):
+def annotate_all(peak, c_counter, progress=None, trace=False, kegg_db=None):
     """Create Pandas Series with compound class annotations."""
     
     data = [[], [], [], [], [], [], []]
@@ -325,7 +323,8 @@ def annotate_all(peak, c_counter, trace=False, kegg_db=None):
             if len(i) > 0: # don't include empty strings
                 d.append(i)
     
-    progress.tick()
+    if progress is not None:
+        progress.tick()
     
     compressed_data = []
     for i, d in enumerate(data):
@@ -356,18 +355,15 @@ def annotate_all(peak, c_counter, trace=False, kegg_db=None):
 def insert_taxonomy(df, trace=False, local_kegg_db=None):
     """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
-    progress.reset(total=len(df['raw_mass']))
+    progress = Progress(total=len(df['raw_mass']))
     c_counter = _count_compounds()
     df = pd.concat([df, df['KEGG_cid'].apply(annotate_all, 
-                                             args=(c_counter, 
+                                             args=(c_counter, progress,
                                              trace,
                                              local_kegg_db))], axis=1)
     print('\nDone! {} ids processed. {} DB lookups'.format(c_counter.get_count(), c_counter.get_looks_count()))
     return df
 
-
-# Object to report progress of annotations.
-progress = Progress()
 
 hmdb2kegg_dict = get_trans_id_table(os.path.join(DB_DIR, 'trans_hmdb2kegg.txt'))
 #lipidmaps2kegg_dict = get_trans_id_table('trans_lipidmaps2kegg.txt')
@@ -376,21 +372,19 @@ print ('\nLoading LIPIDMAPS data from {}\n'.format(_lm_db_fname))
 lm_df = load_local_lipidmaps_db(_lm_db_fname)    
 
 lipidmaps2kegg_dict = lm_df['KEGG_ID'].dropna().to_dict()
-# print(len(trans_table))
-# for k, v in trans_table.items():
-    # print(k, '->', v)
 
 kegg2lipidmaps_dict = {}
 for k, v in lipidmaps2kegg_dict.items():
     kegg2lipidmaps_dict[v] = k
 
 if __name__ == '__main__':
-        
+
     print ('\nStarting...\n')
+    from metabolinks import read_MassTRIX
 
     start_time = time.time()
 
-    testfile_name = 'example_data/MassTRIX_output.tsv'
+    testfile_name = '../example_data/MassTRIX_output.tsv'
 
     results = read_MassTRIX(testfile_name)
     print ("File {} was read\n".format(testfile_name))
@@ -404,7 +398,7 @@ if __name__ == '__main__':
     assert len(results.index) == 15 # there are still 15 peaks
     #print(results.head(2))
 
-    print ('\nStarting annotations...')
+    print ('Starting annotations...')
 
     # Use a local Kegg DB.
     kegg_db = load_local_kegg_db('dbs/kegg_db.txt')
