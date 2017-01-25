@@ -14,7 +14,7 @@ DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
 
 # ------------- Code related to Kegg compound records -------------------
 
-def get_kegg_section(k_record, sname):
+def get_kegg_section(k_record, sname, whole_section=False):
     """Get the section with name _sname_ from a kegg compound record.
     
        Returns a str, possibly empty."""
@@ -31,7 +31,10 @@ def get_kegg_section(k_record, sname):
         elif in_section and not line.startswith(' '):
             break
 
-    sectionlines = [line[12:] for line in section]
+    if whole_section:
+        sectionlines = section
+    else:
+        sectionlines = [line[12:] for line in section]
     return '\n'.join(sectionlines)
 
 
@@ -62,15 +65,6 @@ def load_local_lipidmaps_db(db_fname):
     """Load LIPIDMAPS records from a local text DB."""
     df = pd.read_table(db_fname, index_col=0, dtype={'CHEBI_ID':str})
     return df
-
-def get_dblinks_brite_sections(k_record):
-    """Get sections DBLINKS and BRITE from a kegg compound record.
-    
-       Returns a dict."""
-    
-    dblinks = get_kegg_section(k_record, 'DBLINKS')
-    brite = get_kegg_section(k_record, 'BRITE')
-    return {'DBLINKS':dblinks, 'BRITE':brite}
 
 
 def request_kegg_record(c_id, localdict=None):
@@ -120,31 +114,16 @@ def classes_from_brite(krecord, trace=False):
     """Parses classes from the BRITE section of a kegg record."""
     classes = [[], [], [], []]
 
-    k = krecord.split('BRIT', 1)[1]
-    k = k.split('DBLINKS', 1)[0]
-    k = k.splitlines()
-    l = []
-    for x in k:
-        if x.startswith('E       '):
-            l.append('            ' + x[len('E       '):])
-        else:
-            l.append(x)
-    l = "\n".join(l)
+    # replace word BRITE by spaces
+    krecord = ' '*5 + krecord[5:]
 
-    l = l.split('           ')[1:]
-    p = []
-    for x in l:
-        if not x.startswith('  '):
-            x = ('??'+x)
-            p.append(x)
-        else:
-            p.append(x)
-    p = "".join(p)
-    p = p.split('??')
-    p = "\n".join(p)
-    p = p.splitlines()
-    for x in p:
+    # split by 11 spaces (and discard ":" ), remove trailing \n
+    cstrings = [c.rstrip() for c in krecord.split('           ')[1:]]
+
+    brite_id = ''
+    for x in cstrings:
         if x.startswith(' ') and not x.startswith('  '):
+            brite_id = x.split('[BR:')[1].split(']')[0]
             classes[0].append(x[1:])
         elif x.startswith('  ') and not x.startswith('   '):
             classes[1].append(x[2:])
@@ -155,7 +134,7 @@ def classes_from_brite(krecord, trace=False):
 
     classes = ['#'.join(c) for c in classes]
     if trace:
-        print ('from BRITE:')
+        print ('from BRITE (with id {}):'.format(brite_id))
         print(tuple(classes))
     return tuple(classes)
 
@@ -237,7 +216,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         c_counter.inc_looks()
         already_fetched.append(c_id)
     
-        brite = get_kegg_section(krecord, 'BRITE')
+        brite = get_kegg_section(krecord, 'BRITE', whole_section=True)
         dblinks = get_kegg_section(krecord, 'DBLINKS')
         
         if len(dblinks) > 0:
@@ -252,10 +231,15 @@ def annotate_compound(compound_id, c_counter, already_fetched,
                     if 'KNApSAcK:' in line:
                         ks_id = line.split(':')[1].strip()
     
-    # get compound classification hierarchy
+    # get compound taxonomy
+    
     # first from BRITE section
     if (c_id is not None) and len(brite) > 0:
-        classes = classes_from_brite(krecord, trace)
+        classes = classes_from_brite(brite, trace)
+        if classes is None:
+            classes = ('', '', '', '')
+            if trace:
+                print('BRITE class in blacklist. Skipped')
     
     # then from LIPIDMAPS
     elif (lm_id is not None):
