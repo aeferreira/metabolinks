@@ -7,32 +7,45 @@ import requests
 
 import pandas as pd
 
-DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
+# ------------- Local database loading ----------------------------------
 
-# ------------- Code related to Kegg compound records -------------------
+class LocalDBs(object):
+    def __init__(self,
+                 kegg_db,
+                 lm_df,
+                 hmdb2kegg_dict,
+                 lipidmaps2kegg_dict,
+                 kegg2lipidmaps_dict):
 
-def get_kegg_section(k_record, sname, whole_section=False):
-    """Get the section with name _sname_ from a kegg compound record.
-    
-       Returns a str, possibly empty."""
-    
-    in_section = False
-    section = []
-    
-    for line in k_record.splitlines():
-        if line.startswith(sname):
-            in_section = True
-            section.append(line)
-        elif in_section and line.startswith(' '):
-            section.append(line)
-        elif in_section and not line.startswith(' '):
-            break
+        self.kegg_db = kegg_db
+        self.lm_df = lm_df
+        self.hmdb2kegg_dict = hmdb2kegg_dict
+        self.lipidmaps2kegg_dict = lipidmaps2kegg_dict
+        self.kegg2lipidmaps_dict = kegg2lipidmaps_dict
 
-    if whole_section:
-        sectionlines = section
-    else:
-        sectionlines = [line[12:] for line in section]
-    return '\n'.join(sectionlines)
+_local_dbs = None
+_DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
+        
+def load_local_dbs():
+    print ('\nLoading local DBs')
+    
+    kegg_df_fname = os.path.join(_DB_DIR, 'kegg_db.txt')
+    kegg_db = load_local_kegg_db(kegg_df_fname)
+    
+    lm_db_fname = (os.path.join(_DB_DIR, 'lm_metadata.txt'))
+    lm_df = load_local_lipidmaps_db(lm_db_fname)    
+    
+    trans_hmdb2kegg_fname = os.path.join(_DB_DIR, 'trans_hmdb2kegg.txt')
+    hmdb2kegg_dict = get_trans_id_table(trans_hmdb2kegg_fname)
+
+    lipidmaps2kegg_dict = lm_df['KEGG_ID'].dropna().to_dict()
+
+    kegg2lipidmaps_dict = {}
+    for k, v in lipidmaps2kegg_dict.items():
+        kegg2lipidmaps_dict[v] = k
+    
+    return LocalDBs(kegg_db, lm_df, hmdb2kegg_dict,
+                    lipidmaps2kegg_dict, kegg2lipidmaps_dict)
 
 
 def load_local_kegg_db(db_fname):
@@ -58,14 +71,39 @@ def load_local_kegg_db(db_fname):
     db.close()
     return kegg
 
+
 def load_local_lipidmaps_db(db_fname):
     """Load LIPIDMAPS records from a local text DB."""
     df = pd.read_table(db_fname, index_col=0, dtype={'CHEBI_ID':str})
     return df
+    
+# ------------- Code related to Kegg compound records -------------------
 
+def get_kegg_section(k_record, sname, whole_section=False):
+    """Get the section with name _sname_ from a kegg compound record.
+    
+       Returns a str, possibly empty."""
+    
+    in_section = False
+    section = []
+    
+    for line in k_record.splitlines():
+        if line.startswith(sname):
+            in_section = True
+            section.append(line)
+        elif in_section and line.startswith(' '):
+            section.append(line)
+        elif in_section and not line.startswith(' '):
+            break
 
-def request_kegg_record(c_id, localdict=None):
-    if localdict is not None:
+    if whole_section:
+        sectionlines = section
+    else:
+        sectionlines = [line[12:] for line in section]
+    return '\n'.join(sectionlines)
+
+def request_kegg_record(c_id, localdict):
+    if c_id in localdict:
         return localdict[c_id]
     return requests.get('http://rest.kegg.jp/get/' + c_id).text
 
@@ -129,7 +167,7 @@ def classes_from_brite(krecord, brite_blacklist=None, trace=False):
     return tuple(classes)
 
 
-def classes_from_lipidmaps(lm_id, trace=False):
+def classes_from_lipidmaps(lm_id, lm_df, trace=False):
     if trace:
         print('LIPIDMAPS id: {}'.format(lm_id))
 ##     f = requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
@@ -151,7 +189,7 @@ def classes_from_lipidmaps(lm_id, trace=False):
 
 
 def annotate_compound(compound_id, c_counter, already_fetched, 
-                      trace=False, kegg_db=None, brite_blacklist=None):
+                      trace=False, local_dbs=None, brite_blacklist=None):
     c_id = None
     lm_id = None
     hmdb_id = None
@@ -166,23 +204,23 @@ def annotate_compound(compound_id, c_counter, already_fetched,
     
     if compound_id.startswith('C'):
         c_id = compound_id
-        if c_id in kegg2lipidmaps_dict:
-            lm_id = hmdb2kegg_dict[c_id]
+        if c_id in local_dbs.kegg2lipidmaps_dict:
+            lm_id = local_dbs.kegg2lipidmaps_dict[c_id]
             trans_lipidmaps = lm_id
     
     elif compound_id.startswith('LM'):
         lm_id = compound_id
-        if lm_id in lipidmaps2kegg_dict:
-            c_id = lipidmaps2kegg_dict[lm_id]
+        if lm_id in local_dbs.lipidmaps2kegg_dict:
+            c_id = local_dbs.lipidmaps2kegg_dict[lm_id]
             trans_kegg = c_id
     
     elif compound_id.startswith('HMDB'):
         hmdb_id = compound_id
-        if hmdb_id in hmdb2kegg_dict:
-            c_id = hmdb2kegg_dict[hmdb_id]
+        if hmdb_id in local_dbs.hmdb2kegg_dict:
+            c_id = local_dbs.hmdb2kegg_dict[hmdb_id]
             trans_kegg = c_id
-            if c_id in kegg2lipidmaps_dict:
-                lm_id = kegg2lipidmaps_dict[c_id]
+            if c_id in local_dbs.kegg2lipidmaps_dict:
+                lm_id = local_dbs.kegg2lipidmaps_dict[c_id]
                 trans_lipidmaps = lm_id
 
     else:
@@ -199,7 +237,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         return (trans_kegg, trans_lipidmaps, '', '', '', '', '')
         
     if c_id is not None:
-        krecord = request_kegg_record(c_id, localdict=kegg_db)
+        krecord = request_kegg_record(c_id, localdict=local_dbs.kegg_db)
         if trace:
             print('(look up {})'.format(c_id))
         c_counter.inc_looks()
@@ -236,7 +274,9 @@ def annotate_compound(compound_id, c_counter, already_fetched,
     elif (lm_id is not None):
         if trace:
             print('(look up {})'.format(lm_id))
-        classes = classes_from_lipidmaps(lm_id, trace=trace)
+        classes = classes_from_lipidmaps(lm_id,
+                                         local_dbs.lm_df,
+                                         trace=trace)
         c_counter.inc_looks()
         already_fetched.append(lm_id)
 
@@ -277,7 +317,7 @@ class _count_compounds(object):
 
 
 def annotate_all(peak, c_counter, progress=None, trace=False,
-                 kegg_db=None, brite_blacklist=None):
+                 local_dbs=None, brite_blacklist=None):
     """Create Pandas Series with compound class annotations."""
     
     data = [[], [], [], [], [], [], []]
@@ -293,7 +333,7 @@ def annotate_all(peak, c_counter, progress=None, trace=False,
         d_compound = annotate_compound(compound_id, 
                                        c_counter, 
                                        already_fetched, 
-                                       trace, kegg_db,
+                                       trace, local_dbs,
                                        brite_blacklist)
         
         for d, i in zip(data, d_compound):
@@ -329,12 +369,12 @@ def annotate_all(peak, c_counter, progress=None, trace=False,
     return pd.Series(hash_data, index=col_names)
 
 
-def insert_taxonomy(df, brite_blacklist=None, 
-                    trace=False, local_kegg_db=None):
+def insert_taxonomy(df, brite_blacklist=None, trace=False):
     """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
     progress = Progress(total=len(df['raw_mass']))
     c_counter = _count_compounds()
+    local_dbs = load_local_dbs()
     
     if brite_blacklist is not None:
         with open(brite_blacklist) as f:
@@ -343,25 +383,12 @@ def insert_taxonomy(df, brite_blacklist=None,
     df = pd.concat([df, df['KEGG_cid'].apply(annotate_all, 
                                              args=(c_counter, progress,
                                              trace,
-                                             local_kegg_db,
+                                             local_dbs,
                                              brite_blacklist))], axis=1)
     
     frmt = '\nDone! {} ids processed. {} DB lookups'.format
     print(frmt(c_counter.get_count(), c_counter.get_looks_count()))
     return df
-
-
-hmdb2kegg_dict = get_trans_id_table(os.path.join(DB_DIR, 'trans_hmdb2kegg.txt'))
-#lipidmaps2kegg_dict = get_trans_id_table('trans_lipidmaps2kegg.txt')
-_lm_db_fname = (os.path.join(DB_DIR, 'lm_metadata.txt'))
-print ('\nLoading LIPIDMAPS data from {}\n'.format(_lm_db_fname))
-lm_df = load_local_lipidmaps_db(_lm_db_fname)    
-
-lipidmaps2kegg_dict = lm_df['KEGG_ID'].dropna().to_dict()
-
-kegg2lipidmaps_dict = {}
-for k, v in lipidmaps2kegg_dict.items():
-    kegg2lipidmaps_dict[v] = k
 
 if __name__ == '__main__':
 
@@ -385,12 +412,8 @@ if __name__ == '__main__':
 
     print ('Starting annotations...')
 
-    # Use a local Kegg DB.
-    kegg_db = load_local_kegg_db('dbs/kegg_db.txt')
-    
     # Call the main driver function.
     results = insert_taxonomy(results,
-                              local_kegg_db=kegg_db,
                               #brite_blacklist='../example_data/blacklist.txt',
                               trace=True)
 
