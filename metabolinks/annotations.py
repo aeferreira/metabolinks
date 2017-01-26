@@ -110,7 +110,7 @@ class Progress(object):
         self.count = 0
 
 
-def classes_from_brite(krecord, trace=False):
+def classes_from_brite(krecord, brite_blacklist=None, trace=False):
     """Parses classes from the BRITE section of a kegg record."""
     classes = [[], [], [], []]
 
@@ -131,6 +131,9 @@ def classes_from_brite(krecord, trace=False):
             classes[2].append(x[3:])
         elif x.startswith('    ') and not x.startswith('     '):
             classes[3].append(x[4:])
+    if brite_blacklist is not None:
+        if brite_id in brite_blacklist:
+            classes = [['null'], [brite_id], [], []]
 
     classes = ['#'.join(c) for c in classes]
     if trace:
@@ -142,7 +145,6 @@ def classes_from_brite(krecord, trace=False):
 def classes_from_lipidmaps(lm_id, trace=False):
     if trace:
         print('LIPIDMAPS id: {}'.format(lm_id))
-    # print(lm_df.loc[lm_id])
 ##     f = requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
 ##     s = json.loads(f)
 ##     if f == '[]':
@@ -162,7 +164,7 @@ def classes_from_lipidmaps(lm_id, trace=False):
 
 
 def annotate_compound(compound_id, c_counter, already_fetched, 
-                      trace=False, kegg_db=None):
+                      trace=False, kegg_db=None, brite_blacklist=None):
     c_id = None
     lm_id = None
     hmdb_id = None
@@ -235,17 +237,19 @@ def annotate_compound(compound_id, c_counter, already_fetched,
     
     # first from BRITE section
     if (c_id is not None) and len(brite) > 0:
-        classes = classes_from_brite(brite, trace)
-        if classes is None:
-            classes = ('', '', '', '')
+        classes = classes_from_brite(brite, 
+                                     brite_blacklist=brite_blacklist,
+                                     trace=trace)
+        if classes[0] == 'null':
             if trace:
-                print('BRITE class in blacklist. Skipped')
+                print('BRITE class {} in blacklist. Skipped'.format(classes[1]))
+            classes = ('', '', '', '')
     
     # then from LIPIDMAPS
     elif (lm_id is not None):
         if trace:
             print('(look up {})'.format(lm_id))
-        classes = classes_from_lipidmaps(lm_id, trace)
+        classes = classes_from_lipidmaps(lm_id, trace=trace)
         c_counter.inc_looks()
         already_fetched.append(lm_id)
 
@@ -285,7 +289,8 @@ class _count_compounds(object):
         return self.looks_count
 
 
-def annotate_all(peak, c_counter, progress=None, trace=False, kegg_db=None):
+def annotate_all(peak, c_counter, progress=None, trace=False,
+                 kegg_db=None, brite_blacklist=None):
     """Create Pandas Series with compound class annotations."""
     
     data = [[], [], [], [], [], [], []]
@@ -301,7 +306,8 @@ def annotate_all(peak, c_counter, progress=None, trace=False, kegg_db=None):
         d_compound = annotate_compound(compound_id, 
                                        c_counter, 
                                        already_fetched, 
-                                       trace, kegg_db)
+                                       trace, kegg_db,
+                                       brite_blacklist)
         
         for d, i in zip(data, d_compound):
             if len(i) > 0: # don't include empty strings
@@ -336,16 +342,25 @@ def annotate_all(peak, c_counter, progress=None, trace=False, kegg_db=None):
     return pd.Series(hash_data, index=col_names)
 
 
-def insert_taxonomy(df, trace=False, local_kegg_db=None):
+def insert_taxonomy(df, brite_blacklist=None, 
+                    trace=False, local_kegg_db=None):
     """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
     progress = Progress(total=len(df['raw_mass']))
     c_counter = _count_compounds()
+    
+    if brite_blacklist is not None:
+        with open(brite_blacklist) as f:
+            brite_blacklist = f.read().splitlines()
+    
     df = pd.concat([df, df['KEGG_cid'].apply(annotate_all, 
                                              args=(c_counter, progress,
                                              trace,
-                                             local_kegg_db))], axis=1)
-    print('\nDone! {} ids processed. {} DB lookups'.format(c_counter.get_count(), c_counter.get_looks_count()))
+                                             local_kegg_db,
+                                             brite_blacklist))], axis=1)
+    
+    frmt = '\nDone! {} ids processed. {} DB lookups'.format
+    print(frmt(c_counter.get_count(), c_counter.get_looks_count()))
     return df
 
 
@@ -380,7 +395,6 @@ if __name__ == '__main__':
     results.info()
     assert len(results.columns) == 12 # there are 24 - 12 = 12 columns
     assert len(results.index) == 15 # there are still 15 peaks
-    #print(results.head(2))
 
     print ('Starting annotations...')
 
@@ -388,7 +402,10 @@ if __name__ == '__main__':
     kegg_db = load_local_kegg_db('dbs/kegg_db.txt')
     
     # Call the main driver function.
-    results = insert_taxonomy(results, local_kegg_db=kegg_db, trace=True)
+    results = insert_taxonomy(results,
+                              local_kegg_db=kegg_db,
+                              #brite_blacklist='../example_data/blacklist.txt',
+                              trace=True)
 
     elapsed_time = time.time() - start_time
     m, s = divmod(elapsed_time, 60)
