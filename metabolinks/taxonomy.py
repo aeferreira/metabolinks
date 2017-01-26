@@ -7,9 +7,6 @@ import requests
 
 import pandas as pd
 
-import tkinter as tk
-from tkinter import filedialog
-
 DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
 
 # ------------- Code related to Kegg compound records -------------------
@@ -71,16 +68,6 @@ def request_kegg_record(c_id, localdict=None):
     if localdict is not None:
         return localdict[c_id]
     return requests.get('http://rest.kegg.jp/get/' + c_id).text
-
-
-# Helper. No used in example code (file names are hard coded).
-def get_filename_using_tk():
-    """Choose a filename using Tk"""
-    root = tk.Tk()
-    root.withdraw()
-    fname = filedialog.askopenfilename(filetypes = [("TSV","*.tsv")])
-    print ('Selected file {}'.format(fname))
-    return fname
 
 # Load ID translation tables as dicts
 # IMPORTANT: Use local files, (fetched by fetch_dbs.py)

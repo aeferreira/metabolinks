@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 from six import StringIO, string_types, integer_types
 
 import time
@@ -6,7 +6,37 @@ import time
 from numpy import nan
 import pandas as pd
 
+from metabolinks.taxonomy import insert_taxonomy
+
 """Functions related to the analysis of MassTRIX results files."""
+
+# ----------------------------------------
+# MassTRIXResults
+# ----------------------------------------
+
+class MassTRIXResults(pd.DataFrame):
+    """A subclass of Pandas DataFrame representing MassTRIX identifications.
+    
+       Created to facilitate method chaining, and sparing the name space.
+       Instances are created mainly by reading from file functions.
+    """
+    @property
+    def _constructor(self):
+        return MassTRIXResults    
+    
+##     def __init__(self, other):
+##         # Copy attributes only if other is of good type
+##         if isinstance(other, pd.DataFrame):
+##             self.__dict__  = other.__dict__.copy()
+
+    def cleanup_cols(self, **kwargs):
+        return cleanup_cols(self, **kwargs)
+    
+    def unfold(self, **kwargs):
+        return unfold(self, **kwargs)
+    
+    def insert_taxonomy(self, *args, **kwargs):
+        return insert_taxonomy(self, *args, **kwargs)
 
 # ----------------------------------------
 # I/O functions
@@ -26,8 +56,11 @@ def read_MassTRIX(fname):
     moved_list = [lines[-1]]
     moved_list.extend(lines[:-1]) # last line is not included
 
-    # create a Pandas DataFrame, reading from the list of strings in memory
+    # create a MassTRIXResults, which is also a Pandas DataFrame,
+    # reading from the list of strings in memory
+    
     mem_string = StringIO('\n'.join(moved_list))
+    
     df = pd.read_table(mem_string)
     df = MassTRIXResults(df)
     return df
@@ -114,29 +147,6 @@ def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
     #df.drop(col_names, axis=1, inplace=True)
     return df.drop(col_names, axis=1)
     
-# ----------------------------------------
-# MassTRIXResults
-# ----------------------------------------
-
-class MassTRIXResults(pd.DataFrame):
-    """A subclass of Pandas DataFrame.
-    
-       Created to facilitate method chaining.
-    """
-    @property
-    def _constructor(self):
-        return MassTRIXResults    
-    
-##     def __init__(self, other):
-##         # Copy attributes only if other is of good type
-##         if isinstance(other, pd.DataFrame):
-##             self.__dict__  = other.__dict__.copy()
-
-    def cleanup_cols(self, **kwargs):
-        return cleanup_cols(self, **kwargs)
-    
-    def unfold(self, **kwargs):
-        return unfold(self, **kwargs)
 
 # ----------------------------------------
 # Testing code
@@ -144,7 +154,7 @@ class MassTRIXResults(pd.DataFrame):
 
 if __name__ == '__main__':
 
-    testfile_name = 'example_data/masses.annotated.reformat.tsv'
+    testfile_name = '../example_data/masses.annotated.reformat.tsv'
 
     results = read_MassTRIX(testfile_name).cleanup_cols()
     
