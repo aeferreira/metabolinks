@@ -25,6 +25,12 @@ if __name__=='__main__':
 ##	file = filedialog.askopenfilename(filetypes = [("Excel","*.xlsx")])
 ##	file2 = filedialog.askopenfilename(filetypes = [("TSV","*.tsv")])
 
+	exp_file = "example_data/raw_aligned_data.xlsx"
+	exp_file2 = "example_data/aligned_masstrix_output.tsv"
+	
+	file = exp_file
+	file2 = exp_file2
+
 
 	df = pd.read_excel(file)
 	df['m/z'] = df['m/z'].apply(round_up)
@@ -50,26 +56,28 @@ if __name__=='__main__':
 	dfp = df[df['m/z'].isin(l)]
 
 
-	dfp.to_csv(file[:-5]+'_metaboanalyst_clean.csv', index=False, header=True)
+	dfp.to_csv(file[:-5]+'_metaboanalyst.csv', index=False, header=True)
 
 
 	temp = []
-	with open(file[:-5]+'_metaboanalyst_clean.csv') as f:
+	with open(file[:-5]+'_metaboanalyst.csv') as f:
 		for x in f:
 			if x.startswith('m/z'):
 				temp.append('Sample,'+x.split(',',1)[1])
-				temp.append('Label,I,I,I,Mock,Mock,Mock\n')
+				temp.append('Label\n')
 			else:
 				temp.append(x)
-	with open(file[:-5]+'_metaboanalyst_clean.csv', 'w') as f:
+	with open(file[:-5]+'_metaboanalyst.csv', 'w') as f:
 		f.write("".join(temp))
 
 
 	if len(l) == len(dfp):
 		print ('Converted to MetaboAnalyst')
+		print ('Please add Label Manually')
 	else:
 		print('Converted with some missing m/z')
 		print("Not in Mastrix file:")
 		for x in l:
 			if x not in a:
 				print (x)
+		print ('Please add Label Manually')
