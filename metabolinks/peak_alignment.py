@@ -6,6 +6,8 @@ from numpy import nan
 import six
 import pandas as pd
 
+from metabolinks.spectra import Spectrum, AlignedSpectra
+
 
 def read_spectra_from_xcel(file_name,
                            sample_names=None,
@@ -67,8 +69,8 @@ def read_spectra_from_xcel(file_name,
                 spectrum = df.iloc[:, i: i+2]
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
-                spectrum.columns = ['m/z', 'I']  # force these column labels
-                results.append((sample_names[j], spectrum))
+                spectrum.columns = ['m/z', sample_names[j]]  # force these column labels
+                results.append(spectrum)
 
                 j = j + 1
         else:
@@ -77,13 +79,14 @@ def read_spectra_from_xcel(file_name,
                 spectrum = df.iloc[:, [0, i]]
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
-                spectrum.columns = ['m/z', 'I']  # force these column labels
-                results.append((sample_names[j], spectrum))
+                spectrum.columns = ['m/z', sample_names[j]]  # force these column labels
+                results.append(spectrum)
 
                 j = j + 1
 
         if verbose:
-            for name, spectrum in results:
+            for spectrum in results:
+                name = spectrum.columns[1]
                 print ('{:5d} peaks in sample {}'.format(spectrum.shape[0], name))
         spectra_table[sheetname] = results
 
@@ -95,8 +98,10 @@ def concat_peaks(spectra, verbose=True):
         print ('- Joining data...')
     dfs = []
     # tag with sample names, concat vertically and sort by m/z
-    for samplename, spectrum in spectra:
+    for spectrum in spectra:
         newdf = spectrum.copy()
+        samplename = newdf.columns[1]
+        newdf.columns = ['m/z', 'I']
         newcol = pd.Series(samplename, index=newdf.index, name='_sample')
         newdf = pd.concat([newdf, newcol], axis=1)
 
@@ -242,7 +247,8 @@ def align_spectra(spectra,
                   min_samples=1,
                   verbose=True):
 
-    samplenames = [name for name, df in spectra]
+    samplenames = [s.columns[1] for s in spectra]
+    print ('  Sample names:', samplenames)
     mdf = concat_peaks(spectra, verbose=verbose)
     return group_peaks(mdf, samplenames,
                        ppmtol=ppmtol,
@@ -262,14 +268,15 @@ def align_spectra_in_excel(fname, save_files_prefix=None,
                                            sample_names=sample_names,
                                            header_row=header_row,
                                            verbose=verbose)
+
     if verbose:
-        print ('\n------ Aligning spectra ------')
+        print('\n------ Aligning spectra ------')
 
     aligned_spectra = OrderedDict()
-    for name, spectra in spectra_table.items():
+    for sheetname, spectra in spectra_table.items():
         if verbose:
-            print ('\n-- sheet "{}"'.format(name))
-        aligned_spectra[name] = align_spectra(spectra,
+            print ('\n-- sheet "{}"'.format(sheetname))
+        aligned_spectra[sheetname] = align_spectra(spectra,
                                               ppmtol=ppmtol,
                                               min_samples=min_samples,
                                               verbose=verbose)
@@ -277,16 +284,15 @@ def align_spectra_in_excel(fname, save_files_prefix=None,
         save_aligned_to_excel(save_to_excel, aligned_spectra)
     
     if save_files_prefix is not None:
-        for name in aligned_spectra:
-            ofname = save_files_prefix + name + '.txt'
-            df = aligned_spectra[name]
-            loc_nsamples = df.columns.get_loc('#samples')
-            df = df.iloc[:, :loc_nsamples]
-            df.to_csv(ofname, sep='\t', index=False, na_rep='0')
+        for sheetname in aligned_spectra:
+            ofname = save_files_prefix + sheetname + '.txt'
+            df = aligned_spectra[sheetname]
+            df = df.iloc[:, :df.columns.get_loc('#samples')]
+            spectra = AlignedSpectra(df)
+            spectra.to_csv(ofname, na_rep='0')
             if verbose:
                 print('Created file\n{}'.format(ofname))
 
-    
     return aligned_spectra
 
 
