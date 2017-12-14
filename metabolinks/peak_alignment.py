@@ -10,6 +10,7 @@ import pandas as pd
 def read_spectra_from_xcel(file_name,
                            sample_names=None,
                            header_row=1,
+                           common_mz= False,
                            verbose=True):
 
     spectra_table = OrderedDict()
@@ -49,29 +50,37 @@ def read_spectra_from_xcel(file_name,
 
         # if sample names were not set yet then
         # use "2nd columns" headers as sample names
+        # if common_mz then use headers from position 1
         if len(snames) > 0:
             sample_names = snames
         else:
-            sample_names = df.columns[1::2]
-
-##         print('============================================')
-##         print('Sample names:', sample_names)
+            if common_mz:
+                sample_names = df.columns[1:]
+            else:
+                sample_names = df.columns[1::2]
 
         # split in groups of two (each group is a spectrum)
         results = []
-        j = 0
-        for i in range(0, len(df.columns), 2):
-            spectrum = df.iloc[:, i:i + 2]
-            spectrum.index = range(len(spectrum))
-            spectrum = spectrum.dropna()
-            spectrum.columns = ['m/z', 'I']  # force these column labels
-            results.append((sample_names[j], spectrum))
+        if not common_mz:
+            j = 0
+            for i in range(0, len(df.columns), 2):
+                spectrum = df.iloc[:, i: i+2]
+                spectrum.index = range(len(spectrum))
+                spectrum = spectrum.dropna()
+                spectrum.columns = ['m/z', 'I']  # force these column labels
+                results.append((sample_names[j], spectrum))
 
-##             print('============================================')
-##             print(snames_row[j])
-##             print('-------------------------------')
-##             print(spectrum.head(10))
-            j = j + 1
+                j = j + 1
+        else:
+            j = 0
+            for i in range(1, len(df.columns)):
+                spectrum = df.iloc[:, [0, i]]
+                spectrum.index = range(len(spectrum))
+                spectrum = spectrum.dropna()
+                spectrum.columns = ['m/z', 'I']  # force these column labels
+                results.append((sample_names[j], spectrum))
+
+                j = j + 1
 
         if verbose:
             for name, spectrum in results:
@@ -145,14 +154,6 @@ def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=1, verbose=True):
                         axis=1)
     grouped = result.groupby('_group')
 
-##     print('++++++++++++++++++++++++++++++++++++++++++++++')
-##     for (i,(gname, gvalue)) in enumerate(grouped):
-##         print ('----->>>{}, {} elements'.format(gname, len(gvalue)))
-##         print (gvalue.set_index('_sample'))
-##         if i > 6:
-##             break
-##     print('++++++++++++++++++++++++++++++++++++++++++++++')
-
     colnames = ['m/z'] + sample_ids + ['#samples']
     intensities = {sname: list() for sname in colnames}
 
@@ -189,7 +190,6 @@ def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=1, verbose=True):
 
 
 def save_aligned_to_excel(fname, outdict):
-    print ('\n------ writing results to MS-Excel file ------')
     writer = pd.ExcelWriter(fname, engine='xlsxwriter')
 
     for sname in outdict:
@@ -250,7 +250,8 @@ def align_spectra(spectra,
                        verbose=verbose)
 
 
-def align_spectra_in_excel(fname, save_to_excel=None,
+def align_spectra_in_excel(fname, save_files_prefix=None,
+                           save_to_excel=None,
                            ppmtol=1.0,
                            min_samples=1,
                            sample_names=None,
@@ -264,18 +265,29 @@ def align_spectra_in_excel(fname, save_to_excel=None,
     if verbose:
         print ('\n------ Aligning spectra ------')
 
-    outspectra = OrderedDict()
-    for sheetname, spectra in spectra_table.items():
+    aligned_spectra = OrderedDict()
+    for name, spectra in spectra_table.items():
         if verbose:
-            print ('\n-- sheet "{}"'.format(sheetname))
-        outspectra[sheetname] = align_spectra(spectra,
+            print ('\n-- sheet "{}"'.format(name))
+        aligned_spectra[name] = align_spectra(spectra,
                                               ppmtol=ppmtol,
                                               min_samples=min_samples,
                                               verbose=verbose)
     if save_to_excel is not None:
-        save_aligned_to_excel(save_to_excel, outspectra)
+        save_aligned_to_excel(save_to_excel, aligned_spectra)
+    
+    if save_files_prefix is not None:
+        for name in aligned_spectra:
+            ofname = save_files_prefix + name + '.txt'
+            df = aligned_spectra[name]
+            loc_nsamples = df.columns.get_loc('#samples')
+            df = df.iloc[:, :loc_nsamples]
+            df.to_csv(ofname, sep='\t', index=False, na_rep='0')
+            if verbose:
+                print('Created file\n{}'.format(ofname))
 
-    return outspectra
+    
+    return aligned_spectra
 
 
 if __name__ == '__main__':
@@ -284,12 +296,14 @@ if __name__ == '__main__':
 
     fname = '../example_data/data_to_align.xlsx'
     out_fname = '../example_data/aligned_data.xlsx'
+    oprefix = '../example_data/aligned'
 
     header_row = 2
     sample_names = ['S1', 'S2', 'S3']
     #sample_names = 1
 
-    align_spectra_in_excel(fname, save_to_excel=out_fname,
+    align_spectra_in_excel(fname, save_files_prefix=oprefix,
+                           save_to_excel=out_fname,
                            ppmtol=ppmtol,
                            min_samples=min_samples,
                            header_row=header_row,
