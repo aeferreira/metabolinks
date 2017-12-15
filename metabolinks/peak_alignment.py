@@ -69,7 +69,7 @@ def read_spectra_from_xcel(file_name,
                 spectrum = df.iloc[:, i: i+2]
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
-                spectrum.columns = ['m/z', sample_names[j]]  # force these column labels
+                spectrum = Spectrum(spectrum, sample_name=sample_names[j])
                 results.append(spectrum)
 
                 j = j + 1
@@ -79,15 +79,15 @@ def read_spectra_from_xcel(file_name,
                 spectrum = df.iloc[:, [0, i]]
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
-                spectrum.columns = ['m/z', sample_names[j]]  # force these column labels
+                spectrum = Spectrum(spectrum, sample_name=sample_names[j])
                 results.append(spectrum)
 
                 j = j + 1
 
         if verbose:
             for spectrum in results:
-                name = spectrum.columns[1]
-                print ('{:5d} peaks in sample {}'.format(spectrum.shape[0], name))
+                name = spectrum.sample_name
+                print ('{:5d} peaks in sample {}'.format(spectrum.data.shape[0], name))
         spectra_table[sheetname] = results
 
     return spectra_table
@@ -99,10 +99,9 @@ def concat_peaks(spectra, verbose=True):
     dfs = []
     # tag with sample names, concat vertically and sort by m/z
     for spectrum in spectra:
-        newdf = spectrum.copy()
-        samplename = newdf.columns[1]
+        newdf = spectrum.data.copy()
         newdf.columns = ['m/z', 'I']
-        newcol = pd.Series(samplename, index=newdf.index, name='_sample')
+        newcol = pd.Series(spectrum.sample_name, index=newdf.index, name='_sample')
         newdf = pd.concat([newdf, newcol], axis=1)
 
         dfs.append(newdf)
@@ -129,7 +128,9 @@ def are_near(d1, d2, ppmtol):
     return False
 
 
-def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=1, verbose=True):
+def group_peaks(df, sample_ids, ppmtol=1.0,
+                min_samples=1, fillna=None,
+                verbose=True):
     """Group peaks from different samples.
 
        Peaks are grouped if their relative mass difference is below
@@ -191,14 +192,17 @@ def group_peaks(df, sample_ids, ppmtol=1.0, min_samples=1, verbose=True):
             print ('{:5d} peaks in {} samples'.format(c, n))
         print('  {:3d} total'.format(len(result)))
 
-    return result
+    res = AlignedSpectra(result, sample_names=sample_ids)
+    if fillna is not None:
+        res.fillna(fillna)
+    return res
 
 
 def save_aligned_to_excel(fname, outdict):
     writer = pd.ExcelWriter(fname, engine='xlsxwriter')
 
     for sname in outdict:
-        results = outdict[sname]
+        results = outdict[sname].data
         n_compounds, ncols = results.shape
 
         # write Pandas DataFrame
@@ -245,14 +249,17 @@ def save_aligned_to_excel(fname, outdict):
 def align_spectra(spectra,
                   ppmtol=1.0,
                   min_samples=1,
+                  fillna=None,
                   verbose=True):
 
-    samplenames = [s.columns[1] for s in spectra]
-    print ('  Sample names:', samplenames)
+    samplenames = [s.sample_name for s in spectra]
+    if verbose:
+        print ('  Sample names:', samplenames)
     mdf = concat_peaks(spectra, verbose=verbose)
     return group_peaks(mdf, samplenames,
                        ppmtol=ppmtol,
                        min_samples=min_samples,
+                       fillna=fillna,
                        verbose=verbose)
 
 
@@ -262,6 +269,7 @@ def align_spectra_in_excel(fname, save_files_prefix=None,
                            min_samples=1,
                            sample_names=None,
                            header_row=1,
+                           fillna=None,
                            verbose=True):
 
     spectra_table = read_spectra_from_xcel(fname,
@@ -279,17 +287,15 @@ def align_spectra_in_excel(fname, save_files_prefix=None,
         aligned_spectra[sheetname] = align_spectra(spectra,
                                               ppmtol=ppmtol,
                                               min_samples=min_samples,
+                                              fillna=fillna,
                                               verbose=verbose)
     if save_to_excel is not None:
         save_aligned_to_excel(save_to_excel, aligned_spectra)
     
     if save_files_prefix is not None:
-        for sheetname in aligned_spectra:
+        for sheetname, spectra in aligned_spectra.items():
             ofname = save_files_prefix + sheetname + '.txt'
-            df = aligned_spectra[sheetname]
-            df = df.iloc[:, :df.columns.get_loc('#samples')]
-            spectra = AlignedSpectra(df)
-            spectra.to_csv(ofname, na_rep='0')
+            spectra.to_csv(ofname)
             if verbose:
                 print('Created file\n{}'.format(ofname))
 
@@ -313,4 +319,5 @@ if __name__ == '__main__':
                            ppmtol=ppmtol,
                            min_samples=min_samples,
                            header_row=header_row,
+                           fillna=0,
                            sample_names=sample_names)
