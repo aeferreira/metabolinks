@@ -202,6 +202,24 @@ def group_peaks(df, sample_ids, ppmtol=1.0,
     return res
 
 
+def align_spectra(spectra,
+                  ppmtol=1.0,
+                  min_samples=1,
+                  fillna=None,
+                  verbose=True):
+
+    samplenames = [s.sample_name for s in spectra]
+    if verbose:
+        print ('  Sample names:', samplenames)
+    mdf = concat_peaks(spectra, verbose=verbose)
+    return group_peaks(mdf, samplenames,
+                       ppmtol=ppmtol,
+                       min_samples=min_samples,
+                       fillna=fillna,
+                       verbose=verbose)
+
+
+
 def save_aligned_to_excel(fname, outdict):
     writer = pd.ExcelWriter(fname, engine='xlsxwriter')
 
@@ -248,23 +266,6 @@ def save_aligned_to_excel(fname, outdict):
 
     writer.save()
     print('Created file\n{}'.format(fname))
-
-
-def align_spectra(spectra,
-                  ppmtol=1.0,
-                  min_samples=1,
-                  fillna=None,
-                  verbose=True):
-
-    samplenames = [s.sample_name for s in spectra]
-    if verbose:
-        print ('  Sample names:', samplenames)
-    mdf = concat_peaks(spectra, verbose=verbose)
-    return group_peaks(mdf, samplenames,
-                       ppmtol=ppmtol,
-                       min_samples=min_samples,
-                       fillna=fillna,
-                       verbose=verbose)
 
 
 def align_spectra_in_excel(fname, save_files_prefix=None,
