@@ -39,10 +39,11 @@ class Spectrum(object):
         outdf.to_csv(filename, header=mz_name, index=False, **kwargs)
 
 class AlignedSpectra(object):
-    def __init__(self, df=None, sample_names=None):
+    def __init__(self, df=None, sample_names=None, labels=None):
         self._df = None
         if df is not None:
             self._df = df.copy()
+        self.labels = None
         self.sample_names = None
         if sample_names is not None:
             self.sample_names = sample_names
@@ -78,6 +79,13 @@ class AlignedSpectra(object):
     def fillna(self, value):
         vdict = dict([(n, value) for n in self.sample_names])
         self._df.fillna(vdict, inplace=True)
+        
+    def unfold(self):
+        res = []
+        for i, name in enumerate(self.sample_names):
+            df = self._df.iloc[:, [0, i+1]].dropna()
+            res.append(Spectrum(df, sample_name=name))
+        return res
         
 
 def read_spectrum(filename):
@@ -125,3 +133,12 @@ if __name__ == '__main__':
     print('Saving aligned spectra into', sname, '----------')
     spectra.to_csv(sname, mz_name='Samples')
 
+    print('\nUnfolding spectra ----------')
+    spectra = read_aligned_spectra(fname)
+    unfolded = spectra.unfold()
+    
+    for u in unfolded:
+        print('Spectrum', u.sample_name)
+        print(u.data.head(10))
+        print('+++++')
+        

@@ -160,7 +160,7 @@ def group_peaks(df, sample_ids, ppmtol=1.0,
                         axis=1)
     grouped = result.groupby('_group')
 
-    colnames = ['m/z'] + sample_ids + ['#samples']
+    colnames = ['m/z'] + sample_ids + ['#samples', 'range_ppm']
     intensities = {sname: list() for sname in colnames}
 
     for gname, gvalue in grouped:
@@ -168,6 +168,10 @@ def group_peaks(df, sample_ids, ppmtol=1.0,
 
         intensities['m/z'].append(tagged['m/z'].mean())
         intensities['#samples'].append(len(tagged))
+        m_min = tagged['m/z'].min()
+        m_max = tagged['m/z'].max()
+        range_ppm = 1e6 * (m_max - m_min) / m_max
+        intensities['range_ppm'].append(range_ppm)
 
         for s in sample_ids:
             i = int(tagged.loc[s, 'I']) if s in tagged.index else nan
