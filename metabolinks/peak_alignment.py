@@ -11,6 +11,7 @@ from metabolinks.spectra import Spectrum, AlignedSpectra
 
 def read_spectra_from_xcel(file_name,
                            sample_names=None,
+                           labels=None,
                            header_row=1,
                            common_mz= False,
                            verbose=True):
@@ -83,6 +84,10 @@ def read_spectra_from_xcel(file_name,
                 results.append(spectrum)
 
                 j = j + 1
+        
+        if labels is not None:
+            for i, spectrum in enumerate(results):
+                spectrum.label = labels[i]
 
         if verbose:
             for spectrum in results:
@@ -128,7 +133,7 @@ def are_near(d1, d2, ppmtol):
     return False
 
 
-def group_peaks(df, sample_ids, ppmtol=1.0,
+def group_peaks(df, sample_ids, labels=None, ppmtol=1.0,
                 min_samples=1, fillna=None,
                 verbose=True):
     """Group peaks from different samples.
@@ -196,7 +201,9 @@ def group_peaks(df, sample_ids, ppmtol=1.0,
             print ('{:5d} peaks in {} samples'.format(c, n))
         print('  {:3d} total'.format(len(result)))
 
-    res = AlignedSpectra(result, sample_names=sample_ids)
+    res = AlignedSpectra(result, sample_names=sample_ids, labels=labels)
+    res.compute_similarity_measures()
+
     if fillna is not None:
         res.fillna(fillna)
     return res
@@ -209,10 +216,23 @@ def align_spectra(spectra,
                   verbose=True):
 
     samplenames = [s.sample_name for s in spectra]
+    no_labels = False
+    for s in spectra:
+        if s.label is None:
+            no_labels = True
+            break
+    if no_labels:
+        labels = None
+    else:
+        labels = [s.label for s in spectra]
+    
     if verbose:
         print ('  Sample names:', samplenames)
+        if not no_labels:
+            print ('  Labels:', labels)
+            
     mdf = concat_peaks(spectra, verbose=verbose)
-    return group_peaks(mdf, samplenames,
+    return group_peaks(mdf, samplenames, labels=labels,
                        ppmtol=ppmtol,
                        min_samples=min_samples,
                        fillna=fillna,
@@ -224,7 +244,14 @@ def save_aligned_to_excel(fname, outdict):
     writer = pd.ExcelWriter(fname, engine='xlsxwriter')
 
     for sname in outdict:
-        results = outdict[sname].data
+        
+        aligned_spectra = outdict[sname]
+                
+        sample_similarity = aligned_spectra.sample_similarity
+        label_similarity = aligned_spectra.label_similarity
+        unique_labels = aligned_spectra.unique_labels
+                
+        results = aligned_spectra.data
         n_compounds, ncols = results.shape
 
         # write Pandas DataFrame
@@ -246,23 +273,67 @@ def save_aligned_to_excel(fname, outdict):
         sh.set_column(2, ncols - 1, 25)
         sh.set_column(1, 1, 15)
         sh.set_column(ncols, ncols, 15)
-
-        # Create table of replica counts
-        sh.write_string(1, ncols + 2, '#samples')
+        
+        # Create report sheet
+        rsheetname = sname + ' report'
+        sh = workbook.add_worksheet(rsheetname)
+        
+        row_offset = 1
+        
+        sh.write_string(row_offset, 1, 'Peak reproducibility')
+        
+        row_offset = row_offset + 2
+        
+        # create table of replica counts
+        sh.write_string(row_offset, 2, '#samples')
         counts = results['#samples'].value_counts().sort_index()
-        sh.write_column(2, ncols + 2, counts.index)
-        sh.write_column(2, ncols + 3, counts.values)
+        sh.write_column(row_offset + 1, 2, counts.index)
+        sh.write_column(row_offset + 1, 3, counts.values)
 
-        sh.write_string(2 + len(counts), ncols + 2, 'total')
-        sh.write_number(2 + len(counts), ncols + 3, len(results))
+        sh.write_string(row_offset + 1 + len(counts), 2, 'total')
+        sh.write_number(row_offset + 1 + len(counts), 3, len(results))
 
         # Add pie chart of replica counts
         chart = workbook.add_chart({'type': 'pie'})
-        chart.add_series({'values': [sname, 2, ncols + 3, 1 + len(counts), ncols + 3],
-                          'categories': [sname, 2, ncols + 2, 1 + len(counts), ncols + 2],
+        chart.add_series({'values': [rsheetname, row_offset+1, 3, row_offset + len(counts), 3],
+                          'categories': [rsheetname, row_offset+1, 2, row_offset + len(counts), 2],
                           'name': '#samples'})
         chart.set_size({'width': 380, 'height': 288})
-        sh.insert_chart(7, ncols + 1, chart)
+        sh.insert_chart(1, 5, chart)
+
+        row_offset = row_offset + len(counts) + 7
+
+        sh.write_string(row_offset, 1, 'Sample sizes')
+        
+        row_offset = row_offset + 2
+        
+        sh.write_row(row_offset, 1, aligned_spectra.sample_names)
+        for i in range(sample_similarity.shape[0]):
+            sh.write_number(row_offset + 1, 1 + i, sample_similarity[i, i])
+
+        row_offset = row_offset + 4
+        
+        sh.write_string(row_offset, 1, 'Sample similarity')
+        
+        row_offset = row_offset + 2
+
+        sh.write_row(row_offset, 2, aligned_spectra.sample_names)
+        sh.write_column(row_offset + 1, 1, aligned_spectra.sample_names)
+        for i in range(sample_similarity.shape[0]):
+            sh.write_row(row_offset + i + 1, 2, sample_similarity[i, :])
+            
+        if label_similarity is not None:
+            row_offset = row_offset + sample_similarity.shape[0] + 3
+            
+            sh.write_string(row_offset, 1, 'Label similarity')
+            
+            row_offset = row_offset + 2
+
+            sh.write_row(row_offset, 2, unique_labels)
+            sh.write_column(row_offset + 1, 1, unique_labels)
+            for i in range(label_similarity.shape[0]):
+                sh.write_row(row_offset + i + 1, 2, label_similarity[i, :])
+            
 
     writer.save()
     print('Created file\n{}'.format(fname))
@@ -273,12 +344,14 @@ def align_spectra_in_excel(fname, save_files_prefix=None,
                            ppmtol=1.0,
                            min_samples=1,
                            sample_names=None,
+                           labels=None,
                            header_row=1,
                            fillna=None,
                            verbose=True):
 
     spectra_table = read_spectra_from_xcel(fname,
                                            sample_names=sample_names,
+                                           labels=labels,
                                            header_row=header_row,
                                            verbose=verbose)
 
@@ -317,12 +390,13 @@ if __name__ == '__main__':
 
     header_row = 2
     sample_names = ['S1', 'S2', 'S3']
+    labels = ['wt', 'mod', 'mod']
     #sample_names = 1
 
     align_spectra_in_excel(fname, save_files_prefix=oprefix,
                            save_to_excel=out_fname,
                            ppmtol=ppmtol,
                            min_samples=min_samples,
+                           labels=labels,
                            header_row=header_row,
-                           fillna=0,
                            sample_names=sample_names)
