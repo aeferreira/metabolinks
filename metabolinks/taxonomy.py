@@ -22,6 +22,7 @@ class LocalDBs(object):
         self.hmdb2kegg_dict = hmdb2kegg_dict
         self.lipidmaps2kegg_dict = lipidmaps2kegg_dict
         self.kegg2lipidmaps_dict = kegg2lipidmaps_dict
+        self.new_kegg_records = []
 
 _local_dbs = None
 _DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
@@ -102,10 +103,14 @@ def get_kegg_section(k_record, sname, whole_section=False):
         sectionlines = [line[12:] for line in section]
     return '\n'.join(sectionlines)
 
-def request_kegg_record(c_id, localdict):
+def request_kegg_record(c_id, localdict, local_dbs):
     if c_id in localdict:
         return localdict[c_id]
-    return requests.get('http://rest.kegg.jp/get/' + c_id).text
+    else:
+        record = requests.get('http://rest.kegg.jp/get/' + c_id).text
+        outrecord = '---- Compound: {}\n'.format(c_id) + record
+        local_dbs.new_kegg_records.append(outrecord)
+        return record
 
 # Load ID translation tables as dicts
 # IMPORTANT: Use local files, (fetched by fetch_dbs.py)
@@ -140,15 +145,25 @@ def classes_from_brite(krecord, brite_blacklist=None, trace=False):
     classes = [[], [], [], []]
 
     # replace word BRITE by spaces
-    krecord = ' '*5 + krecord[5:]
+    krecord = ' '* 5 + krecord[5:]
 
     # split by 11 spaces (and discard ":" ), remove trailing \n
     cstrings = [c.rstrip() for c in krecord.split('           ')[1:]]
 
     brite_id = ''
     for x in cstrings:
+##         print('*******************************')
+##         print('|{}|'.format(x))
+##         print('*******************************')
+        
         if x.startswith(' ') and not x.startswith('  '):
-            brite_id = x.split('[BR:')[1].split(']')[0]
+            if '[BR:' in x:
+                brite_id = x.split('[BR:')[1].split(']')[0]
+            elif '[br' in x:
+                brite_id = 'br' + x.split('[br')[1].split(']')[0]
+            else:
+                brite_id = 'br?????'
+                
             classes[0].append(x[1:])
         elif x.startswith('  ') and not x.startswith('   '):
             classes[1].append(x[2:])
@@ -178,10 +193,13 @@ def classes_from_lipidmaps(lm_id, lm_df, trace=False):
 ##     cc = s['core'] if s['core'] is not None else 'null'
 ##     ss = s['main_class'] if s['main_class'] is not None else 'null'
 ##     tt = s['sub_class'] if s['sub_class'] is not None else 'null'
-    record = lm_df.loc[lm_id]
-    cc = ['Lipids [LM]']
-    for field in 'CATEGORY', 'MAIN_CLASS', 'SUB_CLASS':
-        cc.append(record[field] if pd.notnull(record[field]) else 'null')
+    if lm_id not in lm_df.index:
+        cc = ['Lipids [LM]', 'null', 'null', 'null']
+    else:
+        record = lm_df.loc[lm_id]
+        cc = ['Lipids [LM]']
+        for field in 'CATEGORY', 'MAIN_CLASS', 'SUB_CLASS':
+            cc.append(record[field] if pd.notnull(record[field]) else 'null')
     a = tuple(cc)
     if trace:
         print(a)
@@ -237,7 +255,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         return (trans_kegg, trans_lipidmaps, '', '', '', '', '')
         
     if c_id is not None:
-        krecord = request_kegg_record(c_id, localdict=local_dbs.kegg_db)
+        krecord = request_kegg_record(c_id, local_dbs.kegg_db, local_dbs)
         if trace:
             print('(look up {})'.format(c_id))
         c_counter.inc_looks()
@@ -388,6 +406,12 @@ def insert_taxonomy(df, brite_blacklist=None, trace=False):
     
     frmt = '\nDone! {} ids processed. {} DB lookups'.format
     print(frmt(c_counter.get_count(), c_counter.get_looks_count()))
+    print('updating local Kegg DB')
+    kegg_df_fname = os.path.join(_DB_DIR, 'kegg_db.txt')
+    with open(kegg_df_fname, 'a') as kf:
+        kf.write('\n')
+        kf.write('\n'.join(local_dbs.new_kegg_records))
+    print('\nDone')
     return df
 
 if __name__ == '__main__':

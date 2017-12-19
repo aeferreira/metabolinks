@@ -1,4 +1,7 @@
 from __future__ import print_function, absolute_import
+
+from collections import Counter
+
 from six import StringIO, string_types, integer_types
 
 import time
@@ -35,14 +38,17 @@ class MassTRIXResults(pd.DataFrame):
     def unfold(self, **kwargs):
         return unfold(self, **kwargs)
     
-    def insert_taxonomy(self, *args, **kwargs):
+    def insert_taxonomy(self, *args, **kwargs): 
         return insert_taxonomy(self, *args, **kwargs)
+    
+    def compute_element_composition(self, *args, **kwargs):
+        return compute_element_composition(self, *args, **kwargs)
 
 # ----------------------------------------
 # I/O functions
 # ----------------------------------------
 
-def read_MassTRIX(fname):
+def read_MassTRIX(fname, unfolded=False):
     """Reads a MassTRIX file into a Pandas DataFrame object.
        
        On the process, the last line is moved to the beginning and
@@ -52,14 +58,16 @@ def read_MassTRIX(fname):
     with open(fname) as f:
         lines = [line.strip() for line in f]
     
-    # move the last line to the beginning
-    moved_list = [lines[-1]]
-    moved_list.extend(lines[:-1]) # last line is not included
+    if not unfolded:
+        # move the last line to the beginning
+        moved_list = [lines[-1]]
+        moved_list.extend(lines[:-1]) # last line is not included
+        lines = moved_list
 
     # create a MassTRIXResults, which is also a Pandas DataFrame,
     # reading from the list of strings in memory
     
-    mem_string = StringIO('\n'.join(moved_list))
+    mem_string = StringIO('\n'.join(lines))
     
     df = pd.read_table(mem_string)
     df = MassTRIXResults(df)
@@ -149,6 +157,55 @@ def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
     
 
 # ----------------------------------------
+# Element compositions
+# ----------------------------------------
+
+def compute_element_composition(masstrixdf,
+                                compositions = ('CHO', 'CHOS',
+                                                'CHON', 'CHONS',
+                                                'CHOP', 'CHONP',
+                                                'CHONSP'),
+                                verbose=True):
+    
+    mdf = masstrixdf.set_index('raw_mass')
+    formulae = mdf['KEGG_formula'].str.split('#').apply(set).apply(list)
+    # print(formulas)
+
+    # remove unambigous formulae
+    is_1 = [True if len(f) == 1 else False for f in formulae.values]
+    formulae = formulae[is_1]
+    
+    #print(formulae)
+    
+    # convert to list of strings and remove duplicates
+    formulae = list(set([f[0] for f in formulae.values]))
+    #print(formulae)
+    if verbose:
+        print(len(formulae), 'formulae')
+
+    # Calculate element compositions
+    comps = []
+    for formula in formulae:
+        # remove numbers
+        exclude = "0123456789,.[]() "
+        for chr in exclude:
+            formula = formula.replace(chr,'')
+        
+        # count according to composition groups
+        for c in compositions:
+            if set(formula) == set(c):
+                comps.append(c)
+                break
+        else:
+            comps.append('other')
+    elem_comp = Counter(comps)
+    
+    #for f, c in zip(formulae, comps):
+        #print(f, c)
+        
+    return elem_comp
+
+# ----------------------------------------
 # Testing code
 # ----------------------------------------
 
@@ -162,6 +219,16 @@ if __name__ == '__main__':
     
     results.info()
 
+    print('\n+++++++++++++++++++++++++++++++')
+    print('Element compositions:')
+    
+    compositions = ['CHO', 'CHOS', 'CHON', 'CHONS', 
+                    'CHOP', 'CHONP', 'CHONSP']
+    
+    elem_comp = compute_element_composition(results, compositions)
+    for c in compositions + ['other']:
+        print(c, elem_comp[c])
+    
     print('\n+++++++++++++++++++++++++++++++')
 
     results = results.unfold()
