@@ -100,24 +100,56 @@ class AlignedSpectra(object):
             res.append(Spectrum(df, sample_name=name, label=label))
         return res
     
+    
+    def sample_mz(self, sample_name):
+        df = self.data[['m/z', sample_name]].dropna()['m/z']
+        return df.values
+    
+    def label_mz(self, label):
+        # build a list grouping samples with a given label
+        lcolumns = []
+        for c, l in zip(self.data.columns[1:], self.labels):
+            if l == label:
+                lcolumns.append(c)
+        df = self.data[['m/z'] + lcolumns].dropna(how='all', subset=lcolumns)['m/z']
+        return df.values
+    
+    def common_label_mz(self, label1, label2):
+        mz1 = self.label_mz(label1)
+        mz2 = self.label_mz(label2)
+        u = np.intersect1d(mz1, mz2)
+        return u
+    
+    def exclusive_label_mz(self, label):
+        # build list of unique other labels
+        slabels = []
+        for lbl in self.labels:
+            if lbl not in slabels:
+                slabels.append(lbl)
+        slabels = [lbl for lbl in slabels if lbl != label]
+        
+        remaining = self.label_mz(label)
+        for lbl in slabels:
+            remaining = np.setdiff1d(remaining, self.label_mz(lbl))
+        return remaining
+        
+        
+    
     def compute_similarity_measures(self):
         # compute counts and Jaccard index by samples
         self.sample_similarity = None
-        spectra = self.unfold()
         
-        n = len(spectra)
+        n = len(self.sample_names)
         self.sample_similarity = None
         smatrix = np.zeros((n, n))
         for i1 in range(n-1):
             for i2 in range(i1+1, n):
-                s1 = spectra[i1]
-                s2 = spectra[i2]
-                mz1 = s1.data['m/z']
-                mz2 = s2.data['m/z']
+                mz1 = self.sample_mz(self.sample_names[i1])
+                mz2 = self.sample_mz(self.sample_names[i2])
                 smatrix[i1, i1] = len(mz1)
                 smatrix[i2, i2] = len(mz2)
-                set1 = set(mz1.values)
-                set2 = set(mz2.values)
+                set1 = set(mz1)
+                set2 = set(mz2)
                 u12 = set1.union(set2)
                 i12 = set1.intersection(set2)
                 smatrix[i1, i2] = len(i12)
@@ -134,23 +166,9 @@ class AlignedSpectra(object):
                 label = self.labels[i]
                 if label not in slabels:
                     slabels.append(label)
-            # build dict of lists grouping samples with a given label
-            groups = {}
-            for label in slabels:
-                groups[label] = [s for s in spectra if s.label == label]
-            # find union of m/z values for each label (as a set)
             mzs = {}
             for label in slabels:
-                # print('Label', label, len(groups[label]), 'spectra')
-                gl = groups[label]
-                mz = set(gl[0].data['m/z'])
-                #print(0)
-                #print(len(mz), mz)
-                for i in range(1, len(gl)):
-                    mz = mz.union(set(gl[i].data['m/z']))
-                    #print(i)
-                    #print(len(mz), mz)
-                mzs[label] = mz
+                mzs[label] = self.label_mz(label)
             # compute intersection counts and Jaccard index
             n = len(slabels)
             lmatrix = np.zeros((n, n))
@@ -158,8 +176,8 @@ class AlignedSpectra(object):
                 for i2 in range(i1+1, n):
                     label1 = slabels[i1]
                     label2 = slabels[i2]
-                    set1 = mzs[label1]
-                    set2 = mzs[label2]
+                    set1 = set(mzs[label1])
+                    set2 = set(mzs[label2])
                     lmatrix[i1, i1] = len(set1)
                     lmatrix[i2, i2] = len(set2)
                     u12 = set1.union(set2)
@@ -211,6 +229,9 @@ if __name__ == '__main__':
     spectra.data.info()
     print(spectra.data)
 
+    print('\nTesting retrieval of m/z by sample (for s38) ----------')
+    print(spectra.sample_mz('s38'))
+    
     print('\nFilling with zeros ----------')
     spectra.fillna(0)
 
@@ -219,9 +240,18 @@ if __name__ == '__main__':
         return'Samples\t'+'\t'.join(s.sample_names)
     spectra.to_csv(sname, header_func=header)
 
-    print('\nUnfolding spectra ----------')
     labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2']
     spectra = read_aligned_spectra(fname, labels=labels)
+    print('\nTesting retrieval of m/z by label (for v1) ----------')
+    print(spectra.label_mz('v1'))
+
+    print('\nTesting common labels m/z (v1,v2) ----------')
+    print(spectra.common_label_mz('v1', 'v2'))
+
+    print('\nTesting exclusive m/z (v1) ----------')
+    print(spectra.exclusive_label_mz('v1'))
+
+    print('\nUnfolding spectra ----------')
     unfolded = spectra.unfold()
     
     for u in unfolded:
