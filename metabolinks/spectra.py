@@ -1,28 +1,57 @@
+"""Classes representing MS peak lists.
+
+There are two types of peak lists: single (Spectrum) and aligned
+(AlignedSpectra). AlignedSpectra represents multiple peak lists that share
+the same m/z values.
+
+Simple data handling functions are implemented as well as I/O to CSV (TSV).
+
+Much more data handling procedures are available through the property `data`
+which is a Pandas DataFrame.
+
+"""
+
 from __future__ import print_function
 
 import numpy as np
 import pandas as pd
 
-"""Classes representing MS peak lists.
-
-Peak data are implemented as Pandas DataFrames, with columns[0] == 'm/z'.
-I/O to CSV (TSV) and simple transformations are supported."""
 
 class Spectrum(object):
+    """A single peak list.
+
+    The underlying data (property `data`) is implemented in a Pandas DataFrame.
+    The first column holds m/z values and the second columns holds (ususally)
+    intensity data.
+
+    Attributes
+    ----------
+    sample_name : str
+        The name of this sample.
+    label : str
+        Optional sample label, used in classification tasks.
+
+    """
+
     def __init__(self, df=None, sample_name=None, label=None):
-        self._df = None
         if df is not None:
             self._df = df.copy()
-        self.sample_name = None
+        else:
+            self._df = df
+        
         self.label = label
+        
+        self.sample_name = None
         if sample_name is not None:
             self.sample_name = sample_name
         else:
+            # read sample name from the second column name (first is 'm/z')
             if self._df is not None:
                 self.sample_name = self._df.columns[1]
     
     @property
     def data(self):
+        """The Pandas DataFrame holding the MS data."""
         return self._df
 
     def to_csv(self, filename, mz_name=None, sep=None, **kwargs):
@@ -31,8 +60,7 @@ class Spectrum(object):
             header = [mz_name] + list(self._df.columns[1:])
         if sep is None:
             sep = '\t'
-        self._df.to_csv(filename, header=header, sep=sep, 
-                        index=False, **kwargs)
+        self._df.to_csv(filename, header=header, sep=sep, index=False, **kwargs)
     
     def mz_to_csv(self, filename, mz_name=None, **kwargs):
         outdf = self._df.iloc[:,0:1]
@@ -40,7 +68,23 @@ class Spectrum(object):
             outdf.columns = [mz_name]
         outdf.to_csv(filename, header=mz_name, index=False, **kwargs)
 
+
 class AlignedSpectra(object):
+    """A set of peak lists, sharing m/z values.
+
+    The underlying data (property `data`) is implemented in a Pandas DataFrame.
+    The first column holds m/z values and the other columns hold (ususally)
+    intensity data.
+
+    Attributes
+    ----------
+    sample_names : list of str
+        The names of the samples.
+    labes : list of str
+        Optional sample labels, used in classification tasks.
+
+    """
+
     def __init__(self, df=None, sample_names=None, labels=None):
         self._df = None
         if df is not None:
@@ -64,6 +108,7 @@ class AlignedSpectra(object):
     
     @property
     def data(self):
+        """The Pandas DataFrame holding the MS data."""
         return self._df
 
     def to_csv(self, filename, header_func=None, sep=None, 
@@ -86,10 +131,12 @@ class AlignedSpectra(object):
                 
 
     def fillna(self, value):
+        """Substitute missing values for a given value."""
         vdict = dict([(n, value) for n in self.sample_names])
         self._df.fillna(vdict, inplace=True)
         
     def unfold(self):
+        """Return a list of Spectrum objects, unfolding the peak lists."""
         res = []
         for i, name in enumerate(self.sample_names):
             df = self._df.iloc[:, [0, i+1]].dropna()
@@ -102,11 +149,13 @@ class AlignedSpectra(object):
     
     
     def sample_mz(self, sample_name):
+        """Extract m/z values for a given sample."""
         df = self.data[['m/z', sample_name]].dropna()['m/z']
         return df.values
     
     def label_mz(self, label):
-        # build a list grouping samples with a given label
+       """Extract m/z values for a given label."""
+         # build a list grouping samples with a given label
         lcolumns = []
         for c, l in zip(self.data.columns[1:], self.labels):
             if l == label:
@@ -132,9 +181,7 @@ class AlignedSpectra(object):
         for lbl in slabels:
             remaining = np.setdiff1d(remaining, self.label_mz(lbl))
         return remaining
-        
-        
-    
+
     def compute_similarity_measures(self):
         # compute counts and Jaccard index by samples
         self.sample_similarity = None
