@@ -1,8 +1,10 @@
 """Classes representing MS peak lists.
 
-There are two types of peak lists: single (Spectrum) and aligned
-(AlignedSpectra). AlignedSpectra represents multiple peak lists that share
-the same m/z values.
+There are two types of peak lists:
+
+- single (Spectrum)
+- aligned (AlignedSpectra). AlignedSpectra represents
+multiple peak lists that share the same m/z values.
 
 Simple data handling functions are implemented as well as I/O to CSV (TSV).
 
@@ -53,6 +55,32 @@ class Spectrum(object):
     def data(self):
         """The Pandas DataFrame holding the MS data."""
         return self._df
+
+    def __str__(self):
+        res = ['Sample: ' + self.sample_name]
+        res.append('Label: {}'.format(self.label))
+        res.append('Size: {}'.format(len(self.data)))
+        res.append(str(self.data))
+        return '\n'.join(res)
+
+    @property
+    def mz(self):
+        """Get m/z values as a numpy array"""
+        res = self._df.dropna()['m/z'].values
+        return res
+
+    @property
+    def all_mz(self):
+        """Get m/z values as a numpy array, even for missing data"""
+        res = self._df['m/z'].values
+        return res
+
+    def fillna(self, value):
+        """Get new Spectrum with missing values replaced for a given value."""
+        new_df = self._df.fillna(value)
+        return Spectrum(df=new_df,
+                        sample_name=self.sample_name,
+                        label=self.label)
 
     def to_csv(self, filename, mz_name=None, sep=None, **kwargs):
         header = True
@@ -111,6 +139,26 @@ class AlignedSpectra(object):
         """The Pandas DataFrame holding the MS data."""
         return self._df
 
+    @property
+    def sample_count(self):
+        """Get the number of samples."""
+        return len(self.sample_names)
+
+    @property
+    def mz(self):
+        """Get m/z values as a numpy array"""
+        res = self._df['m/z'].values
+        return res
+
+    def label_of(self,sample):
+        """Get label from sample name"""
+        if self.labels is None:
+            return None
+        for s, lbl in zip(self.sample_names, self.labels):
+            if s == sample:
+                return lbl
+        return None
+
     def to_csv(self, filename, header_func=None, sep=None, 
                no_report_columns=True, **kwargs):
         if sep is None:
@@ -128,13 +176,15 @@ class AlignedSpectra(object):
                 of.write(header+'\n')
                 out_df.to_csv(of, header=False, sep=sep, 
                               index=False, **kwargs)
-                
 
     def fillna(self, value):
         """Substitute missing values for a given value."""
         vdict = dict([(n, value) for n in self.sample_names])
-        self._df.fillna(vdict, inplace=True)
-        
+        new_df = self._df.fillna(vdict)
+        return AlignedSpectra(df=new_df,
+                              sample_names=self.sample_names,
+                              labels=self.labels)
+
     def unfold(self):
         """Return a list of Spectrum objects, unfolding the peak lists."""
         res = []
@@ -146,26 +196,26 @@ class AlignedSpectra(object):
                 label = self.labels[i]
             res.append(Spectrum(df, sample_name=name, label=label))
         return res
-    
-    
-    def sample_mz(self, sample_name):
-        """Extract m/z values for a given sample."""
-        df = self.data[['m/z', sample_name]].dropna()['m/z']
-        return df.values
-    
-    def label_mz(self, label):
-       """Extract m/z values for a given label."""
+
+    def sample(self, sample):
+        """Get data for a given sample name, as a Spectrum."""
+        df = self.data[['m/z', sample]].dropna()
+        return Spectrum(df=df, sample_name=sample, label=self.label_of(sample))
+
+    def label(self, label):
+        """Get data for a given label, as an AlignedSpectra object."""
          # build a list grouping samples with a given label
         lcolumns = []
         for c, l in zip(self.data.columns[1:], self.labels):
             if l == label:
                 lcolumns.append(c)
-        df = self.data[['m/z'] + lcolumns].dropna(how='all', subset=lcolumns)['m/z']
-        return df.values
-    
+        df = self.data[['m/z'] + lcolumns].dropna(how='all', subset=lcolumns)
+        return AlignedSpectra(df=df, sample_names=lcolumns,
+                                     labels=[label]*len(lcolumns))
+
     def common_label_mz(self, label1, label2):
-        mz1 = self.label_mz(label1)
-        mz2 = self.label_mz(label2)
+        mz1 = self.label(label1).mz
+        mz2 = self.label(label2).mz
         u = np.intersect1d(mz1, mz2)
         return u
     
@@ -176,10 +226,10 @@ class AlignedSpectra(object):
             if lbl not in slabels:
                 slabels.append(lbl)
         slabels = [lbl for lbl in slabels if lbl != label]
-        
-        remaining = self.label_mz(label)
+
+        remaining = self.label(label).mz
         for lbl in slabels:
-            remaining = np.setdiff1d(remaining, self.label_mz(lbl))
+            remaining = np.setdiff1d(remaining, self.label(lbl).mz)
         return remaining
 
     def compute_similarity_measures(self):
@@ -191,8 +241,8 @@ class AlignedSpectra(object):
         smatrix = np.zeros((n, n))
         for i1 in range(n-1):
             for i2 in range(i1+1, n):
-                mz1 = self.sample_mz(self.sample_names[i1])
-                mz2 = self.sample_mz(self.sample_names[i2])
+                mz1 = self.sample(self.sample_names[i1]).mz
+                mz2 = self.sample(self.sample_names[i2]).mz
                 smatrix[i1, i1] = len(mz1)
                 smatrix[i2, i2] = len(mz2)
                 set1 = set(mz1)
@@ -215,7 +265,7 @@ class AlignedSpectra(object):
                     slabels.append(label)
             mzs = {}
             for label in slabels:
-                mzs[label] = self.label_mz(label)
+                mzs[label] = self.label(label).mz
             # compute intersection counts and Jaccard index
             n = len(slabels)
             lmatrix = np.zeros((n, n))
@@ -236,7 +286,6 @@ class AlignedSpectra(object):
             self.unique_labels = slabels
 
 
-
 def read_spectrum(filename, label=None):
     s = pd.read_table(filename, index_col=False)
     # keep only the first two columns
@@ -255,42 +304,88 @@ def read_aligned_spectra(filename, labels=None):
     return AlignedSpectra(s, labels=labels)
 
 
+def _sample_data():
+    return """m/z	s38	s39	s40	s32	s33	s34
+97.58868	1073218	1049440	1058971	2351567	1909877	2197036
+97.59001	637830	534900	582966	1440216	1124346	1421899
+97.59185	460092	486631		1137139	926038	1176756
+97.72992			506345			439583
+98.34894	2232032	2165052	1966283			
+98.35078	3255288	2813578	2516386			
+98.35122		2499163	2164976			
+98.36001			1270764	1463557	1390574	
+98.57354				4627491	6142759	
+98.57382		3721991	3338506			4208438
+98.57497	6229543	3347404	2327096			
+98.57528				2510001	1989197	4377331
+98.57599	6897403	3946118				
+98.57621			3242232	2467520		4314818
+98.57692	8116811	5708658	3899578			
+98.57712				2418202	986128	4946201
+98.57790	3891025	3990442	3888258	2133404		3643682
+98.57899		1877649	1864650	1573559		1829208
+99.28772	2038979				3476845	"""
+
+
 if __name__ == '__main__':
+    from six import StringIO
 
-    fname = '../example_data/aligned_spectra.txt'
-    sname = '../example_data/aligned_spectra_test.txt'
-    mzname = '../example_data/spectrum_mz.txt'
+    sample = StringIO(_sample_data())
+
+    sname = 'saved_spectra_test.txt'
+    mzname = 'spectrum_mz.txt'
     
-    print('Reading spectrum', fname, '----------')
-    spectrum = read_spectrum(fname)
-    print('Sample name:', spectrum.sample_name)
+    print('Reading one spectrum (from aligned reads only first --------------')
+    spectrum = read_spectrum(sample)
+    print(spectrum,'\n')
     spectrum.data.info()
-    print(spectrum.data.head(10))
 
-    print('Saving spectrum mz into', mzname, '----------')
+    print('\nm/z values ----------')
+    print(spectrum.mz)
+
+    print('\nFilling with zeros ----------')
+    spectrumzero = spectrum.fillna(0)
+    print(spectrumzero.data)
+
+    print('\nSaving spectrum mz into', mzname, '----------')
     spectrum.mz_to_csv(mzname, mz_name='moverz')
 
-    print('\nReading aligned spectra', fname, '----------')
-    spectra = read_aligned_spectra(fname)
+    print('\nReading aligned spectra (all of them) ----------')
+    labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2']
+    sample.seek(0)
+    spectra = read_aligned_spectra(sample, labels=labels)
     print('Sample names:', spectra.sample_names)
+    print('Labels:', spectra.labels)
     spectra.data.info()
     print(spectra.data)
 
-    print('\nTesting retrieval of m/z by sample (for s38) ----------')
-    print(spectra.sample_mz('s38'))
+    print('\nTesting retrieval of sample data (for s38) ----------')
+    print(spectra.sample('s38').data)
     
-    print('\nFilling with zeros ----------')
-    spectra.fillna(0)
+    print('\nTesting retrieval of m/z by sample (for s38) ----------')
+    print(spectra.sample('s38').mz)
+    
+    print('\nTesting retrieval of label data (for v1) ----------')
+    print(spectra.label('v1').data)
+    
+    print('\nTesting retrieval of m/z by label (for v1) ----------')
+    print(spectra.label('v1').mz)
 
-    print('Saving aligned spectra into', sname, '----------')
+    print('\nFilling with zeros ----------')
+    spectrazero = spectra.fillna(0)
+    print(spectrazero.data)
+
+    print('\nUnfolding spectra ----------')
+    unfolded = spectra.unfold()
+    
+    for u in unfolded:
+        print(u)
+        print('+++++')
+    
+    print('\nSaving aligned spectra into', sname, '----------')
     def header(s):
         return'Samples\t'+'\t'.join(s.sample_names)
     spectra.to_csv(sname, header_func=header)
-
-    labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2']
-    spectra = read_aligned_spectra(fname, labels=labels)
-    print('\nTesting retrieval of m/z by label (for v1) ----------')
-    print(spectra.label_mz('v1'))
 
     print('\nTesting common labels m/z (v1,v2) ----------')
     print(spectra.common_label_mz('v1', 'v2'))
@@ -298,14 +393,6 @@ if __name__ == '__main__':
     print('\nTesting exclusive m/z (v1) ----------')
     print(spectra.exclusive_label_mz('v1'))
 
-    print('\nUnfolding spectra ----------')
-    unfolded = spectra.unfold()
-    
-    for u in unfolded:
-        print('Spectrum', u.sample_name, u.label, 'size:', len(u.data))
-        print(u.data)
-        print('+++++')
-    
     print('\nComputing similarity ----------')
     
     spectra.compute_similarity_measures()

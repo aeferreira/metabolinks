@@ -84,7 +84,7 @@ def read_spectra_from_xcel(file_name,
                 results.append(spectrum)
 
                 j = j + 1
-        
+
         if labels is not None:
             for i, spectrum in enumerate(results):
                 spectrum.label = labels[i]
@@ -205,7 +205,7 @@ def group_peaks(df, sample_ids, labels=None, ppmtol=1.0,
     res.compute_similarity_measures()
 
     if fillna is not None:
-        res.fillna(fillna)
+        res = res.fillna(fillna)
     return res
 
 
