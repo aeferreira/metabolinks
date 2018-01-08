@@ -18,13 +18,14 @@ from __future__ import print_function
 import numpy as np
 import pandas as pd
 
+from metabolinks.utils import _is_string
 
 class Spectrum(object):
     """A single peak list.
 
     The underlying data (property `data`) is implemented in a Pandas DataFrame.
-    The first column holds m/z values and the second columns holds (ususally)
-    intensity data.
+    The index holds m/z values or any other peak labels.
+    There should be only one column, which holds (ususally) intensity data.
 
     Attributes
     ----------
@@ -47,9 +48,9 @@ class Spectrum(object):
         if sample_name is not None:
             self.sample_name = sample_name
         else:
-            # read sample name from the second column name (first is 'm/z')
+            # read sample name from the name of the only column
             if self._df is not None:
-                self.sample_name = self._df.columns[1]
+                self.sample_name = self._df.columns[0]
     
     @property
     def data(self):
@@ -59,20 +60,20 @@ class Spectrum(object):
     def __str__(self):
         res = ['Sample: ' + self.sample_name]
         res.append('Label: {}'.format(self.label))
-        res.append('Size: {}'.format(len(self.data)))
+        res.append('{} peaks'.format(len(self.data)))
         res.append(str(self.data))
         return '\n'.join(res)
 
     @property
     def mz(self):
         """Get m/z values as a numpy array"""
-        res = self._df.dropna()['m/z'].values
+        res = self._df.dropna().index.values
         return res
 
     @property
     def all_mz(self):
         """Get m/z values as a numpy array, even for missing data"""
-        res = self._df['m/z'].values
+        res = self._df.index.values
         return res
 
     def fillna(self, value):
@@ -85,16 +86,15 @@ class Spectrum(object):
     def to_csv(self, filename, mz_name=None, sep=None, **kwargs):
         header = True
         if mz_name is not None:
-            header = [mz_name] + list(self._df.columns[1:])
+            header = [mz_name] + list(self._df.columns)
         if sep is None:
             sep = '\t'
-        self._df.to_csv(filename, header=header, sep=sep, index=False, **kwargs)
+        self._df.to_csv(filename, header=header, sep=sep, index=True, **kwargs)
     
     def mz_to_csv(self, filename, mz_name=None, **kwargs):
-        outdf = self._df.iloc[:,0:1]
-        if mz_name is not None:
-            outdf.columns = [mz_name]
-        outdf.to_csv(filename, header=mz_name, index=False, **kwargs)
+        outdf = self.data.copy()
+        outdf.index.name = mz_name
+        outdf.to_csv(filename, columns=[])
 
 
 class AlignedSpectra(object):
@@ -126,9 +126,10 @@ class AlignedSpectra(object):
             if self._df is not None:
                 if '#samples' in self._df.columns:
                     s_loc = self._df.columns.get_loc('#samples')
-                    self.sample_names = list(self._df.columns[1:s_loc])
+                    self.sample_names = list(self._df.columns[:s_loc])
                 else:
-                    self.sample_names = list(self._df.columns[1:])
+                    self.sample_names = list(self._df.columns)
+        
         self.sample_similarity = None
         self.label_similarity = None
         self.unique_labels = None
@@ -147,8 +148,18 @@ class AlignedSpectra(object):
     @property
     def mz(self):
         """Get m/z values as a numpy array"""
-        res = self._df['m/z'].values
+        res = self.data.index.values
         return res
+
+    def __str__(self):
+        return '\n'.join(
+               ('{} samples:'.format(self.sample_count),
+               str(self.sample_names),
+               'Labels: {}'.format(self.labels),
+               'Size: {}'.format(len(self.data)),
+               str(self.data))
+               ) # No, I will not become a JS freak
+
 
     def label_of(self,sample):
         """Get label from sample name"""
@@ -169,47 +180,47 @@ class AlignedSpectra(object):
                 s_loc = self._df.columns.get_loc('#samples')
                 out_df = self._df.iloc[:, :s_loc]
         if header_func is None:
-            out_df.to_csv(filename, header=True, sep=sep, index=False, **kwargs)
+            out_df.to_csv(filename, header=True, sep=sep, index=True, **kwargs)
         else:
-            with open(filename, 'w') as of:
-                header = header_func(self)
-                of.write(header+'\n')
-                out_df.to_csv(of, header=False, sep=sep, 
-                              index=False, **kwargs)
-
+            # prepend output with result of header_func
+            needs_to_close = False
+            if _is_string(filename):
+                of = open(filename, 'w') 
+                needs_to_close = True
+            else:
+                of = filename
+            
+            header = header_func(self) + '\n'
+            of.write(header)
+            out_df.to_csv(of, header=False, sep=sep, 
+                          index=True, **kwargs)
+            
+            if needs_to_close:
+                of.close()
+        
     def fillna(self, value):
         """Substitute missing values for a given value."""
-        vdict = dict([(n, value) for n in self.sample_names])
-        new_df = self._df.fillna(vdict)
-        return AlignedSpectra(df=new_df,
+        return AlignedSpectra(df=self._df.fillna(value),
                               sample_names=self.sample_names,
                               labels=self.labels)
 
-    def unfold(self):
-        """Return a list of Spectrum objects, unfolding the peak lists."""
-        res = []
-        for i, name in enumerate(self.sample_names):
-            df = self._df.iloc[:, [0, i+1]].dropna()
-            if self.labels is None:
-                label = None
-            else:
-                label = self.labels[i]
-            res.append(Spectrum(df, sample_name=name, label=label))
-        return res
-
     def sample(self, sample):
         """Get data for a given sample name, as a Spectrum."""
-        df = self.data[['m/z', sample]].dropna()
+        df = self.data[[sample]].dropna()
         return Spectrum(df=df, sample_name=sample, label=self.label_of(sample))
+
+    def unfold(self):
+        """Return a list of Spectrum objects, unfolding the peak lists."""
+        return [self.sample(name) for name in self.sample_names]
 
     def label(self, label):
         """Get data for a given label, as an AlignedSpectra object."""
          # build a list grouping samples with a given label
         lcolumns = []
-        for c, l in zip(self.data.columns[1:], self.labels):
+        for c, l in zip(self.data.columns, self.labels):
             if l == label:
                 lcolumns.append(c)
-        df = self.data[['m/z'] + lcolumns].dropna(how='all', subset=lcolumns)
+        df = self.data[lcolumns].dropna(how='all', subset=lcolumns)
         return AlignedSpectra(df=df, sample_names=lcolumns,
                                      labels=[label]*len(lcolumns))
 
@@ -290,19 +301,26 @@ def read_spectrum(filename, label=None):
     s = pd.read_table(filename, index_col=False)
     # keep only the first two columns
     s = s.iloc[:, [0,1]]
-    # force 'm/z' name for first column
-    newnames = ['m/z', s.columns[1]]
-    s.columns = newnames
+    s = s.set_index(s.columns[0])
     return Spectrum(s, label=label)
 
 
 def read_aligned_spectra(filename, labels=None):
     s = pd.read_table(filename, index_col=False)
-    # force 'm/z' name for first column
-    newnames = ['m/z'] + list(s.columns[1:])
-    s.columns = newnames
+    s = s.set_index(s.columns[0])
     return AlignedSpectra(s, labels=labels)
 
+def _get_text_as_file(text):
+    # try to open in case it is a pathname
+    try:
+        f = open(text)
+        text = f.read()
+        f.close()
+    except (IOError, OSError):
+        pass
+
+    textlines = StringIO(str(text))
+    return textlines
 
 def _sample_data():
     return """m/z	s38	s39	s40	s32	s33	s34
@@ -331,47 +349,45 @@ if __name__ == '__main__':
     from six import StringIO
 
     sample = StringIO(_sample_data())
-
-    sname = 'saved_spectra_test.txt'
-    mzname = 'spectrum_mz.txt'
-    
-    print('Reading one spectrum (from aligned reads only first --------------')
+   
+    print('Reading one spectrum (from aligned reads only first) ------------')
     spectrum = read_spectrum(sample)
     print(spectrum,'\n')
     spectrum.data.info()
 
-    print('\nm/z values ----------')
+    print('\nm/z values (excluding missing data) ----------')
     print(spectrum.mz)
 
-    print('\nFilling with zeros ----------')
+    print('\Spectrum with missing values filled with zeros ----------')
     spectrumzero = spectrum.fillna(0)
     print(spectrumzero.data)
 
-    print('\nSaving spectrum mz into', mzname, '----------')
-    spectrum.mz_to_csv(mzname, mz_name='moverz')
+    print('\nSaving  mz into a file ----------')
+    mzfile = StringIO()    
+    spectrum.mz_to_csv(mzfile, mz_name='moverz')
+    print('\n--- Resulting file:')
+    print(mzfile.getvalue())
 
     print('\nReading aligned spectra (all of them) ----------')
     labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2']
     sample.seek(0)
     spectra = read_aligned_spectra(sample, labels=labels)
-    print('Sample names:', spectra.sample_names)
-    print('Labels:', spectra.labels)
+    print(spectra,'\n')
     spectra.data.info()
-    print(spectra.data)
 
-    print('\nTesting retrieval of sample data (for s38) ----------')
-    print(spectra.sample('s38').data)
+    print('\nData of sample s38 ----------')
+    print(spectra.sample('s38'))
     
-    print('\nTesting retrieval of m/z by sample (for s38) ----------')
+    print('\nm/z of sample s38 ----------')
     print(spectra.sample('s38').mz)
     
-    print('\nTesting retrieval of label data (for v1) ----------')
-    print(spectra.label('v1').data)
+    print('\nData of label v1 ----------')
+    print(spectra.label('v1'))
     
-    print('\nTesting retrieval of m/z by label (for v1) ----------')
+    print('\nm/z of label v1 ----------')
     print(spectra.label('v1').mz)
 
-    print('\nFilling with zeros ----------')
+    print('\Spectra with missing values filled with zeros ----------')
     spectrazero = spectra.fillna(0)
     print(spectrazero.data)
 
@@ -382,18 +398,26 @@ if __name__ == '__main__':
         print(u)
         print('+++++')
     
-    print('\nSaving aligned spectra into', sname, '----------')
+    print('\nSaving aligned spectra into a file ----------')
     def header(s):
-        return'Samples\t'+'\t'.join(s.sample_names)
-    spectra.to_csv(sname, header_func=header)
+        # this returns a header suitable for various metabolomics tools
+        line1 = 'Labels,{}'.format(','.join(s.labels))
+        line2 = 'Samples,'+','.join(s.sample_names)
+        return '\n'.join([line1, line2])
 
-    print('\nTesting common labels m/z (v1,v2) ----------')
+    samplefile = StringIO()    
+    spectra.to_csv(samplefile, header_func=header, sep=',')
+    print('\n--- Resulting file:')
+    print(samplefile.getvalue())
+    #spectra.to_csv('testout.txt', header_func=header, sep=',')
+
+    print('\nCommon m/z between labels (v1,v2) ----------')
     print(spectra.common_label_mz('v1', 'v2'))
 
-    print('\nTesting exclusive m/z (v1) ----------')
+    print('\nm/z values exclusive to label v1 ----------')
     print(spectra.exclusive_label_mz('v1'))
 
-    print('\nComputing similarity ----------')
+    print('\nComputing similarity measures ----------')
     
     spectra.compute_similarity_measures()
     
