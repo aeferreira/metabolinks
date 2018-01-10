@@ -15,6 +15,9 @@ which is a Pandas DataFrame.
 
 from __future__ import print_function
 
+from collections import OrderedDict
+import six
+
 import numpy as np
 import pandas as pd
 
@@ -310,17 +313,98 @@ def read_aligned_spectra(filename, labels=None):
     s = s.set_index(s.columns[0])
     return AlignedSpectra(s, labels=labels)
 
-def _get_text_as_file(text):
-    # try to open in case it is a pathname
-    try:
-        f = open(text)
-        text = f.read()
-        f.close()
-    except (IOError, OSError):
-        pass
 
-    textlines = StringIO(str(text))
-    return textlines
+def read_spectra_from_xcel(file_name,
+                           sample_names=None,
+                           labels=None,
+                           header_row=1,
+                           common_mz= False,
+                           verbose=True):
+
+    spectra_table = OrderedDict()
+
+    wb = pd.ExcelFile(file_name).book
+    header = header_row - 1
+
+    if verbose:
+        print ('------ Reading MS-Excel file -------\n{}'.format(file_name))
+
+    for sheetname in wb.sheet_names():
+        if verbose:
+            print ('- reading sheet "{}"...'.format(sheetname))
+
+        # if sample_names argument if present (not None) then
+        # if an integer, read row with sample names,
+        # otherwise sample_names must a list of names for samples
+        snames = []
+        if sample_names is not None:
+            if isinstance(sample_names, six.integer_types):
+                sh = wb.sheet_by_name(sheetname)
+                snames = sh.row_values(sample_names - 1)
+                snames = [s for s in snames if len(s.strip()) > 0]
+                header = sample_names
+            else:
+                snames = sample_names
+
+        # read data (and discard empty xl columns)
+        df = pd.read_excel(file_name,
+                           sheetname=sheetname,
+                           header=header)
+        df = df.dropna(axis=1, how='all')
+
+##         df.info()
+##         print('============================================')
+##         print(df.head())
+
+        # if sample names were not set yet then
+        # use "2nd columns" headers as sample names
+        # if common_mz then use headers from position 1
+        if len(snames) > 0:
+            sample_names = snames
+        else:
+            if common_mz:
+                sample_names = df.columns[1:]
+            else:
+                sample_names = df.columns[1::2]
+
+        # split in groups of two (each group is a spectrum)
+        results = []
+        if not common_mz:
+            j = 0
+            for i in range(0, len(df.columns), 2):
+                spectrum = df.iloc[:, i: i+2]
+                spectrum.index = range(len(spectrum))
+                spectrum = spectrum.dropna()
+                spectrum = spectrum.set_index(spectrum.columns[0])
+                spectrum = Spectrum(spectrum, sample_name=sample_names[j])
+                results.append(spectrum)
+
+                j = j + 1
+        else:
+            j = 0
+            for i in range(1, len(df.columns)):
+                spectrum = df.iloc[:, [0, i]]
+                spectrum.index = range(len(spectrum))
+                spectrum = spectrum.dropna()
+                spectrum = spectrum.set_index(spectrum.columns[0])
+                spectrum = Spectrum(spectrum, sample_name=sample_names[j])
+                results.append(spectrum)
+
+                j = j + 1
+
+        if labels is not None:
+            for i, spectrum in enumerate(results):
+                spectrum.label = labels[i]
+
+        if verbose:
+            for spectrum in results:
+                name = spectrum.sample_name
+                print ('{:5d} peaks in sample {}'.format(spectrum.data.shape[0], name))
+        spectra_table[sheetname] = results
+
+    return spectra_table
+
+
 
 def _sample_data():
     return """m/z	s38	s39	s40	s32	s33	s34
