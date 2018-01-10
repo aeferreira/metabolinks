@@ -70,6 +70,7 @@ def read_spectra_from_xcel(file_name,
                 spectrum = df.iloc[:, i: i+2]
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
+                spectrum = spectrum.set_index(spectrum.columns[0])
                 spectrum = Spectrum(spectrum, sample_name=sample_names[j])
                 results.append(spectrum)
 
@@ -80,6 +81,7 @@ def read_spectra_from_xcel(file_name,
                 spectrum = df.iloc[:, [0, i]]
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
+                spectrum = spectrum.set_index(spectrum.columns[0])
                 spectrum = Spectrum(spectrum, sample_name=sample_names[j])
                 results.append(spectrum)
 
@@ -104,7 +106,13 @@ def concat_peaks(spectra, verbose=True):
     dfs = []
     # tag with sample names, concat vertically and sort by m/z
     for spectrum in spectra:
-        newdf = spectrum.data.copy()
+        mzcol = pd.Series(spectrum.mz,
+                          index= range(len(spectrum.data)), 
+                          name='m/z')
+        intensity_column = spectrum.data.iloc[:, 0]
+        intensity_column.index = range(len(spectrum.data))
+        newdf = pd.concat([mzcol, intensity_column], axis=1)
+        
         newdf.columns = ['m/z', 'I']
         newcol = pd.Series(spectrum.sample_name, index=newdf.index, name='_sample')
         newdf = pd.concat([newdf, newcol], axis=1)
@@ -201,6 +209,7 @@ def group_peaks(df, sample_ids, labels=None, ppmtol=1.0,
             print ('{:5d} peaks in {} samples'.format(c, n))
         print('  {:3d} total'.format(len(result)))
 
+    result = result.set_index('m/z')
     res = AlignedSpectra(result, sample_names=sample_ids, labels=labels)
     res.compute_similarity_measures()
 
