@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from metabolinks.utils import _is_string
+from metabolinks.similarity import compute_similarity_measures
 
 class Spectrum(object):
     """A single peak list.
@@ -132,12 +133,8 @@ class AlignedSpectra(object):
                     self.sample_names = list(self._df.columns[:s_loc])
                 else:
                     self.sample_names = list(self._df.columns)
-        
-        self.sample_similarity = None
-        self.label_similarity = None
-        self.unique_labels = None
 
-    
+
     @property
     def data(self):
         """The Pandas DataFrame holding the MS data."""
@@ -245,60 +242,6 @@ class AlignedSpectra(object):
         for lbl in slabels:
             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
         return remaining
-
-    def compute_similarity_measures(self):
-        # compute counts and Jaccard index by samples
-        self.sample_similarity = None
-        
-        n = len(self.sample_names)
-        self.sample_similarity = None
-        smatrix = np.zeros((n, n))
-        for i1 in range(n-1):
-            for i2 in range(i1+1, n):
-                mz1 = self.sample(self.sample_names[i1]).mz
-                mz2 = self.sample(self.sample_names[i2]).mz
-                smatrix[i1, i1] = len(mz1)
-                smatrix[i2, i2] = len(mz2)
-                set1 = set(mz1)
-                set2 = set(mz2)
-                u12 = set1.union(set2)
-                i12 = set1.intersection(set2)
-                smatrix[i1, i2] = len(i12)
-                jaccard = len(i12) / len(u12)
-                smatrix[i2, i1] = jaccard
-        self.sample_similarity = smatrix
-        
-        if self.labels is not None:
-            self.label_similarity = None
-            self.unique_labels = None
-            # build list of unique labels
-            slabels = [self.labels[0]]
-            for i in range(1, len(self.labels)):
-                label = self.labels[i]
-                if label not in slabels:
-                    slabels.append(label)
-            mzs = {}
-            for label in slabels:
-                mzs[label] = self.label(label).mz
-            # compute intersection counts and Jaccard index
-            n = len(slabels)
-            lmatrix = np.zeros((n, n))
-            for i1 in range(n-1):
-                for i2 in range(i1+1, n):
-                    label1 = slabels[i1]
-                    label2 = slabels[i2]
-                    set1 = set(mzs[label1])
-                    set2 = set(mzs[label2])
-                    lmatrix[i1, i1] = len(set1)
-                    lmatrix[i2, i2] = len(set2)
-                    u12 = set1.union(set2)
-                    i12 = set1.intersection(set2)
-                    lmatrix[i1, i2] = len(i12)
-                    jaccard = len(i12) / len(u12)
-                    lmatrix[i2, i1] = jaccard
-            self.label_similarity = lmatrix
-            self.unique_labels = slabels
-
 
 def read_spectrum(filename, label=None):
     s = pd.read_table(filename, index_col=False)
@@ -503,10 +446,10 @@ if __name__ == '__main__':
 
     print('\nComputing similarity measures ----------')
     
-    spectra.compute_similarity_measures()
+    sim = compute_similarity_measures(spectra)
     
     print('\n- Sample similarity --')
-    print(spectra.sample_similarity)
+    print(sim.sample_similarity)
         
     print('\n- Label similarity --')
-    print(spectra.label_similarity)
+    print(sim.label_similarity)

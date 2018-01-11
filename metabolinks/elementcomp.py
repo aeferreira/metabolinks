@@ -1,15 +1,13 @@
 from collections import Counter
 
-from metabolinks.masstrix import read_MassTRIX
-
-def compute_element_composition(masstrixdf,
-                                compositions = ('CHO', 'CHOS',
+def element_composition(df, column=None,
+                            compositions = ('CHO', 'CHOS',
                                                 'CHON', 'CHONS',
                                                 'CHOP', 'CHONP',
                                                 'CHONSP'),
-                                verbose=True):
-    mdf = masstrixdf.set_index('raw_mass')
-    formulae = mdf['KEGG_formula'].str.split('#').apply(set).apply(list)
+                            verbose=True):
+    
+    formulae = df[column].str.split('#').apply(set).apply(list)
     # print(formulas)
 
     # remove unambigous formulae
@@ -41,13 +39,14 @@ def compute_element_composition(masstrixdf,
             comps.append('other')
     elem_comp = Counter(comps)
     
-    for f, c in zip(formulae, comps):
-        print(f, c)
+##     for f, c in zip(formulae, comps):
+##         print(f, c)
         
     return elem_comp
 
 if __name__ == '__main__':
 
+    from metabolinks.masstrix import read_MassTRIX
     testfile_name = '../example_data/masses.annotated.reformat.tsv'
 
     df = read_MassTRIX(testfile_name).cleanup_cols()
@@ -60,7 +59,8 @@ if __name__ == '__main__':
     compositions = ['CHO', 'CHOS', 'CHON', 'CHONS', 
                     'CHOP', 'CHONP', 'CHONSP']
     
-    elem_comp = compute_element_composition(df, compositions)
+    elem_comp = element_composition(df, column='KEGG_formula',
+                                    compositions=compositions)
     for c in compositions + ['other']:
         print(c, elem_comp[c])
 

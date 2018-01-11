@@ -10,6 +10,7 @@ from numpy import nan
 import pandas as pd
 
 from metabolinks.taxonomy import insert_taxonomy
+from metabolinks.elementcomp import element_composition
 
 """Functions related to the analysis of MassTRIX results files."""
 
@@ -42,7 +43,7 @@ class MassTRIXResults(pd.DataFrame):
         return insert_taxonomy(self, *args, **kwargs)
     
     def compute_element_composition(self, *args, **kwargs):
-        return compute_element_composition(self, *args, **kwargs)
+        return element_composition(self, column='KEGG_formula', **kwargs)
 
 # ----------------------------------------
 # I/O functions
@@ -157,55 +158,6 @@ def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
     
 
 # ----------------------------------------
-# Element compositions
-# ----------------------------------------
-
-def compute_element_composition(masstrixdf,
-                                compositions = ('CHO', 'CHOS',
-                                                'CHON', 'CHONS',
-                                                'CHOP', 'CHONP',
-                                                'CHONSP'),
-                                verbose=True):
-    
-    mdf = masstrixdf.set_index('raw_mass')
-    formulae = mdf['KEGG_formula'].str.split('#').apply(set).apply(list)
-    # print(formulas)
-
-    # remove unambigous formulae
-    is_1 = [True if len(f) == 1 else False for f in formulae.values]
-    formulae = formulae[is_1]
-    
-    #print(formulae)
-    
-    # convert to list of strings and remove duplicates
-    formulae = list(set([f[0] for f in formulae.values]))
-    #print(formulae)
-    if verbose:
-        print(len(formulae), 'formulae')
-
-    # Calculate element compositions
-    comps = []
-    for formula in formulae:
-        # remove numbers
-        exclude = "0123456789,.[]() "
-        for chr in exclude:
-            formula = formula.replace(chr,'')
-        
-        # count according to composition groups
-        for c in compositions:
-            if set(formula) == set(c):
-                comps.append(c)
-                break
-        else:
-            comps.append('other')
-    elem_comp = Counter(comps)
-    
-    #for f, c in zip(formulae, comps):
-        #print(f, c)
-        
-    return elem_comp
-
-# ----------------------------------------
 # Testing code
 # ----------------------------------------
 
@@ -225,7 +177,8 @@ if __name__ == '__main__':
     compositions = ['CHO', 'CHOS', 'CHON', 'CHONS', 
                     'CHOP', 'CHONP', 'CHONSP']
     
-    elem_comp = compute_element_composition(results, compositions)
+    elem_comp = results.compute_element_composition(compositions=compositions)
+    
     for c in compositions + ['other']:
         print(c, elem_comp[c])
     

@@ -5,8 +5,8 @@ from numpy import nan
 
 import pandas as pd
 
-from metabolinks.spectra import Spectrum, AlignedSpectra, read_spectra_from_xcel
-
+from metabolinks.spectra import AlignedSpectra, read_spectra_from_xcel
+from metabolinks.similarity import compute_similarity_measures
 
 def concat_peaks(spectra, verbose=True):
     if verbose:
@@ -153,7 +153,7 @@ def align_spectra(spectra,
                       min_samples=min_samples,
                       verbose=verbose)
     
-    gdf.compute_similarity_measures()
+    #gdf.compute_similarity_measures()
     
     if fillna is not None:
         gdf = gdf.fillna(fillna)
@@ -166,12 +166,16 @@ def save_aligned_to_excel(fname, aligned_dict):
     for sname in aligned_dict:
         
         aligned_spectra = aligned_dict[sname]
+        
+        sim = compute_similarity_measures(aligned_spectra)
                 
-        sample_similarity = aligned_spectra.sample_similarity
-        label_similarity = aligned_spectra.label_similarity
-        unique_labels = aligned_spectra.unique_labels
+        sample_similarity = sim.sample_similarity
+        label_similarity = sim.label_similarity
+        unique_labels = sim.unique_labels
                 
         results = aligned_spectra.data
+        results = results.reset_index(level=0)
+        
         n_compounds, ncols = results.shape
 
         # write Pandas DataFrame
@@ -183,16 +187,17 @@ def save_aligned_to_excel(fname, aligned_dict):
 
         # center '#samples' column
         format = workbook.add_format({'align': 'center'})
-        sh.set_column(ncols, ncols, None, format)
+        sh.set_column(ncols-1, ncols-1, None, format)
 
         # change displayed precision in 'm/z' column
-        format2 = workbook.add_format({'num_format': '#.00000'})
-        sh.set_column(1, 1, None, format2)
+        format2 = workbook.add_format({'num_format': '0.0000000'})
+        sh.set_column(1, 1, 15, format2)
 
         # change widths
-        sh.set_column(2, ncols - 1, 25)
-        sh.set_column(1, 1, 15)
-        sh.set_column(ncols, ncols, 15)
+        sh.set_column(2, ncols - 2, 25)
+        #sh.set_column(1, 1, 15)
+        format3 = workbook.add_format({'num_format': '0.0000'})
+        sh.set_column(ncols, ncols, 15, format3)
         
         # Create report sheet
         rsheetname = sname + ' report'
@@ -253,7 +258,6 @@ def save_aligned_to_excel(fname, aligned_dict):
             sh.write_column(row_offset + 1, 1, unique_labels)
             for i in range(label_similarity.shape[0]):
                 sh.write_row(row_offset + i + 1, 2, label_similarity[i, :])
-            
 
     writer.save()
     print('Created file\n{}'.format(fname))
