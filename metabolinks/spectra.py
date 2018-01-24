@@ -4,7 +4,7 @@ There are two types of peak lists:
 
 - single (Spectrum)
 - aligned (AlignedSpectra). AlignedSpectra represents
-multiple peak lists that share the same m/z values.
+multiple peak lists that share the same m/z values (or other peak labels).
 
 Simple data handling functions are implemented as well as I/O to CSV (TSV).
 
@@ -40,11 +40,8 @@ class Spectrum(object):
 
     """
 
-    def __init__(self, df=None, sample_name=None, label=None):
-        if df is not None:
-            self._df = df.copy()
-        else:
-            self._df = df
+    def __init__(self, df, sample_name=None, label=None):
+        self._df = df.copy()
         
         self.label = label
         
@@ -83,9 +80,7 @@ class Spectrum(object):
     def fillna(self, value):
         """Get new Spectrum with missing values replaced for a given value."""
         new_df = self._df.fillna(value)
-        return Spectrum(df=new_df,
-                        sample_name=self.sample_name,
-                        label=self.label)
+        return Spectrum(new_df, sample_name=self.sample_name, label=self.label)
 
     def to_csv(self, filename, mz_name=None, sep=None, **kwargs):
         header = True
@@ -112,28 +107,22 @@ class AlignedSpectra(object):
     ----------
     sample_names : list of str
         The names of the samples.
-    labes : list of str
+    labels : list of str
         Optional sample labels, used in classification tasks.
 
     """
 
-    def __init__(self, df=None, sample_names=None, labels=None):
-        self._df = None
-        if df is not None:
-            self._df = df.copy()
+    def __init__(self, df, sample_names=None, labels=None):
+        self._df = df.copy()
         self.labels = labels
         
-        self.sample_names = None
-        if sample_names is not None:
-            self.sample_names = sample_names
+        if sample_names is None:
+            self.sample_names = list(self._df.columns)
+        elif isinstance(sample_names, int):
+            # read sample_names from columns
+            self.sample_names = list(self._df.columns[:sample_names])
         else:
-            if self._df is not None:
-                if '#samples' in self._df.columns:
-                    s_loc = self._df.columns.get_loc('#samples')
-                    self.sample_names = list(self._df.columns[:s_loc])
-                else:
-                    self.sample_names = list(self._df.columns)
-
+            self.sample_names = sample_names
 
     @property
     def data(self):
@@ -158,7 +147,7 @@ class AlignedSpectra(object):
                'Labels: {}'.format(self.labels),
                'Size: {}'.format(len(self.data)),
                str(self.data))
-               ) # No, I will not become a JS freak
+               ) # No, I will not become a js freak
 
 
     def label_of(self,sample):
@@ -171,14 +160,12 @@ class AlignedSpectra(object):
         return None
 
     def to_csv(self, filename, header_func=None, sep=None, 
-               no_report_columns=True, **kwargs):
+               no_meta_columns=True, **kwargs):
         if sep is None:
             sep = '\t'
         out_df = self._df.copy()
-        if no_report_columns:
-            if '#samples' in self._df.columns:
-                s_loc = self._df.columns.get_loc('#samples')
-                out_df = self._df.iloc[:, :s_loc]
+        if no_meta_columns:
+            out_df = out_df.iloc[:, :len(self.sample_names)]
         if header_func is None:
             out_df.to_csv(filename, header=True, sep=sep, index=True, **kwargs)
         else:
@@ -189,25 +176,25 @@ class AlignedSpectra(object):
                 needs_to_close = True
             else:
                 of = filename
-            
+
             header = header_func(self) + '\n'
             of.write(header)
             out_df.to_csv(of, header=False, sep=sep, 
                           index=True, **kwargs)
-            
+
             if needs_to_close:
                 of.close()
-        
+
     def fillna(self, value):
         """Substitute missing values for a given value."""
-        return AlignedSpectra(df=self._df.fillna(value),
+        return AlignedSpectra(self.data.fillna(value),
                               sample_names=self.sample_names,
                               labels=self.labels)
 
     def sample(self, sample):
         """Get data for a given sample name, as a Spectrum."""
         df = self.data[[sample]].dropna()
-        return Spectrum(df=df, sample_name=sample, label=self.label_of(sample))
+        return Spectrum(df, sample_name=sample, label=self.label_of(sample))
 
     def unfold(self):
         """Return a list of Spectrum objects, unfolding the peak lists."""
@@ -215,14 +202,29 @@ class AlignedSpectra(object):
 
     def label(self, label):
         """Get data for a given label, as an AlignedSpectra object."""
-         # build a list grouping samples with a given label
+        # build a list grouping samples with a given label
         lcolumns = []
         for c, l in zip(self.data.columns, self.labels):
             if l == label:
                 lcolumns.append(c)
         df = self.data[lcolumns].dropna(how='all', subset=lcolumns)
-        return AlignedSpectra(df=df, sample_names=lcolumns,
-                                     labels=[label]*len(lcolumns))
+        return AlignedSpectra(df, sample_names=lcolumns,
+                                  labels=[label]*len(lcolumns))
+    
+    def filter_few_replicates(self, minimum=1):
+        # build list of unique labels
+        unique_labels = list(set(self.labels))
+        for label in unique_labels:
+            # build a list grouping samples with each given label
+            lcolumns = []
+            for c, l in zip(self.data.columns, self.labels):
+                if l == label:
+                    lcolumns.append(c)
+            n_label = len(lcolumns)
+            counts = self._df[lcolumns].count(axis=1)
+            print(f'---------- LABEL {label} ------')
+            print(counts)
+            #self.data[#build query here] = numpy.nan
 
     def common_label_mz(self, label1, label2):
         mz1 = self.label(label1).mz
@@ -242,6 +244,7 @@ class AlignedSpectra(object):
         for lbl in slabels:
             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
         return remaining
+
 
 def read_spectrum(filename, label=None):
     s = pd.read_table(filename, index_col=False)
@@ -385,7 +388,7 @@ if __name__ == '__main__':
     print('\nm/z values (excluding missing data) ----------')
     print(spectrum.mz)
 
-    print('\Spectrum with missing values filled with zeros ----------')
+    print('\nSpectrum with missing values filled with zeros ----------')
     spectrumzero = spectrum.fillna(0)
     print(spectrumzero.data)
 
@@ -414,7 +417,7 @@ if __name__ == '__main__':
     print('\nm/z of label v1 ----------')
     print(spectra.label('v1').mz)
 
-    print('\Spectra with missing values filled with zeros ----------')
+    print('\nSpectra with missing values filled with zeros ----------')
     spectrazero = spectra.fillna(0)
     print(spectrazero.data)
 
@@ -453,3 +456,7 @@ if __name__ == '__main__':
         
     print('\n- Label similarity --')
     print(sim.label_similarity)
+    
+    print('\n- Filter fewer than 2')
+    spectra.filter_few_replicates(minimum=2)
+
