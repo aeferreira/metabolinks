@@ -211,7 +211,8 @@ class AlignedSpectra(object):
         return AlignedSpectra(df, sample_names=lcolumns,
                                   labels=[label]*len(lcolumns))
     
-    def filter_few_replicates(self, minimum=1):
+    def rep_at_least(self, minimum=1):
+        df = self._df.copy()
         # build list of unique labels
         unique_labels = list(set(self.labels))
         for label in unique_labels:
@@ -221,10 +222,11 @@ class AlignedSpectra(object):
                 if l == label:
                     lcolumns.append(c)
             n_label = len(lcolumns)
-            counts = self._df[lcolumns].count(axis=1)
-            print(f'---------- LABEL {label} ------')
-            print(counts)
-            #self.data[#build query here] = numpy.nan
+            lessthanmin = df[lcolumns].count(axis=1) < minimum
+            df.loc[lessthanmin, lcolumns] = np.nan
+        df = df.dropna(how='all')
+        return AlignedSpectra(df, sample_names=self.sample_names,
+                                  labels=self.labels)
 
     def common_label_mz(self, label1, label2):
         mz1 = self.label(label1).mz
@@ -417,6 +419,12 @@ if __name__ == '__main__':
     print('\nm/z of label v1 ----------')
     print(spectra.label('v1').mz)
 
+    print('\nFiltered fewer than 2 per label')
+    print('\n-- Original\n')
+    print(spectra)
+    print('\n-- With a minimum of 2 replicates\n')
+    print(spectra.rep_at_least(minimum=2))
+
     print('\nSpectra with missing values filled with zeros ----------')
     spectrazero = spectra.fillna(0)
     print(spectrazero.data)
@@ -457,6 +465,3 @@ if __name__ == '__main__':
     print('\n- Label similarity --')
     print(sim.label_similarity)
     
-    print('\n- Filter fewer than 2')
-    spectra.filter_few_replicates(minimum=2)
-
