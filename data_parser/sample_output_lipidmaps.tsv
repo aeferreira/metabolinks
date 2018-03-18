@@ -1,7 +1,7 @@
 COMMON_NAME	SYSTEMATIC_NAME	FORMULA	EXACT_MASS	CHEBI_ID	KEGG_ID	HMDBID	LM_ID
+(+/-)alpha-hydoxy butyric acid	2-hydroxy-butanoic acid	C4H8O3	104.047345	1148	C05984	HMDB00008	LMFA01050004
 Serratamic acid	N-(3S-hydroxydecanoyl)-L-serine	C13H25NO5	275.173274	None	None	None	LMFA00000002
 N-linolenoyl-glutamine	N-(9Z,12Z,15Z-octadecatrienoyl)-glutamine	C23H38N2O4	406.283158	None	None	None	LMFA00000004
 None	N-(3-(15-methyl-hexadecanoyloxy)-13-methyl-tetradecanoyl)-L-serine	C37H71NO6	625.528140	None	None	None	LMFA00000005
-None	N-(3-(hexadecanoyloxy)-heptadecanoyl)-L-ornithine	C38H74N2O5	638.559774	None	None	None	LMFA00000003
 None	2-methoxy-12-methyloctadec-17-en-5-ynoyl anhydride	C40H66O5	626.491026	None	None	None	LMFA00000001
-(+/-)alpha-hydoxy butyric acid	2-hydroxy-butanoic acid	C4H8O3	104.047345	1148	C05984	HMDB00008	LMFA01050004
+None	N-(3-(hexadecanoyloxy)-heptadecanoyl)-L-ornithine	C38H74N2O5	638.559774	None	None	None	LMFA00000003

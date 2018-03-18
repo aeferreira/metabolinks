@@ -1,0 +1,12 @@
+Common Name	Systematic Name	Formula	Monoisotopic Mass	ChEBI ID	KEGG Compound ID	HMBD ID	Lipid Maps ID
+(+/-)alpha-hydoxy butyric acid	2-hydroxy-butanoic acid	C4H8O3	104.047345	1148	C05984	HMDB00008	LMFA01050004
+1-alkyl-2-acylglycerol	None	C4H6O4R2	118.027	598	None	None	None
+(1S,4R)-fenchone	(1S,4R)-fenchan-2-one	C10H16O	152.12	165	C11387	None	None
+2,6-dichlorobenzonitrile	2,6-dichlorobenzonitrile	C7H3Cl2N	170.964	943	C11040	None	None
+Serratamic acid	N-(3S-hydroxydecanoyl)-L-serine	C13H25NO5	275.173274	None	None	None	LMFA00000002
+16alpha-hydroxyestrone	3,16alpha-dihydroxyestra-1,3,5(10)-trien-17-one	C18H22O3	286.157	776	C05300	None	LMST02010034
+(-)-epicatechin	(2R,3R)-2-(3,4-dihydroxyphenyl)-3,4-dihydro-2H-chromene-3,5,7-triol	C15H14O6	290.079	90	C09727	None	LMPK12020003
+N-linolenoyl-glutamine	N-(9Z,12Z,15Z-octadecatrienoyl)-glutamine	C23H38N2O4	406.283158	None	None	None	LMFA00000004
+None	N-(3-(15-methyl-hexadecanoyloxy)-13-methyl-tetradecanoyl)-L-serine	C37H71NO6	625.52814	None	None	None	LMFA00000005
+None	2-methoxy-12-methyloctadec-17-en-5-ynoyl anhydride	C40H66O5	626.491026	None	None	None	LMFA00000001
+None	N-(3-(hexadecanoyloxy)-heptadecanoyl)-L-ornithine	C38H74N2O5	638.559774	None	None	None	LMFA00000003
