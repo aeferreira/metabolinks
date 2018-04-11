@@ -304,7 +304,7 @@ def read_spectra_from_xcel(file_name,
 ##         print('============================================')
 ##         print(df.head())
 
-        # if sample names were not set yet then
+        # if sample names are not set then
         # use "2nd columns" headers as sample names
         # if common_mz then use headers from position 1
         if len(snames) > 0:
