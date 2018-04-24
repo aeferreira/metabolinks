@@ -2,7 +2,6 @@ from __future__ import print_function
 import time
 import os
 
-import json
 import requests
 
 import pandas as pd
