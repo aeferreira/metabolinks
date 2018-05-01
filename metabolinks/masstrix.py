@@ -163,7 +163,8 @@ def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
 
 if __name__ == '__main__':
 
-    testfile_name = '../example_data/masses.annotated.reformat.tsv'
+    #testfile_name = '../example_data/masses.annotated.reformat.tsv'
+    testfile_name = 'data/MassTRIX_output.tsv'
 
     results = read_MassTRIX(testfile_name).cleanup_cols()
     

@@ -1,11 +1,16 @@
-# -*- coding: utf8 -*-
+# -*- coding: utf-8 -*-
+"""`metabolinks` is on `Github`_.
 
-import codecs
-import os
-import re
+.. _github: https://github.com/aeferreira/metabolinks
 
-from setuptools import find_packages, setup
+"""
+from io import open
+from setuptools import setup, find_packages
 
+def read_file(filename, encoding='utf-8'):
+    with open(filename, encoding=encoding) as f:
+        content = f.read()
+    return content
 
 ###############################################################################
 
@@ -29,53 +34,33 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering :: Information Analysis"
 ]
 
-###############################################################################
-
-
-
-LONG = (
-    read("README.rst") + "\n\n" +
-    "Release Information\n" +
-    "===================\n\n" +
-    re.search("(\d+.\d.\d \(.*?\)\n.*?)\n\n\n----\n\n\n",
-              read("CHANGELOG.rst"), re.S).group(1) +
-    "\n\n`Full changelog " +
-    "<{uri}en/stable/changelog.html>`_.\n\n".format(uri=URI) +
-    read("AUTHORS.rst")
-)
-
-
 if __name__ == "__main__":
     setup(
         name="metabolinks",
-        license="License :: OSI Approved :: MIT License",
+        license="MIT",
         url='https://github.com/aeferreira/metabolinks',
         download_url='https://github.com/aeferreira/metabolinks',
         version='0.51',
+        zip_safe=False,
         author='António Ferreira and Gil Pires',
-        author_email="aeferreira@fc.ul.pt",
+        author_email="aeferreira@fc.ul.pt and gilpires071997@gmail.com",
         maintainer='António Ferreira',
         maintainer_email="aeferreira@fc.ul.pt",
         classifiers=CLASSIFIERS,
-        keywords=keywords=['Metabolomics', 'Mass Spectrometry',
+        keywords=['Metabolomics', 'Mass Spectrometry',
                   'Data Analysis', 'Ultra-high resolution MS'],
         description="A set of tools for high-resolution MS metabolomics data analysis",
-        long_description="""A set of tools for high-resolution MS metabolomics data analysis.
-        
-        Metabolinks aims at providing several tools that streamline most of
-        the metabolomics workflow. These tools were written having ultra-high
-        resolution MS based metabolomics in mind.
-        Features are a bit scarce right now:
-        
-        - peak list alignment
-        - data matrix filtering, convertion and sample similarity
-        - compound taxonomy retrieval
-        
-        But our road map is clear and we expect to stabilize in a beta version pretty soon.
-        Stay tuned, and check out examples (jupyter notebooks).
-        """,
+        long_description=read_file('README.rst'),
         packages=['metabolinks'],
-        zip_safe=False,
-        install_requires=['six', 'requests', 'numpy', 'pandas', 'pytest', 'matplotlib>=2.0'],
+        package_data={'metabolinks': [
+            'examples/peak_alignment_xcel.ipynb',
+            'examples/taxonomy_annotation_example.ipynb',
+            'data/data_to_align.xlsx',
+            'data/MassTRIX_output.tsv'
+        ]},
+        include_package_data=True,
+        install_requires=['six', 'requests', 'numpy', 
+                          'pandas', 'xlrd', 'xlsxwriter',
+                          'pytest', 'matplotlib>=2.0'],
     )
         

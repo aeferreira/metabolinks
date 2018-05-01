@@ -1,0 +1,6 @@
+include LICENSE
+include README.rst
+recursive-include metabolinks/examples *.ipynb
+include metabolinks/data/data_to_align.xlsx
+include metabolinks/data/MassTRIX_output.tsv
+prune metabolinks/examples/.ipynb_checkpoints

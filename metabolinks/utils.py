@@ -7,10 +7,9 @@
 from __future__ import print_function, absolute_import
 from six import string_types, integer_types
 
-import tkinter as tk
-
 def get_filename_using_tk():
     """Choose a filename using Tk"""
+    import tkinter as tk
     root = tk.Tk()
     root.withdraw()
     fname = tk.filedialog.askopenfilename(filetypes = [("TSV","*.tsv")])

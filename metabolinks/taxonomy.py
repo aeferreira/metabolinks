@@ -420,7 +420,7 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    testfile_name = '../example_data/MassTRIX_output.tsv'
+    testfile_name = 'data/MassTRIX_output.tsv'
 
     results = read_MassTRIX(testfile_name)
     print ("File {} was read\n".format(testfile_name))
@@ -452,6 +452,6 @@ if __name__ == '__main__':
     # Export the annotated dataframe into a MS-Excel file
     # Name it with the same name as the .tsv, replacing tail with '_raw.xlsx'
     
-    out_fname = testfile_name[:-4]+'_raw.xlsx'
+    out_fname = testfile_name[:-4]+'_comptaxa.xlsx'
     results.to_excel(out_fname, header=True, index=False)
     print ("File {} written".format(out_fname))
