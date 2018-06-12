@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, OrderedDict
 
 def element_composition(df, column=None,
                             compositions = ('CHO', 'CHOS',
@@ -38,16 +38,21 @@ def element_composition(df, column=None,
         else:
             comps.append('other')
     elem_comp = Counter(comps)
+    final_comps = OrderedDict()
+    labels = list(compositions) + ['other']
+    for k in labels:
+        final_comps[k] = elem_comp[k]
+    
     
 ##     for f, c in zip(formulae, comps):
 ##         print(f, c)
         
-    return elem_comp
+    return final_comps
 
 if __name__ == '__main__':
 
     from metabolinks.masstrix import read_MassTRIX
-    testfile_name = '../example_data/masses.annotated.reformat.tsv'
+    testfile_name = 'data/MassTRIX_output.tsv'
 
     df = read_MassTRIX(testfile_name).cleanup_cols()
     
@@ -61,6 +66,6 @@ if __name__ == '__main__':
     
     elem_comp = element_composition(df, column='KEGG_formula',
                                     compositions=compositions)
-    for c in compositions + ['other']:
+    for c in elem_comp:
         print(c, elem_comp[c])
 
