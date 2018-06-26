@@ -10,7 +10,7 @@ from metabolinks.similarity import compute_similarity_measures
 
 def concat_peaks(spectra, verbose=True):
     if verbose:
-        print ('- Joining data...')
+        print ('- Joining data...', end=' ')
 
     n = len(spectra)
     dfs = []
@@ -34,7 +34,7 @@ def concat_peaks(spectra, verbose=True):
     cdf.index = list(range(len(cdf)))
 
     if verbose:
-        print('  done, {} peaks in {} samples'.format(cdf.shape[0], n))
+        print('done, (total {} peaks in {} samples)'.format(cdf.shape[0], n))
     return cdf
 
 
@@ -60,7 +60,7 @@ def group_peaks(df, sample_ids, labels=None,
        a mass difference tolerance, in ppm."""
 
     if verbose:
-        print ('- Aligning...')
+        print ('- Aligning...', end=' ')
     glabel = 0
     start = 0
     glabels = [0]
@@ -104,7 +104,7 @@ def group_peaks(df, sample_ids, labels=None,
     n_non_discarded = len(result)
 
     if verbose:
-        print('  done, {} aligned peaks'.format(n_non_discarded))
+        print('done, {} aligned peaks'.format(n_non_discarded))
 
     if min_samples > 1:
         result = result[result['#samples'] >= min_samples]
@@ -121,6 +121,8 @@ def group_peaks(df, sample_ids, labels=None,
 
     result = result.set_index('m/z')
     res = AlignedSpectra(result, sample_names=sample_ids, labels=labels)
+    if verbose:
+        print('{}'.format(res.info()))
 
     return res
 
@@ -143,6 +145,7 @@ def align_spectra(spectra,
         labels = [s.label for s in spectra]
     
     if verbose:
+        print ('------ Aligning spectra -------------')
         print ('  Sample names:', samplenames)
         if not no_labels:
             print ('  Labels:', labels)

@@ -57,6 +57,9 @@ class Spectrum(object):
     def data(self):
         """The Pandas DataFrame holding the MS data."""
         return self._df
+    
+    def __len__(self):
+        return len(self.data)
 
     def __str__(self):
         res = ['Sample: ' + self.sample_name]
@@ -149,6 +152,14 @@ class AlignedSpectra(object):
                str(self.data))
                ) # No, I will not become a js freak
 
+    def info(self):
+        res = ['Number of peaks: {}'.format(len(self.data))]
+        for i, name in enumerate(self.sample_names):
+            sample = self.sample(name)
+            label = sample.label
+            peaks = len(sample)
+            res.append('{:5d} peaks in sample {}, with label {}'.format(peaks, name, label))
+        return '\n'.join(res)
 
     def label_of(self,sample):
         """Get label from sample name"""
@@ -275,11 +286,9 @@ def read_spectra_from_xcel(file_name,
     header = header_row - 1
 
     if verbose:
-        print ('------ Reading MS-Excel file -------\n{}'.format(file_name))
+        print ('------ Reading MS-Excel file - {}'.format(file_name))
 
     for sheetname in wb.sheet_names():
-        if verbose:
-            print ('- reading sheet "{}"...'.format(sheetname))
 
         # if sample_names argument if present (not None) then
         # if an integer, read row with sample names,
@@ -290,13 +299,12 @@ def read_spectra_from_xcel(file_name,
                 sh = wb.sheet_by_name(sheetname)
                 snames = sh.row_values(sample_names - 1)
                 snames = [s for s in snames if len(s.strip()) > 0]
-                header = sample_names
             else:
                 snames = sample_names
 
         # read data (and discard empty xl columns)
         df = pd.read_excel(file_name,
-                           sheetname=sheetname,
+                           sheet_name=sheetname,
                            header=header)
         df = df.dropna(axis=1, how='all')
 
@@ -345,9 +353,12 @@ def read_spectra_from_xcel(file_name,
                 spectrum.label = labels[i]
 
         if verbose:
+            print ('- {} spectra found in sheet "{}":'.format(len(results), sheetname))
             for spectrum in results:
                 name = spectrum.sample_name
-                print ('{:5d} peaks in sample {}'.format(spectrum.data.shape[0], name))
+                label = spectrum.label
+                size = len(spectrum)
+                print ('{:5d} peaks in sample {}, with label {}'.format(size, name, label))
         spectra_table[sheetname] = results
 
     return spectra_table
@@ -406,6 +417,7 @@ if __name__ == '__main__':
     spectra = read_aligned_spectra(sample, labels=labels)
     print(spectra,'\n')
     spectra.data.info()
+    print(spectra.info())
 
     print('\nData of sample s38 ----------')
     print(spectra.sample('s38'))
