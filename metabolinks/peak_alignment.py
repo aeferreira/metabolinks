@@ -8,36 +8,6 @@ import pandas as pd
 from metabolinks.spectra import AlignedSpectra, read_spectra_from_xcel
 from metabolinks.similarity import compute_similarity_measures
 
-def concat_peaks(spectra, verbose=True):
-    if verbose:
-        print ('- Joining data...', end=' ')
-
-    n = len(spectra)
-    dfs = []
-    # tag with sample names, concat vertically and sort by m/z
-    for spectrum in spectra:
-        # create DataFrame with columns 'm/z', 'I', and '_sample'
-        mzcol = pd.Series(spectrum.mz, index= range(len(spectrum.data)), 
-                          name='m/z')
-        intensity_column = pd.Series(spectrum.data.iloc[:, 0].values,
-                                     index=mzcol.index,
-                                     name='I')
-        labelcol = pd.Series(spectrum.sample_name, index=mzcol.index,
-                             name='_sample')
-
-        dfs.append(pd.concat([mzcol, intensity_column, labelcol], axis=1))
-    
-    # sort by m/z
-    cdf = pd.concat(dfs)
-    cdf = cdf.sort_values(by='m/z')
-    #reindex with increasing integers
-    cdf.index = list(range(len(cdf)))
-
-    if verbose:
-        print('done, (total {} peaks in {} samples)'.format(cdf.shape[0], n))
-    return cdf
-
-
 def are_near(d1, d2, ppmtol):
     """Predicate: flags if two entries should belong to the same compound"""
     reltol = ppmtol * 1.0e-6
@@ -150,13 +120,39 @@ def align_spectra(spectra,
         if not no_labels:
             print ('  Labels:', labels)
             
-    mdf = concat_peaks(spectra, verbose=verbose)
-    gdf = group_peaks(mdf, samplenames, labels=labels,
+        print ('- Joining data...', end=' ')
+    
+    # Joining data phase
+    
+    n = len(spectra)
+    dfs = []
+    
+    # tag with sample names, concat vertically and sort by m/z
+    for spectrum in spectra:
+        # create DataFrame with columns 'm/z', 'I', and '_sample'
+        mzcol = pd.Series(spectrum.mz, index=range(len(spectrum.data)), 
+                          name='m/z')
+        intensity_column = pd.Series(spectrum.data.iloc[:, 0].values,
+                                     index=mzcol.index,
+                                     name='I')
+        labelcol = pd.Series(spectrum.sample_name, index=mzcol.index,
+                             name='_sample')
+
+        dfs.append(pd.concat([mzcol, intensity_column, labelcol], axis=1))
+    
+    # sort by m/z
+    cdf = pd.concat(dfs)
+    cdf = cdf.sort_values(by='m/z')
+    #reindex with increasing integers
+    cdf.index = list(range(len(cdf)))
+
+    if verbose:
+        print('done, (total {} peaks in {} samples)'.format(cdf.shape[0], n))
+
+    gdf = group_peaks(cdf, samplenames, labels=labels,
                       ppmtol=ppmtol,
                       min_samples=min_samples,
                       verbose=verbose)
-    
-    #gdf.compute_similarity_measures()
     
     if fillna is not None:
         gdf = gdf.fillna(fillna)
