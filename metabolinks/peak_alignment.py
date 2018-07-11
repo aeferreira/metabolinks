@@ -93,10 +93,10 @@ def align_spectra(inputs,
     # Compute slices to use in table building
     ncols = 0
     tslices = []
-    for s in inputs:
-        sncols = s.data.shape[1]
-        tslices.append((ncols, ncols+sncols))
-        ncols += sncols
+    for namelist in samplenames:
+        n = len(namelist)
+        tslices.append((ncols, ncols+n))
+        ncols += n
     
     print('CONTROL', tslices)
     
@@ -117,12 +117,11 @@ def align_spectra(inputs,
     for sindx, s in enumerate(inputs):
         # create DataFrame with columns 'm/z', '_peak_index', and '_spectrum'
         dfs.append(
-            pd.DataFrame(
-                {'m/z': s.mz,
-                 '_peak_index': range(len(s.data)),
-                 '_spectrum': sindx
-                }
-            )
+            pd.DataFrame({
+                'm/z': s.mz,
+                '_peak_index': range(len(s.data)),
+                '_spectrum': sindx
+            })
         )
 
     # sort by m/z
@@ -141,14 +140,13 @@ def align_spectra(inputs,
 
     grouped = group_peaks(cdf, ppmtol=ppmtol)
     
-    colnames = ['m/z'] + all_samplenames + ['#samples', 'range_ppm']
+    colnames = ['m/z'] + all_samplenames + ['range_ppm']
     aligned_dict = {c: list() for c in colnames}
 
     for _, g in grouped:
         group = g.set_index('_spectrum')
 
         aligned_dict['m/z'].append(group['m/z'].mean())
-        aligned_dict['#samples'].append(len(group))
         
         m_min, m_max = group['m/z'].min(), group['m/z'].max()
         range_ppm = 1e6 * (m_max - m_min) / m_min
@@ -156,14 +154,17 @@ def align_spectra(inputs,
 
         for i, s in enumerate(inputs):
             if i in group.index:
-                peak_row = group.loc[i, '_peak_index']
-                for col, value in zip(samplenames[i], s.data.iloc[peak_row,:]):
+                row = group.loc[i, '_peak_index']
+                for col, value in zip(samplenames[i], s.data.iloc[row]):
                     aligned_dict[col].append(value)
             else:
                 for col in samplenames[i]:
                     aligned_dict[col].append(nan)
 
-    result = pd.DataFrame(aligned_dict, columns=colnames)
+    result = pd.DataFrame(aligned_dict, columns=colnames).set_index('m/z')
+    
+    # insert column with sample count (before last column)
+    result.insert(len(result.columns)-1, '#samples', result.count(axis=1)-1)
     
     # Discard rows according to min_samples cutoff
     n_non_discarded = len(result)
@@ -183,7 +184,6 @@ def align_spectra(inputs,
             print ('{:5d} peaks in {} samples'.format(c, n))
         #print('  {:3d} total'.format(len(result)))
 
-    result = result.set_index('m/z')
     result = AlignedSpectra(result, sample_names=all_samplenames, labels=labels)
     if verbose:
         print('{}'.format(result.info()))
@@ -646,7 +646,6 @@ if __name__ == '__main__':
     samples = [read_spectrum(s) for s in sampledata]
     for sample in samples:
         print(sample,'\n')
-        sample.data.info()
         print('------------')
 
     ppmtol = 1.0
@@ -655,7 +654,22 @@ if __name__ == '__main__':
     aligned = align_spectra(samples,
                   ppmtol=ppmtol, min_samples=min_samples,
                   fillna=None, verbose=True)
+    print(aligned)
     print('=========================')
+    print('\n\nTESTING alignment with aligned inputs')
+    
+    aligned2 = align_spectra(samples[:2],
+                  ppmtol=ppmtol, min_samples=min_samples,
+                  fillna=None, verbose=True)
+    print(aligned2)
+    print('-----------------------------------------')
+    print('Now the final alignment')
+    aligned_final = align_spectra([aligned2, samples[2]],
+                  ppmtol=ppmtol, min_samples=min_samples,
+                  fillna=None, verbose=True)
+    
+    print(aligned_final)
+    
 ##     
     
 ##     fname = 'data/data_to_align.xlsx'
