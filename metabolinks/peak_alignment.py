@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import itertools
 from collections import OrderedDict
 from numpy import nan
 
@@ -59,16 +60,45 @@ def align_spectra(inputs,
                   fillna=None,
                   verbose=True):
 
-    samplenames = [s.sample_name for s in inputs]
+    # Compute sample names and labels of the resulting table
+    samplenames = []
+    for s in inputs:
+        try:
+            samplenames.append([s.sample_name])
+        except AttributeError as error:
+            samplenames.append(s.sample_names)
+    # flatten list to get all sample names
+    
+    all_samplenames = list(itertools.chain(*samplenames))
+
     no_labels = False
     for s in inputs:
-        if s.label is None:
-            no_labels = True
-            break
+        try:
+            if s.label is None:
+                no_labels = True
+                break
+        except AttributeError as error:
+            if s.labels is None:
+                no_labels = True
+                break
     if no_labels:
         labels = None
     else:
-        labels = [s.label for s in inputs]
+        labels = []
+        for s in inputs:
+            try:
+                labels.append(s.label)
+            except AttributeError as error:
+                labels.extend(s.labels)
+    # Compute slices to use in table building
+    ncols = 0
+    tslices = []
+    for s in inputs:
+        sncols = s.data.shape[1]
+        tslices.append((ncols, ncols+sncols))
+        ncols += sncols
+    
+    print('CONTROL', tslices)
     
     if verbose:
         print ('------ Aligning spectra -------------')
@@ -84,20 +114,17 @@ def align_spectra(inputs,
     dfs = []
     
     # tag with sample names, concat vertically and sort by m/z
-    for i, spectrum in enumerate(inputs):
-        # create DataFrame with columns 'm/z', 'I', and '_sample'
-        mzcol = pd.Series(spectrum.mz, 
-                          index=range(len(spectrum.data)), 
-                          name='m/z')
-        peak_indx_column = pd.Series(range(len(spectrum.data)),
-                                     index=mzcol.index,
-                                     name='_peak_index')
-        spectrum_index_column = pd.Series(i, index=mzcol.index, name='_spectrum')
+    for sindx, s in enumerate(inputs):
+        # create DataFrame with columns 'm/z', '_peak_index', and '_spectrum'
+        dfs.append(
+            pd.DataFrame(
+                {'m/z': s.mz,
+                 '_peak_index': range(len(s.data)),
+                 '_spectrum': sindx
+                }
+            )
+        )
 
-        dfs.append(pd.concat([mzcol, 
-                              peak_indx_column, 
-                              spectrum_index_column], axis=1))
-    
     # sort by m/z
     cdf = pd.concat(dfs) # vertically
     cdf = cdf.sort_values(by='m/z')
@@ -114,31 +141,27 @@ def align_spectra(inputs,
 
     grouped = group_peaks(cdf, ppmtol=ppmtol)
     
-    colnames = ['m/z']
-    colnames.extend(samplenames)
-    colnames.extend(['#samples', 'range_ppm'])
-      
+    colnames = ['m/z'] + all_samplenames + ['#samples', 'range_ppm']
     aligned_dict = {c: list() for c in colnames}
 
-    for gname, gvalue in grouped:
-        tagged = gvalue.set_index('_spectrum')
+    for _, g in grouped:
+        group = g.set_index('_spectrum')
 
-        aligned_dict['m/z'].append(tagged['m/z'].mean())
-        aligned_dict['#samples'].append(len(tagged))
+        aligned_dict['m/z'].append(group['m/z'].mean())
+        aligned_dict['#samples'].append(len(group))
         
-        m_min = tagged['m/z'].min()
-        m_max = tagged['m/z'].max()
-        range_ppm = 1e6 * (m_max - m_min) / m_max
+        m_min, m_max = group['m/z'].min(), group['m/z'].max()
+        range_ppm = 1e6 * (m_max - m_min) / m_min
         aligned_dict['range_ppm'].append(range_ppm)
 
         for i, s in enumerate(inputs):
-            if i in tagged.index:
-                peak_row = tagged.loc[i, '_peak_index']
-                for cname, cvalue in zip([samplenames[i]], s.data.iloc[peak_row,:]):
-                    aligned_dict[cname].append(cvalue)
+            if i in group.index:
+                peak_row = group.loc[i, '_peak_index']
+                for col, value in zip(samplenames[i], s.data.iloc[peak_row,:]):
+                    aligned_dict[col].append(value)
             else:
-                for cname in [samplenames[i]]:
-                    aligned_dict[cname].append(nan)
+                for col in samplenames[i]:
+                    aligned_dict[col].append(nan)
 
     result = pd.DataFrame(aligned_dict, columns=colnames)
     
@@ -161,7 +184,7 @@ def align_spectra(inputs,
         #print('  {:3d} total'.format(len(result)))
 
     result = result.set_index('m/z')
-    result = AlignedSpectra(result, sample_names=samplenames, labels=labels)
+    result = AlignedSpectra(result, sample_names=all_samplenames, labels=labels)
     if verbose:
         print('{}'.format(result.info()))
 
