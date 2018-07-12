@@ -257,6 +257,9 @@ class AlignedSpectra(object):
         for lbl in slabels:
             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
         return remaining
+    
+    def compute_similarity_measures(self, *args, **kwargs):
+        return compute_similarity_measures(self, *args, **kwargs)
 
 
 def read_spectrum(filename, label=None):
@@ -469,7 +472,7 @@ if __name__ == '__main__':
 
     print('\nComputing similarity measures ----------')
     
-    sim = compute_similarity_measures(spectra)
+    sim = spectra.compute_similarity_measures()
     
     print('\n- Sample similarity --')
     print(sim.sample_similarity)

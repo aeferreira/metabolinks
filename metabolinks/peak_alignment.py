@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 
 from metabolinks.spectra import AlignedSpectra, read_spectra_from_xcel, read_spectrum
-from metabolinks.similarity import compute_similarity_measures
 
 def are_near(d1, d2, reltol):
     """Predicate: flags if two entries should belong to the same compound"""
@@ -51,7 +50,7 @@ def group_peaks(df, ppmtol=1.0):
 
     return result.groupby('_group')
     
-def align_spectra(inputs, ppmtol=1.0, min_samples=1, verbose=True):
+def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
     """Align peak lists, according to m/z proximity.
     
        Returns an instance of AlignedSpectra."""
@@ -198,6 +197,7 @@ def align_spectra(inputs, ppmtol=1.0, min_samples=1, verbose=True):
 
     return result
 
+align_spectra = align
 
 def align_spectra_in_excel(fname,
                            save_to_excel=None,
@@ -220,9 +220,9 @@ def align_spectra_in_excel(fname,
     for sheetname, spectra in spectra_table.items():
         if verbose:
             print ('\n-- sheet "{}"'.format(sheetname))
-        aligned = align_spectra(spectra,
-                                ppmtol=ppmtol, min_samples=min_samples,
-                                verbose=verbose)
+        aligned = align(spectra,
+                        ppmtol=ppmtol, min_samples=min_samples,
+                        verbose=verbose)
         if fillna is not None:
             aligned = aligned.fillna(fillna)
         aligned_spectra[sheetname] = aligned
@@ -240,7 +240,7 @@ def save_aligned_to_excel(fname, aligned_dict):
         
         aligned_spectra = aligned_dict[sname]
         
-        sim = compute_similarity_measures(aligned_spectra)
+        sim = aligned_spectra.compute_similarity_measures()
                 
         sample_similarity = sim.sample_similarity
         label_similarity = sim.label_similarity
@@ -677,24 +677,24 @@ if __name__ == '__main__':
     
     print(aligned_mix)
     
-##     fname = 'data/data_to_align.xlsx'
-##     out_fname = 'data/aligned_data.xlsx'
+    fname = 'data/data_to_align.xlsx'
+    out_fname = 'data/aligned_data.xlsx'
 
-##     header_row = 2
-##     sample_names = ['S1', 'S2', 'S3']
-##     labels = ['wt', 'mod', 'mod']
-##     sample_names = 1
+    header_row = 2
+    sample_names = ['S1', 'S2', 'S3']
+    labels = ['wt', 'mod', 'mod']
+    sample_names = 1
 
-##     aligned = align_spectra_in_excel(fname,
-##                            save_to_excel=out_fname,
-##                            ppmtol=ppmtol,
-##                            min_samples=min_samples,
-##                            labels=labels,
-##                            header_row=header_row,
-##                            sample_names=sample_names)
-##         
-##     print('+++++++++++++++++++++++++++++++++++++++++++++++++++++')
-##     for sheetname in aligned:
-##         print(aligned[sheetname])
-##         print('-----------------------------------')
+    aligned = align_spectra_in_excel(fname,
+                           save_to_excel=out_fname,
+                           ppmtol=ppmtol,
+                           min_samples=min_samples,
+                           labels=labels,
+                           header_row=header_row,
+                           sample_names=sample_names)
+        
+    print('+++++++++++++++++++++++++++++++++++++++++++++++++++++')
+    for sheetname in aligned:
+        print(aligned[sheetname])
+        print('-----------------------------------')
 
