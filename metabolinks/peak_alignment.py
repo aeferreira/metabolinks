@@ -2,8 +2,8 @@ from __future__ import print_function
 
 import itertools
 from collections import OrderedDict
-from numpy import nan
 
+import numpy as np
 import pandas as pd
 
 from metabolinks.spectra import AlignedSpectra, read_spectra_from_xcel, read_spectrum
@@ -22,10 +22,7 @@ def are_near(d1, d2, reltol):
 
 
 def group_peaks(df, ppmtol=1.0):
-    """Group peaks from different samples.
-
-       Peaks are grouped if their relative mass difference is below
-       a mass difference tolerance, in ppm."""
+    """Compute groups of peaks, according to m/z proximity."""
     
     # compute group indexes
     glabel = 0
@@ -54,11 +51,10 @@ def group_peaks(df, ppmtol=1.0):
 
     return result.groupby('_group')
     
-def align_spectra(inputs,
-                  ppmtol=1.0,
-                  min_samples=1,
-                  fillna=None,
-                  verbose=True):
+def align_spectra(inputs, ppmtol=1.0, min_samples=1, verbose=True):
+    """Align peak lists, according to m/z proximity.
+    
+       Returns an instance of AlignedSpectra."""
 
     # Compute sample names and labels of the resulting table
     samplenames = []
@@ -97,9 +93,7 @@ def align_spectra(inputs,
         n = len(namelist)
         tslices.append((ncols, ncols+n))
         ncols += n
-    
-    print('CONTROL', tslices)
-    
+       
     if verbose:
         print ('------ Aligning spectra -------------')
         print ('  Sample names:', samplenames)
@@ -141,31 +135,41 @@ def align_spectra(inputs,
     grouped = group_peaks(cdf, ppmtol=ppmtol)
     
     colnames = ['m/z'] + all_samplenames + ['range_ppm']
-    aligned_dict = {c: list() for c in colnames}
-
-    for _, g in grouped:
+    
+    nan = np.nan
+    aligned_array = np.full((len(grouped), len(all_samplenames)), nan)
+    
+    mz_array = [0.0] * len(grouped)
+    mz_range_array = [0.0] * len(grouped)
+    
+    for igroup, (_, g) in enumerate(grouped):
         group = g.set_index('_spectrum')
 
-        aligned_dict['m/z'].append(group['m/z'].mean())
-        
+        mz_array[igroup] = group['m/z'].mean()
+
         m_min, m_max = group['m/z'].min(), group['m/z'].max()
         range_ppm = 1e6 * (m_max - m_min) / m_min
-        aligned_dict['range_ppm'].append(range_ppm)
+        mz_range_array[igroup] = range_ppm
 
         for i, s in enumerate(inputs):
             if i in group.index:
                 row = group.loc[i, '_peak_index']
-                for col, value in zip(samplenames[i], s.data.iloc[row]):
-                    aligned_dict[col].append(value)
-            else:
-                for col in samplenames[i]:
-                    aligned_dict[col].append(nan)
+                start, end = tslices[i][0], tslices[i][1]
+                ndata = end-start
+                aligned_array[igroup, start:end] = s.data.iloc[row, :ndata]
 
-    result = pd.DataFrame(aligned_dict, columns=colnames).set_index('m/z')
-    
-    # insert column with sample count (before last column)
-    result.insert(len(result.columns)-1, '#samples', result.count(axis=1)-1)
-    
+    result = pd.DataFrame(aligned_array, 
+                          columns=all_samplenames, 
+                          index=mz_array)
+    # insert column with sample count
+    result.insert(len(result.columns), 
+                  '#samples',
+                  result.count(axis=1))
+    # insert column with ppm range
+    result.insert(len(result.columns), 
+                  '#range_ppm',
+                  pd.Series(mz_range_array, index=result.index))
+
     # Discard rows according to min_samples cutoff
     n_non_discarded = len(result)
 
@@ -177,20 +181,56 @@ def align_spectra(inputs,
 
         if min_samples > 1:
             n_discarded = n_non_discarded - len(result)
-            print('- {} peaks were discarded (#samples < {})'.format(n_discarded, min_samples))
+            msg = '- {} peaks were discarded (#samples < {})'.format
+            print(msg(n_discarded, min_samples))
 
         counts_table = result['#samples'].value_counts().sort_index()
         for n, c in counts_table.iteritems():
             print ('{:5d} peaks in {} samples'.format(c, n))
         #print('  {:3d} total'.format(len(result)))
 
-    result = AlignedSpectra(result, sample_names=all_samplenames, labels=labels)
+    result = AlignedSpectra(result, 
+                            sample_names=all_samplenames,
+                            labels=labels)
+    
     if verbose:
-        print('{}'.format(result.info()))
+        print(result.info())
 
-    if fillna is not None:
-        result = result.fillna(fillna)
     return result
+
+
+def align_spectra_in_excel(fname,
+                           save_to_excel=None,
+                           ppmtol=1.0, min_samples=1,
+                           sample_names=None, labels=None,
+                           header_row=1,
+                           fillna=None,
+                           verbose=True):
+
+    spectra_table = read_spectra_from_xcel(fname,
+                                           sample_names=sample_names,
+                                           labels=labels,
+                                           header_row=header_row,
+                                           verbose=verbose)
+
+    if verbose:
+        print('\n------ Aligning spectra ------')
+
+    aligned_spectra = OrderedDict()
+    for sheetname, spectra in spectra_table.items():
+        if verbose:
+            print ('\n-- sheet "{}"'.format(sheetname))
+        aligned = align_spectra(spectra,
+                                ppmtol=ppmtol, min_samples=min_samples,
+                                verbose=verbose)
+        if fillna is not None:
+            aligned = aligned.fillna(fillna)
+        aligned_spectra[sheetname] = aligned
+
+    if save_to_excel is not None:
+        save_aligned_to_excel(save_to_excel, aligned_spectra)
+    
+    return aligned_spectra
 
 
 def save_aligned_to_excel(fname, aligned_dict):
@@ -294,40 +334,6 @@ def save_aligned_to_excel(fname, aligned_dict):
 
     writer.save()
     print('Created file\n{}'.format(fname))
-
-
-def align_spectra_in_excel(fname,
-                           save_to_excel=None,
-                           ppmtol=1.0,
-                           min_samples=1,
-                           sample_names=None,
-                           labels=None,
-                           header_row=1,
-                           fillna=None,
-                           verbose=True):
-
-    spectra_table = read_spectra_from_xcel(fname,
-                                           sample_names=sample_names,
-                                           labels=labels,
-                                           header_row=header_row,
-                                           verbose=verbose)
-
-    if verbose:
-        print('\n------ Aligning spectra ------')
-
-    aligned_spectra = OrderedDict()
-    for sheetname, spectra in spectra_table.items():
-        if verbose:
-            print ('\n-- sheet "{}"'.format(sheetname))
-        aligned_spectra[sheetname] = align_spectra(spectra,
-                                              ppmtol=ppmtol,
-                                              min_samples=min_samples,
-                                              fillna=fillna,
-                                              verbose=verbose)
-    if save_to_excel is not None:
-        save_aligned_to_excel(save_to_excel, aligned_spectra)
-    
-    return aligned_spectra
 
 
 if __name__ == '__main__':
@@ -651,26 +657,25 @@ if __name__ == '__main__':
     ppmtol = 1.0
     min_samples = 1
     
-    aligned = align_spectra(samples,
-                  ppmtol=ppmtol, min_samples=min_samples,
-                  fillna=None, verbose=True)
+    inputs = samples
+    
+    aligned = align_spectra(inputs, verbose=True)
     print(aligned)
     print('=========================')
     print('\n\nTESTING alignment with aligned inputs')
     
-    aligned2 = align_spectra(samples[:2],
-                  ppmtol=ppmtol, min_samples=min_samples,
-                  fillna=None, verbose=True)
+    inputs = samples[:2]
+    
+    aligned2 = align_spectra(inputs, verbose=True)
     print(aligned2)
     print('-----------------------------------------')
     print('Now the final alignment')
-    aligned_final = align_spectra([aligned2, samples[2]],
-                  ppmtol=ppmtol, min_samples=min_samples,
-                  fillna=None, verbose=True)
     
-    print(aligned_final)
+    inputs = [aligned2, samples[2]]
     
-##     
+    aligned_mix = align_spectra(inputs, verbose=True)
+    
+    print(aligned_mix)
     
 ##     fname = 'data/data_to_align.xlsx'
 ##     out_fname = 'data/aligned_data.xlsx'
