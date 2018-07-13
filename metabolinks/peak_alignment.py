@@ -51,43 +51,6 @@ def group_peaks(df, ppmtol=1.0):
     return result.groupby('_group')
 
 
-class AlignmentStats(object):
-    def __str__(self):
-        res = []
-        res.append(self.result.info())
-        lines=['Sample coverage of peaks']
-        for n, c in self.scounts.items():
-            lines.append('{:5d} peaks in {} samples'.format(c, n))
-        res.append('\n'.join(lines))
-        excess_ranges = self.excess_ranges
-        if len(excess_ranges) > 0:
-            res.append('Peaks with m/z range in excess of tolerance')
-            res.append(excess_ranges)
-        lines = ['m/z range distribution']
-        range_hist = self.range_hist
-        bins = range_hist[1]
-        counts = range_hist[0]
-        for i, c in enumerate(counts):
-            lines.append('  [{:3.1f},{:3.1f}[ : {}'.format(bins[i], bins[i+1], c))
-        res.append('\n'.join(lines))
-        return '\n'.join(res)
-
-def computeAlignmentStats(result, range_ppm, nsamples):
-    alignment_stats = AlignmentStats()
-    alignment_stats.result = result
-    
-    # compute table with sample counts
-    alignment_stats.scounts = nsamples.value_counts().sort_index()
-    # compute ranges greater than ppmtol
-    alignment_stats.range_ppm = range_ppm
-    alignment_stats.excess_ranges = range_ppm[range_ppm > ppmtol]
-    # compute histogram of range_ppm
-    alignment_stats.range_hist = np.histogram(range_ppm.values,
-                                              bins=10,
-                                              range=(0.0, ppmtol))
-    return alignment_stats
-
-
 def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
     """Align peak lists, according to m/z proximity.
     
@@ -215,10 +178,13 @@ def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
                             sample_names=all_samplenames,
                             labels=labels)
 
-    alignment_stats = computeAlignmentStats(result, range_ppm, nsamples)
+    alignment_stats = AlignmentStats(result, range_ppm, nsamples, ppmtol)
+    # "inject" alignment_stats in result
+    result.alignment_stats = alignment_stats
 
     if verbose:
         print('done, {} aligned peaks'.format(n_non_discarded))
+        print(result.info())
 
         if min_samples > 1:
             n_discarded = n_non_discarded - len(result)
@@ -226,14 +192,71 @@ def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
             print(msg(n_discarded, min_samples))
 
         print(alignment_stats)
-    
-    # "inject" alignment_stats in result
-    result.alignment_stats = alignment_stats
-    
+        
+        sim = result.compute_similarity_measures()
+        
+        print('\nSample similarity (common peak counts and Jaccard indexes)')
+        df_ss = pd.DataFrame(np.tril(sim.sample_similarity, -1),
+                             columns=all_samplenames,
+                             index=all_samplenames)
+        print(df_ss)
+        #print(sim.sample_similarity)
+            
+        if sim.label_similarity is not None:
+            print('\nLabel similarity (common peak counts and Jaccard indexes)')
+            print(sim.label_similarity)
+        
     return result
 
 # Alias
 align_spectra = align
+
+
+class AlignmentStats(object):
+    """A container that holds descriptive measures of an alignment task.
+    """
+    
+    def __init__(self, result, range_ppm, nsamples, ppmtol):
+        self.result = None
+        self.scounts = None
+        self.range_ppm = None
+        self.excess_ranges = None
+        self.range_hist = None
+        
+        self.result = result
+        
+        # compute table with sample counts
+        self.scounts = nsamples.value_counts().sort_index()
+        # compute ranges greater than ppmtol
+        self.range_ppm = range_ppm
+        self.excess_ranges = range_ppm[range_ppm > ppmtol]
+        # compute histogram of range_ppm
+        self.range_hist = np.histogram(range_ppm.values,
+                                                  bins=10,
+                                                  range=(0.0, ppmtol))
+
+    def __str__(self):
+        res = []
+        lines=['Sample coverage of peaks']
+        for n, c in self.scounts.items():
+            lines.append('{:5d} peaks in {} samples'.format(c, n))
+        res.append('\n'.join(lines))
+        lines = ['m/z range distribution']
+        range_hist = self.range_hist
+        bins = range_hist[1]
+        counts = range_hist[0]
+        for i, c in enumerate(counts):
+            lines.append('  [{:3.1f},{:3.1f}[ : {}'.format(bins[i], bins[i+1], c))
+        res.append('\n'.join(lines))
+        excess_ranges = self.excess_ranges
+        if len(excess_ranges) > 0:
+            res.append('Peaks with m/z range in excess of tolerance')
+            res.append(str(excess_ranges))
+        else:
+            res.append('No peaks found with m/z range > {}'.format(bins[-1]))
+        return '\n'.join(res)
+
+
 
 def align_spectra_in_excel(fname,
                            save_to_excel=None,
@@ -283,6 +306,7 @@ def save_aligned_to_excel(fname, aligned_dict):
         unique_labels = sim.unique_labels
                 
         results = aligned_spectra.data
+        results.index.name = 'm/z'
         results = results.reset_index(level=0)
         
         n_compounds, ncols = results.shape
@@ -299,11 +323,8 @@ def save_aligned_to_excel(fname, aligned_dict):
         sh.set_column(1, 1, 15, format2)
 
         # change widths
-        sh.set_column(2, ncols - 2, 25)
-        #sh.set_column(1, 1, 15)
-        format3 = workbook.add_format({'num_format': '0.0000'})
-        sh.set_column(ncols, ncols, 15, format3)
-        
+        sh.set_column(2, ncols+1, 25)
+       
         # Create report sheet
         rsheetname = sname + ' report'
         sh = workbook.add_worksheet(rsheetname)
@@ -317,7 +338,6 @@ def save_aligned_to_excel(fname, aligned_dict):
         # create table of replica counts
         sh.write_string(row_offset, 2, '#samples')
         counts = aligned_spectra.alignment_stats.scounts
-        #counts = results['#samples'].value_counts().sort_index()
         sh.write_column(row_offset + 1, 2, counts.index)
         sh.write_column(row_offset + 1, 3, counts.values)
 
@@ -333,9 +353,31 @@ def save_aligned_to_excel(fname, aligned_dict):
         sh.insert_chart(1, 5, chart)
 
         row_offset = row_offset + len(counts) + 7
+        sh.write_string(row_offset, 1, 'm/z range distribution (in ppm)')        
 
-        sh.write_string(row_offset, 1, 'Sample sizes')
-        
+        range_hist =  aligned_spectra.alignment_stats.range_hist
+        bins = range_hist[1]
+        counts = range_hist[0]
+        for i, c in enumerate(counts):
+            interval = '[{:3.1f}, {:3.1f}['.format(bins[i], bins[i+1])
+            sh.write_string(row_offset + 1 + i, 2, interval)
+            sh.write(row_offset + 1 + i, 3, c)            
+
+        row_offset = row_offset + len(counts) + 1
+        excess_ranges = aligned_spectra.alignment_stats.excess_ranges
+        if len(excess_ranges) > 0:
+            sh.write_string(row_offset, 1, 'Peaks with m/z range in excess of tolerance')
+            for i, elem in enumerate(excess_ranges.itertuples()):
+                sh.write_string(row_offset + 1 + i, 2, elem[0])
+                sh.write(row_offset + 1 + i, 3, elem[1])
+        else:
+            sh.write_string(row_offset, 1, 'No peaks found with m/z range > {}'.format(bins[-1])) 
+            i = 1
+
+        row_offset = row_offset + i + 3
+
+        sh.write_string(row_offset, 1, 'Sample sizes')        
+
         row_offset = row_offset + 2
         
         sh.write_row(row_offset, 1, aligned_spectra.sample_names)
