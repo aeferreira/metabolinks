@@ -196,11 +196,7 @@ def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
         sim = result.compute_similarity_measures()
         
         print('\nSample similarity (common peak counts and Jaccard indexes)')
-        df_ss = pd.DataFrame(np.tril(sim.sample_similarity, -1),
-                             columns=all_samplenames,
-                             index=all_samplenames)
-        print(df_ss)
-        #print(sim.sample_similarity)
+        print(sim.sample_similarity)
             
         if sim.label_similarity is not None:
             print('\nLabel similarity (common peak counts and Jaccard indexes)')
@@ -753,7 +749,20 @@ if __name__ == '__main__':
     aligned_mix = align_spectra(inputs, verbose=True)
     print('\n--- Result: --------------------')    
     print(aligned_mix)
+       
+    print('=========================')
+    print('\n\nTESTING alignment with min_samples cutoff')
+    inputs = samples
     
+    aligned = align_spectra(inputs, min_samples=2, verbose=True)
+    print('\n--- Result: --------------------')
+    print(aligned)
+    
+    
+    print('=========================')
+    print('\n\nTESTING alignment with several input sets from an Excel file')
+    ppmtol = 1.0
+    min_samples = 1
     fname = 'data/data_to_align.xlsx'
     out_fname = 'data/aligned_data.xlsx'
 

@@ -131,6 +131,9 @@ class AlignedSpectra(object):
     def data(self):
         """The Pandas DataFrame holding the MS data."""
         return self._df
+    
+    def __len__(self):
+        return len(self.data)
 
     @property
     def sample_count(self):
