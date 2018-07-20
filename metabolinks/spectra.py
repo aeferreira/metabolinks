@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from metabolinks.utils import _is_string
-from metabolinks.similarity import compute_similarity_measures
+from metabolinks.similarity import mz_similarity
 
 class Spectrum(object):
     """A single peak list.
@@ -260,9 +260,6 @@ class AlignedSpectra(object):
         for lbl in slabels:
             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
         return remaining
-    
-    def compute_similarity_measures(self, *args, **kwargs):
-        return compute_similarity_measures(self, *args, **kwargs)
 
 
 def read_spectrum(filename, label=None):
@@ -475,11 +472,4 @@ if __name__ == '__main__':
 
     print('\nComputing similarity measures ----------')
     
-    sim = spectra.compute_similarity_measures()
-    
-    print('\n- Sample similarity --')
-    print(sim.sample_similarity)
-        
-    print('\n- Label similarity --')
-    print(sim.label_similarity)
-    
+    print(mz_similarity(spectra))

@@ -6,7 +6,12 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from metabolinks.spectra import AlignedSpectra, read_spectra_from_xcel, read_spectrum
+from metabolinks.spectra import (Spectrum, 
+                                 AlignedSpectra,
+                                 read_spectra_from_xcel,
+                                 read_spectrum)
+
+from metabolinks.similarity import mz_similarity
 
 def are_near(d1, d2, reltol):
     """Predicate: flags if two entries should belong to the same compound"""
@@ -51,7 +56,8 @@ def group_peaks(df, ppmtol=1.0):
     return result.groupby('_group')
 
 
-def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
+def align(inputs, ppmtol=1.0, min_samples=1,
+          report_similarity_measures=False, verbose=True):
     """Align peak lists, according to m/z proximity.
     
        Returns an instance of AlignedSpectra."""
@@ -59,22 +65,24 @@ def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
     # Compute sample names and labels of the resulting table
     samplenames = []
     for s in inputs:
-        try:
-            samplenames.append([s.sample_name])
-        except AttributeError as error:
+        if isinstance(s, AlignedSpectra):
             samplenames.append(s.sample_names)
+        elif isinstance(s, Spectrum):
+            samplenames.append([s.sample_name])
+        else:
+            raise ValueError("wrong type of input to align function")
     # flatten list to get all sample names
     
     all_samplenames = list(itertools.chain(*samplenames))
 
     no_labels = False
     for s in inputs:
-        try:
-            if s.label is None:
+        if isinstance(s, AlignedSpectra):
+            if s.labels is None:
                 no_labels = True
                 break
-        except AttributeError as error:
-            if s.labels is None:
+        else:
+            if s.label is None:
                 no_labels = True
                 break
     if no_labels:
@@ -82,10 +90,10 @@ def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
     else:
         labels = []
         for s in inputs:
-            try:
-                labels.append(s.label)
-            except AttributeError as error:
+            if isinstance(s, AlignedSpectra):
                 labels.extend(s.labels)
+            else:
+                labels.append(s.label)
     # Compute slices to use in table building
     ncols = 0
     tslices = []
@@ -193,20 +201,13 @@ def align(inputs, ppmtol=1.0, min_samples=1, verbose=True):
 
         print(alignment_stats)
         
-        sim = result.compute_similarity_measures()
-        
-        print('\nSample similarity (common peak counts and Jaccard indexes)')
-        print(sim.sample_similarity)
-            
-        if sim.label_similarity is not None:
-            print('\nLabel similarity (common peak counts and Jaccard indexes)')
-            print(sim.label_similarity)
-        
+        if report_similarity_measures:
+            print(mz_similarity(result))
+
     return result
 
 # Alias
 align_spectra = align
-
 
 class AlignmentStats(object):
     """A container that holds descriptive measures of an alignment task.
@@ -295,12 +296,8 @@ def save_aligned_to_excel(fname, aligned_dict):
         
         aligned_spectra = aligned_dict[sname]
         
-        sim = aligned_spectra.compute_similarity_measures()
-                
-        sample_similarity = sim.sample_similarity
-        label_similarity = sim.label_similarity
-        unique_labels = sim.unique_labels
-                
+        sim = mz_similarity(aligned_spectra)
+                                
         results = aligned_spectra.data
         results.index.name = 'm/z'
         results = results.reset_index(level=0)
@@ -376,32 +373,59 @@ def save_aligned_to_excel(fname, aligned_dict):
 
         row_offset = row_offset + 2
         
+        sample_intersection_counts = sim.sample_intersection_counts
+        sample_similarity_jaccard = sim.sample_similarity_jaccard
+        label_intersection_counts = sim.label_intersection_counts
+        label_similarity_jaccard = sim.label_similarity_jaccard
+        unique_labels = sim.unique_labels
+        sample_names = sim.sample_names
+
         sh.write_row(row_offset, 1, aligned_spectra.sample_names)
-        for i in range(sample_similarity.shape[0]):
-            sh.write_number(row_offset + 1, 1 + i, sample_similarity[i, i])
+        for i in range(sample_intersection_counts.shape[0]):
+            sh.write_number(row_offset + 1, 1 + i, sample_intersection_counts[i, i])
 
         row_offset = row_offset + 4
         
-        sh.write_string(row_offset, 1, 'Sample similarity')
+        sh.write_string(row_offset, 1, 'Sample similarity, common peak counts')
         
         row_offset = row_offset + 2
 
-        sh.write_row(row_offset, 2, aligned_spectra.sample_names)
-        sh.write_column(row_offset + 1, 1, aligned_spectra.sample_names)
-        for i in range(sample_similarity.shape[0]):
-            sh.write_row(row_offset + i + 1, 2, sample_similarity[i, :])
+        sh.write_row(row_offset, 2, sample_names)
+        sh.write_column(row_offset + 1, 1, sample_names)
+        for i in range(sample_intersection_counts.shape[0]):
+            sh.write_row(row_offset + i + 1, 2, sample_intersection_counts[i, :])
             
-        if label_similarity is not None:
-            row_offset = row_offset + sample_similarity.shape[0] + 3
+        sh.write_string(row_offset, 1, 'Sample similarity, Jaccard indexes')
+        
+        row_offset = row_offset + sample_intersection_counts.shape[0] + 3
+
+        sh.write_row(row_offset, 2, sample_names)
+        sh.write_column(row_offset + 1, 1, sample_names)
+        for i in range(sample_similarity_jaccard.shape[0]):
+            sh.write_row(row_offset + i + 1, 2, sample_similarity_jaccard[i, :])
             
-            sh.write_string(row_offset, 1, 'Label similarity')
+        if label_intersection_counts is not None:
+            row_offset = row_offset + sample_similarity_jaccard.shape[0] + 3
+            
+            sh.write_string(row_offset, 1, 'Label similarity, common peak counts')
             
             row_offset = row_offset + 2
 
             sh.write_row(row_offset, 2, unique_labels)
             sh.write_column(row_offset + 1, 1, unique_labels)
-            for i in range(label_similarity.shape[0]):
-                sh.write_row(row_offset + i + 1, 2, label_similarity[i, :])
+            for i in range(label_intersection_counts.shape[0]):
+                sh.write_row(row_offset + i + 1, 2, label_intersection_counts[i, :])
+
+            row_offset = row_offset + label_intersection_counts.shape[0] + 3
+            
+            sh.write_string(row_offset, 1, 'Label similarity, Jaccard indexes')
+            
+            row_offset = row_offset + 2
+
+            sh.write_row(row_offset, 2, unique_labels)
+            sh.write_column(row_offset + 1, 1, unique_labels)
+            for i in range(label_similarity_jaccard.shape[0]):
+                sh.write_row(row_offset + i + 1, 2, label_similarity_jaccard[i, :])
 
     writer.save()
     print('Created file\n{}'.format(fname))
