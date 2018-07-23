@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import time
 import itertools
 from collections import OrderedDict
 
@@ -12,6 +13,7 @@ from metabolinks.spectra import (Spectrum,
                                  read_spectrum)
 
 from metabolinks.similarity import mz_similarity
+from metabolinks.utils import s2HMS
 
 def are_near(d1, d2, reltol):
     """Predicate: flags if two entries should belong to the same compound"""
@@ -62,6 +64,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     
        Returns an instance of AlignedSpectra."""
 
+    start_time = time.clock()
     # Compute sample names and labels of the resulting table
     samplenames = []
     for s in inputs:
@@ -192,6 +195,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
 
     if verbose:
         print('done, {} aligned peaks'.format(n_non_discarded))
+        print('Elapsed time:', s2HMS(time.clock() - start_time))
         print(result.info())
 
         if min_samples > 1:
