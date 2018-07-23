@@ -43,7 +43,7 @@ class Spectrum(object):
     def __init__(self, df, sample_name=None, label=None):
         self._df = df.copy()
         
-        self.label = label
+        self.set_label(label)
         
         self.sample_name = None
         if sample_name is not None:
@@ -67,6 +67,11 @@ class Spectrum(object):
         res.append('{} peaks'.format(len(self.data)))
         res.append(str(self.data))
         return '\n'.join(res)
+    
+    def set_label(self, label=None):
+        if not (label is None or _is_string(label)):
+            raise ValueError('Spectrum label must be a string or None')
+        self.label = label
 
     @property
     def mz(self):
@@ -117,7 +122,6 @@ class AlignedSpectra(object):
 
     def __init__(self, df, sample_names=None, labels=None):
         self._df = df.copy()
-        self.labels = labels
         
         if sample_names is None:
             self.sample_names = list(self._df.columns)
@@ -125,7 +129,18 @@ class AlignedSpectra(object):
             # read sample_names from columns
             self.sample_names = list(self._df.columns[:sample_names])
         else:
-            self.sample_names = sample_names
+            self.sample_names = sample_names[:len(self._df.columns)]
+            self._df.columns = self.sample_names
+        
+        self.set_labels(labels)
+
+    def set_labels(self, lbs=None):
+        if lbs is None:
+            self.labels = None
+        elif _is_string(lbs):
+            self.labels = [lbs] * len(self.sample_names)
+        else:
+            self.labels = lbs[:len(self.sample_names)]
 
     @property
     def data(self):
@@ -145,7 +160,7 @@ class AlignedSpectra(object):
         """Get m/z values as a numpy array"""
         res = self.data.index.values
         return res
-
+    
     def __str__(self):
         return '\n'.join(
                ('{} samples:'.format(self.sample_count),
@@ -415,7 +430,7 @@ if __name__ == '__main__':
     print(mzfile.getvalue())
 
     print('\nReading aligned spectra (all of them) ----------')
-    labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2']
+    labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
     sample.seek(0)
     spectra = read_aligned_spectra(sample, labels=labels)
     print(spectra,'\n')
