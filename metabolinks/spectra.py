@@ -52,6 +52,9 @@ class Spectrum(object):
             # read sample name from the name of the only column
             if self._df is not None:
                 self.sample_name = self._df.columns[0]
+        #newcols = list(self._df.columns)
+        #newcols[0] = sample_name
+        self._df.rename(columns={self._df.columns[0]: sample_name})
     
     @property
     def data(self):
@@ -366,9 +369,12 @@ def read_spectra_from_xcel(file_name,
 
                 j = j + 1
 
+
         if labels is not None:
-            for i, spectrum in enumerate(results):
-                spectrum.label = labels[i]
+            if _is_string(labels):
+                labels = [labels] * len(results)
+            for lbl, spectrum in zip(labels, results):
+                spectrum.set_label(lbl)
 
         if verbose:
             print ('- {} spectra found in sheet "{}":'.format(len(results), sheetname))
