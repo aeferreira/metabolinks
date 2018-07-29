@@ -143,7 +143,7 @@ class AlignedSpectra(object):
         elif _is_string(lbs):
             self.labels = [lbs] * len(self.sample_names)
         else:
-            self.labels = lbs[:len(self.sample_names)]
+            self.labels = list(lbs[:len(self.sample_names)])
 
     @property
     def data(self):
@@ -175,7 +175,7 @@ class AlignedSpectra(object):
 
     def info(self):
         res = ['Number of peaks: {}'.format(len(self.data))]
-        for i, name in enumerate(self.sample_names):
+        for name in self.sample_names:
             sample = self.sample(name)
             label = sample.label
             peaks = len(sample)
@@ -191,7 +191,21 @@ class AlignedSpectra(object):
                 return lbl
         return None
 
-    def to_csv(self, filename, header_func=None, sep=None, 
+    def default_header_csv(self, s, sep=None, with_labels=False):
+        # this returns a header suitable for various metabolomics tools
+        if sep is None:
+            sep = '\t'
+        lines = []
+        line = ['Sample'] + s.sample_names
+        line = sep.join(['"{}"'.format(n) for n in line])
+        lines.append(line)
+        if with_labels and s.labels is not None:
+            line = ['Label'] + s.labels
+            line = sep.join(['"{}"'.format(n) for n in line])
+            lines.append(line)
+        return '\n'.join(lines)
+
+    def to_csv(self, filename, header_func=None, sep=None, with_labels=False,
                no_meta_columns=True, **kwargs):
         if sep is None:
             sep = '\t'
@@ -199,23 +213,21 @@ class AlignedSpectra(object):
         if no_meta_columns:
             out_df = out_df.iloc[:, :len(self.sample_names)]
         if header_func is None:
-            out_df.to_csv(filename, header=True, sep=sep, index=True, **kwargs)
+            header_func = self.default_header_csv
+        # prepend output with result of header_func
+        needs_to_close = False
+        if _is_string(filename):
+            of = open(filename, 'w') 
+            needs_to_close = True
         else:
-            # prepend output with result of header_func
-            needs_to_close = False
-            if _is_string(filename):
-                of = open(filename, 'w') 
-                needs_to_close = True
-            else:
-                of = filename
+            of = filename
 
-            header = header_func(self) + '\n'
-            of.write(header)
-            out_df.to_csv(of, header=False, sep=sep, 
-                          index=True, **kwargs)
+        header = header_func(self, sep=sep, with_labels=with_labels) + '\n'
+        of.write(header)
+        out_df.to_csv(of, header=False, index=True, sep=sep, **kwargs)
 
-            if needs_to_close:
-                of.close()
+        if needs_to_close:
+            of.close()
 
     def fillna(self, value):
         """Substitute missing values for a given value."""
@@ -253,7 +265,6 @@ class AlignedSpectra(object):
             for c, l in zip(self.data.columns, self.labels):
                 if l == label:
                     lcolumns.append(c)
-            n_label = len(lcolumns)
             lessthanmin = df[lcolumns].count(axis=1) < minimum
             df.loc[lessthanmin, lcolumns] = np.nan
         df = df.dropna(how='all')
@@ -288,9 +299,20 @@ def read_spectrum(filename, label=None):
     return Spectrum(s, label=label)
 
 
-def read_aligned_spectra(filename, labels=None):
-    s = pd.read_table(filename, index_col=False)
+def read_aligned_spectra(filename, labels=None, **kwargs):
+    if labels == True:
+        s = pd.read_table(filename, header=[0,1], **kwargs)
+    else:
+        s = pd.read_table(filename, index_col=False, **kwargs)
+    
+    if labels == True:
+        snames = s.columns.get_level_values(0)
+        lnames = s.columns.get_level_values(1)[1:]
+        s.columns = snames
+        labels = lnames
+
     s = s.set_index(s.columns[0])
+    s.index.name = 'm/z'
     return AlignedSpectra(s, labels=labels)
 
 
@@ -328,10 +350,6 @@ def read_spectra_from_xcel(file_name,
                            sheet_name=sheetname,
                            header=header)
         df = df.dropna(axis=1, how='all')
-
-##         df.info()
-##         print('============================================')
-##         print(df.head())
 
         # if sample names are not set then
         # use "2nd columns" headers as sample names
@@ -435,6 +453,26 @@ if __name__ == '__main__':
     print('\n--- Resulting file:')
     print(mzfile.getvalue())
 
+    print('\nReading aligned spectra (all of them) no labels ----------')
+    sample.seek(0)
+    spectra = read_aligned_spectra(sample)
+    print(spectra,'\n')
+    spectra.data.info()
+    print(spectra.info())
+
+    print('\nSaving aligned spectra into a file ----------')
+    samplefile = StringIO()    
+    spectra.to_csv(samplefile, sep=',')
+    print('\n--- Resulting file:')
+    print(samplefile.getvalue())
+
+    print('\n--- Reading back:')
+    samplefile.seek(0)
+    spectra2 = read_aligned_spectra(samplefile, sep=',')
+    print(spectra2,'\n')
+    spectra2.data.info()
+    print(spectra2.info())
+
     print('\nReading aligned spectra (all of them) ----------')
     labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
     sample.seek(0)
@@ -473,17 +511,17 @@ if __name__ == '__main__':
         print('+++++')
     
     print('\nSaving aligned spectra into a file ----------')
-    def header(s):
-        # this returns a header suitable for various metabolomics tools
-        line1 = 'Labels,{}'.format(','.join(s.labels))
-        line2 = 'Samples,'+','.join(s.sample_names)
-        return '\n'.join([line1, line2])
-
     samplefile = StringIO()    
-    spectra.to_csv(samplefile, header_func=header, sep=',')
+    spectra.to_csv(samplefile, sep=',', with_labels=True)
     print('\n--- Resulting file:')
     print(samplefile.getvalue())
-    #spectra.to_csv('testout.txt', header_func=header, sep=',')
+
+    print('\n--- Reading back:')
+    samplefile.seek(0)
+    spectra2 = read_aligned_spectra(samplefile, labels=True, sep=',')
+    print(spectra2,'\n')
+    spectra2.data.info()
+    print(spectra2.info())
 
     print('\nCommon m/z between labels (v1,v2) ----------')
     print(spectra.common_label_mz('v1', 'v2'))
