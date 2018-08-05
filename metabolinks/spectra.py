@@ -255,6 +255,15 @@ class AlignedSpectra(object):
         return AlignedSpectra(df, sample_names=lcolumns,
                                   labels=[label]*len(lcolumns))
     
+    def unique_labels(self):
+        if self.labels is None:
+            return None
+        ulabels = []
+        for lbl in self.labels:
+            if lbl not in ulabels:
+                ulabels.append(lbl)
+        return ulabels
+    
     def rep_at_least(self, minimum=1):
         df = self._df.copy()
         # build list of unique labels
@@ -279,17 +288,24 @@ class AlignedSpectra(object):
     
     def exclusive_label_mz(self, label):
         # build list of unique other labels
-        slabels = []
-        for lbl in self.labels:
-            if lbl not in slabels:
-                slabels.append(lbl)
-        slabels = [lbl for lbl in slabels if lbl != label]
+        slabels = [lbl for lbl in self.unique_labels() if lbl != label]
 
         remaining = self.label(label).mz
         for lbl in slabels:
             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
         return remaining
 
+    @property
+    def exclusive_mz(self):
+        res = OrderedDict()
+        for label in self.labels:
+            slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+
+            remaining = self.label(label).mz
+            for lbl in slabels:
+                remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+            res[label] = remaining
+        return res
 
 def read_spectrum(filename, label=None):
     s = pd.read_table(filename, index_col=False)
@@ -528,6 +544,11 @@ if __name__ == '__main__':
 
     print('\nm/z values exclusive to label v1 ----------')
     print(spectra.exclusive_label_mz('v1'))
+
+    print('\nm/z values exclusive to each label ----------')
+    for label, values in spectra.exclusive_mz.items():
+        print('label:', label)
+        print(values)
 
     print('\nComputing similarity measures ----------')
     
