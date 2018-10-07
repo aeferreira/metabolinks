@@ -1,0 +1,14 @@
+name: metabolinks-environment
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - matplotlib>=2.0
+  - pandas
+  - pip:
+    - six
+    - requests
+    - xlrd
+    - xlsxwriter
+    - pytest
