@@ -3,12 +3,11 @@ channels:
   - conda-forge
 dependencies:
   - python
+  - pytest
+  - six
+  - requests
   - numpy
   - matplotlib>=2.0
   - pandas
-  - pip:
-    - six
-    - requests
-    - xlrd
-    - xlsxwriter
-    - pytest
+  - xlrd
+  - xlsxwriter
