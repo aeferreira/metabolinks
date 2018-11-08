@@ -371,12 +371,12 @@ def read_spectra_from_xcel(file_name,
         # use "2nd columns" headers as sample names
         # if common_mz then use headers from position 1
         if len(snames) > 0:
-            sample_names = snames
+            pass # already fetched
         else:
             if common_mz:
-                sample_names = df.columns[1:]
+                snames = df.columns[1:]
             else:
-                sample_names = df.columns[1::2]
+                snames = df.columns[1::2]
 
         # split in groups of two (each group is a spectrum)
         results = []
@@ -387,7 +387,7 @@ def read_spectra_from_xcel(file_name,
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
                 spectrum = spectrum.set_index(spectrum.columns[0])
-                spectrum = Spectrum(spectrum, sample_name=sample_names[j])
+                spectrum = Spectrum(spectrum, sample_name=snames[j])
                 results.append(spectrum)
 
                 j = j + 1
@@ -398,7 +398,7 @@ def read_spectra_from_xcel(file_name,
                 spectrum.index = range(len(spectrum))
                 spectrum = spectrum.dropna()
                 spectrum = spectrum.set_index(spectrum.columns[0])
-                spectrum = Spectrum(spectrum, sample_name=sample_names[j])
+                spectrum = Spectrum(spectrum, sample_name=snames[j])
                 results.append(spectrum)
 
                 j = j + 1
@@ -553,3 +553,9 @@ if __name__ == '__main__':
     print('\nComputing similarity measures ----------')
     
     print(mz_similarity(spectra))
+    
+##     print('\nReading from Excel ----------')
+##     file_name='data_to_align.xlsx'
+##     spectra3 = read_spectra_from_xcel(file_name,
+##                            sample_names=1, header_row=1)
+    
