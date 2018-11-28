@@ -24,8 +24,8 @@ from six import StringIO
 
 # Extract information from metadata of SDF files of LIPIDMAPS
 
-def get_lm_records(lmfilename):
-    """Generator to yield on LM record at a time."""
+def get_sdf_records(lmfilename):
+    """Generator to yield one SDF record at a time."""
     with open(lmfilename) as lmfile:
         curr_record = []
         for line in lmfile:
@@ -65,7 +65,7 @@ with open(out_lm_file, 'w') as outfile:
     count = 0
     print('LM_ID\t'+'\t'.join(fields), file=outfile)
     
-    for record in get_lm_records(all_lipids_file):
+    for record in get_sdf_records(all_lipids_file):
         metadata = get_lm_metafields(record)
         lm_id = metadata['LM_ID']
         print(lm_id)
@@ -84,7 +84,7 @@ print('{} records processed in {}'.format(count, all_lipids_file))
 print('File {} generated'.format(out_lm_file))
 
 # Extract information from HMDB
-#expname = 'HMDB00010.xml'
+
 all_mets_file = 'metabo_dbs/hmdb_metabolites.zip'
 print('\n------------------------------------------\n')
 print ('Creating conversions HMDB->KeGGId...')
