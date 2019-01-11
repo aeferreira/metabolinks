@@ -17,10 +17,43 @@ http://www.hmdb.ca/downloads -> All metabolites data set.
 this file is used to generate trans_hmdb2kegg.txt.
 
 """
-
+import requests
+from zipfile import ZipFile
+import time
 import xml.etree.ElementTree as ET
 import zipfile
 from six import StringIO
+
+
+def fetch_db(url, file_name):
+    """Fetch and extract online data bases' .zip files"""
+    start=time.time()
+    # download the file contents in binary format
+    print('Downloading...')
+    r = requests.get(url)
+    # open method to open a file on your system and write the contents
+    with open(file_name, "wb") as f:
+        f.write(r.content)
+
+    # opening the zip file in READ mode 
+    with ZipFile(file_name, 'r') as zip: 
+        # printing all the contents of the zip file 
+        zip.printdir() 
+  
+        # extracting all the files 
+        print('Extracting all the files now...') 
+        zip.extractall() 
+        print('Done!')
+    end=time.time()
+    print('It took', end-start, 'seconds to fetch this data base.')
+    
+
+print('Fetching hmbd')
+fetch_db('http://www.hmdb.ca/system/downloads/current/hmdb_metabolites.zip', 'hmbd_db.zip')
+print('Fetching LIPIDMAPS')
+fetch_db('http://www.lipidmaps.org/resources/downloads/LMSDFDownload12Dec17.zip', 'LIPIDMAPS_db.zip')
+print('Fetching ChEBI')
+fetch_db('ftp://ftp.ebi.ac.uk/pub/databases/chebi/SDF/ChEBI_complete.sdf.gz', 'ChEBI_db.zip')
 
 # Extract information from metadata of SDF files of LIPIDMAPS
 
