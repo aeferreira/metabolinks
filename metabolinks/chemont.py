@@ -7,44 +7,14 @@ Prerequisites:  ChemOnt_2_1.obo file
 """
 import time
 
-def extract_name(lines):
-    #extract terms from lines
-    for l in lines:
-        if l.startswith('name:'):
-            return l.split(': ')[1]
-
-
-def extract_parent_class(lines):
-    #extract parent class from lines
-    for l in lines:
-        if l.startswith('is_a'):
-            return l.split('! ')[1]
-
-
-def extract_name_parent(t):
-    #extract name and parent class from term record
-    name = parent = ""
-    lines= t.splitlines()
-    for l in lines:
-        if l.startswith('is_a'):
-            parent= l.split('! ')[1]
-        if l.startswith('name:'):
-            name =  l.split(': ')[1]
-    return (name, parent)
-
-
-def list_iter(list_of_lists):
-    #iteration of 2-level nested lists
-    for elem in list_of_lists:
-        for i in elem:
-            yield i
-
-
-def read_name_parent_from_OBO(filename):
+def read_OBO(filename):
+    """Parse OBO files and build hierarchy tables.
+    
+    Returns tables of term names and list of children (as dicts)."""
 
     with open(filename, encoding='utf_8') as f:
         content = f.read()
-
+    
     #create a list of terms
     terms= content.split('\n\n')
     #remove empty lines
@@ -52,76 +22,54 @@ def read_name_parent_from_OBO(filename):
     #remove version info, etc.
     terms.pop(0)
 
-    term_table = []
+    names_table = {}
+    children_table = {}
+    
     for t in terms:
-        # extract name and parent class from each term
-        # create list of (term, parent) tuples
+        # extract term ID, name and parent from term record
         lines = t.splitlines()
-        name = extract_name(lines)
-        parent_class = extract_parent_class(lines)
-        term_table.append((name, parent_class))
-    return term_table
+        for line in lines:
+            if line.startswith('id:'):
+                term_id = line.split('CHEMONTID:')[1]
+            if line.startswith('name:'):
+                name = line.split(': ')[1]
+            if line.startswith('is_a'):
+                parent = line.split('CHEMONTID:')[1].split(' ! ')[0]
 
-print('started!')
-start_time = time.time()
+        # fill tables
 
-#read ChemOnt_2_1.obo file
-term_table = read_name_parent_from_OBO('ChemOnt_2_1.obo')
+        names_table[term_id] = name
 
-kingdoms = ['Organic compounds', 'Inorganic compounds']
+        if parent in children_table:
+            children_table[parent].append(term_id)
+        else:
+            children_table[parent] = [term_id]
 
-superclasses = []
-for k in kingdoms:
-    templist = []
-    for term, parent_class in term_table:
-        #organize superclasses by kingdom
-        if parent_class == k:
-            templist.append(term)
-    superclasses.append(templist)
+    return names_table, children_table
 
-## for i in superclasses:
-##     print(i)
+def show_hierarchy(names_table, children_table):
+    for k, kingdom in enumerate(children_table['9999999']):
+        print(k + 1, names_table[kingdom])
+        for s, superclass in enumerate(children_table.get(kingdom, ())):
+            print(f'   {k+1}.{s} {names_table[superclass]}')
+            for c, cclass in enumerate(children_table.get(superclass, ())):
+                print(f'      {k+1}.{s}.{c} {names_table[cclass]}')
+                for b, sclass in enumerate(children_table.get(cclass, ())):
+                    print(f'         {k+1}.{s}.{c}.{b} {names_table[sclass]}')
 
-classes = []
-for k in list_iter(superclasses):
-    templist = []
-    for term, parent_class in term_table:
-        #organize classes by superclasses
-        if parent_class == k:
-            templist.append(term)
-    classes.append(templist)
 
-## inorganic_offset = len(superclasses[0])
-## for i in classes[inorganic_offset]:
-##     print(i)
+if __name__ == '__main__':
+    print('started!')
+    start_time = time.time()
 
-subclasses = []
-for k in list_iter(classes):
-    templist = []
-    for term, parent_class in term_table:
-        #organize subclasses by classes
-        if parent_class == k:
-            templist.append(term)
-    subclasses.append(templist)
+    #read ChemOnt_2_1.obo file
+    names_table, children_table = read_OBO('ChemOnt_2_1.obo')
 
-elapsed = time.time() - start_time
-print(f'Done. Elapsed time = {elapsed:.3f} s\n')
+    elapsed = time.time() - start_time
 
-#show hierarchy
-c_index = 0
-sc_index = 0
-for k, kname in enumerate(kingdoms):
-    print(k + 1, kname)
+    print(f'Tables created. Elapsed time = {elapsed:.3f} s\n')
 
-    for s, superclass_name in enumerate(superclasses[k]):
-        print(f' {k + 1}.{s} {superclass_name}')
+    ## for i, t in zip(range(20), children_table):
+    ##     print(t, ':', names_table[t], '-->', children_table[t])
 
-        for c, class_name in enumerate(classes[c_index]):
-            print(f'    {k + 1}.{s}.{c} {class_name}' )
-
-            for b, subclass_name in enumerate(subclasses[sc_index]):
-                print(f'         {k + 1}.{s}.{c}.{b} {subclass_name}')
-            sc_index += 1
-        
-        c_index += 1
-
+    show_hierarchy(names_table, children_table)
