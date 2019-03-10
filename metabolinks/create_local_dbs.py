@@ -27,11 +27,14 @@ from six import StringIO
 
 def fetch_db(url, file_name):
     """Fetch and extract online data bases' .zip files"""
-    start=time.time()
+    start = time.time()
     # download the file contents in binary format
     print('Downloading...')
-    r = requests.get(url)
+    s = requests.Session()
+    r = s.get(url, stream=True)
+    
     # open method to open a file on your system and write the contents
+    print('Download complete. Creating the files...')
     with open(file_name, "wb") as f:
         f.write(r.content)
 
@@ -44,10 +47,10 @@ def fetch_db(url, file_name):
         print('Extracting all the files now...') 
         zip.extractall() 
         print('Done!')
-    end=time.time()
+    end = time.time()
     print('It took', end-start, 'seconds to fetch this data base.')
     
-
+    
 print('Fetching hmbd')
 fetch_db('http://www.hmdb.ca/system/downloads/current/hmdb_metabolites.zip', 'hmbd_db.zip')
 print('Fetching LIPIDMAPS')
