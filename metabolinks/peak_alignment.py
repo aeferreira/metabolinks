@@ -165,7 +165,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
                 row = group.loc[i, '_peak_index']
                 start, end = tslices[i][0], tslices[i][1]
                 ndata = end-start
-                aligned_array[igroup, start:end] = s.data.iloc[row, :ndata]
+                aligned_array[igroup, start:end] = s.data.iloc[int(row), :ndata]
 
     result = pd.DataFrame(aligned_array, 
                           columns=all_samplenames, 
