@@ -7,8 +7,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from metabolinks.spectra import (Spectrum, 
-                                 MSDataSet,
+from metabolinks.datastructures import (MSDataSet, 
                                  read_spectra_from_xcel,
                                  read_spectrum)
 
