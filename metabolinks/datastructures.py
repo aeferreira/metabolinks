@@ -1,19 +1,4 @@
-"""Classes representing MS peak lists.
-
-There are two types of peak lists:
-
-- single (Spectrum)
-- aligned (AlignedSpectra). AlignedSpectra represents
-multiple peak lists that share the same m/z values (or other peak labels).
-
-Simple data handling functions are implemented as well as I/O to CSV (TSV).
-
-Much more data handling procedures are available through the property `data`
-which is a Pandas DataFrame.
-
-"""
-
-from __future__ import print_function
+"""Classes representing MS data."""
 
 from collections import OrderedDict
 import six
@@ -21,122 +6,52 @@ import six
 import numpy as np
 import pandas as pd
 
+from metabolinks.datasetup import gen_df
 from metabolinks.utils import _is_string
 from metabolinks.similarity import mz_similarity
 
-class Spectrum(object):
-    """A single peak list.
 
-    The underlying data (property `data`) is implemented in a Pandas DataFrame.
-    The index holds m/z values or any other peak labels.
-    There should be only one column, which holds (ususally) intensity data.
+class MSDataSet(object):
+    """A general container for MS data.
 
-    Attributes
-    ----------
-    sample_name : str
-        The name of this sample.
-    label : str
-        Optional sample label, used in classification tasks.
+    This is a wrapper around a Pandas DataFrame (the `data` property).
+
+    Direct metadata is stored in the (hierarquical) column index of `data`:
+    The (row) index contains one level, the "features", often labels of spectral entities. Examples are
+    m/z values, formulae or any format-specific labeling scheme.
+    
+    Columns contain three levels (outwards from the data):
+
+    - `info_type` describes the type of data in each column. The default is "I". A common example is
+       the pair "RT", "I" for each sample
+    - `sample` contains the names of samples
+    - `label` contains the labels of each sample
+    
+    In the display of data, if the all entries of a given level are equal then that level will
+    be absent from the output.
 
     """
 
-    def __init__(self, df, sample_name=None, label=None):
-        self._df = df.copy()
-        
-        self.set_label(label)
-        
-        self.sample_name = None
-        if sample_name is not None:
-            self.sample_name = sample_name
-        else:
-            # read sample name from the name of the only column
-            if self._df is not None:
-                self.sample_name = self._df.columns[0]
-        #newcols = list(self._df.columns)
-        #newcols[0] = sample_name
-        self._df.rename(columns={self._df.columns[0]: sample_name})
-    
+    def __init__(self, data, features=None, samples=None, labels=None, info_types=None, features_name=None, info_name=None):
+        """Build member `_df`, aliased as `data` as a pandas DataFrame with appropriate index and columns from data and keyword arguments.
+
+        Information is retrieved from `data` function argument, keyword arguments may overwrite it and, if needed,
+        default values are provided.
+        `data` function argument can be a numpy array, a pandas DataFrames or structures with a DataFrame member `data`.
+        """
+
+        self._df = gen_df(data, features=features,
+                                samples=samples,
+                                labels=labels,
+                                info_types=info_types,
+                                features_name=features_name,
+                                info_name=info_name)
+
     @property
     def data(self):
         """The Pandas DataFrame holding the MS data."""
         return self._df
     
-    def __len__(self):
-        return len(self.data)
-
-    def __str__(self):
-        res = ['Sample: ' + self.sample_name]
-        res.append('Label: {}'.format(self.label))
-        res.append('{} peaks'.format(len(self.data)))
-        res.append(str(self.data))
-        return '\n'.join(res)
-    
-    def set_label(self, label=None):
-        if not (label is None or _is_string(label)):
-            raise ValueError('Spectrum label must be a string or None')
-        self.label = label
-
-    @property
-    def mz(self):
-        """Get m/z values as a numpy array"""
-        res = self._df.dropna().index.values
-        return res
-
-    @property
-    def all_mz(self):
-        """Get m/z values as a numpy array, even for missing data"""
-        res = self._df.index.values
-        return res
-
-    def fillna(self, value):
-        """Get new Spectrum with missing values replaced for a given value."""
-        new_df = self._df.fillna(value)
-        return Spectrum(new_df, sample_name=self.sample_name, label=self.label)
-
-    def to_csv(self, filename, mz_name=None, sep=None, **kwargs):
-        header = True
-        if mz_name is not None:
-            header = [mz_name] + list(self._df.columns)
-        if sep is None:
-            sep = '\t'
-        self._df.to_csv(filename, header=header, sep=sep, index=True, **kwargs)
-    
-    def mz_to_csv(self, filename, mz_name=None, **kwargs):
-        outdf = self.data.copy()
-        outdf.index.name = mz_name
-        outdf.to_csv(filename, columns=[])
-
-
-class AlignedSpectra(object):
-    """A set of peak lists, sharing m/z values.
-
-    The underlying data (property `data`) is implemented in a Pandas DataFrame.
-    The first column holds m/z values and the other columns hold (ususally)
-    intensity data.
-
-    Attributes
-    ----------
-    sample_names : list of str
-        The names of the samples.
-    labels : list of str
-        Optional sample labels, used in classification tasks.
-
-    """
-
-    def __init__(self, df, sample_names=None, labels=None):
-        self._df = df.copy()
-        
-        if sample_names is None:
-            self.sample_names = list(self._df.columns)
-        elif isinstance(sample_names, int):
-            # read sample_names from columns
-            self.sample_names = list(self._df.columns[:sample_names])
-        else:
-            self.sample_names = sample_names[:len(self._df.columns)]
-            self._df.columns = self.sample_names
-        
-        self.set_labels(labels)
-
     def set_labels(self, lbs=None):
         if lbs is None:
             self.labels = None
@@ -145,11 +60,6 @@ class AlignedSpectra(object):
         else:
             self.labels = list(lbs[:len(self.sample_names)])
 
-    @property
-    def data(self):
-        """The Pandas DataFrame holding the MS data."""
-        return self._df
-    
     def __len__(self):
         return len(self.data)
 
@@ -231,7 +141,7 @@ class AlignedSpectra(object):
 
     def fillna(self, value):
         """Substitute missing values for a given value."""
-        return AlignedSpectra(self.data.fillna(value),
+        return MSDataSet(self.data.fillna(value),
                               sample_names=self.sample_names,
                               labels=self.labels)
 
@@ -252,7 +162,7 @@ class AlignedSpectra(object):
             if l == label:
                 lcolumns.append(c)
         df = self.data[lcolumns].dropna(how='all', subset=lcolumns)
-        return AlignedSpectra(df, sample_names=lcolumns,
+        return MSDataSet(df, sample_names=lcolumns,
                                   labels=[label]*len(lcolumns))
     
     def unique_labels(self):
@@ -277,7 +187,7 @@ class AlignedSpectra(object):
             lessthanmin = df[lcolumns].count(axis=1) < minimum
             df.loc[lessthanmin, lcolumns] = np.nan
         df = df.dropna(how='all')
-        return AlignedSpectra(df, sample_names=self.sample_names,
+        return MSDataSet(df, sample_names=self.sample_names,
                                   labels=self.labels)
 
     def common_label_mz(self, label1, label2):
@@ -328,8 +238,8 @@ def read_aligned_spectra(filename, labels=None, **kwargs):
         labels = lnames
 
     s = s.set_index(s.columns[0])
-    s.index.name = 'm/z'
-    return AlignedSpectra(s, labels=labels)
+    s.index.name = 'features'
+    return MSDataSet(s, labels=labels)
 
 
 def read_spectra_from_xcel(file_name,
@@ -448,6 +358,8 @@ def _sample_data():
 
 if __name__ == '__main__':
     from six import StringIO
+
+    
 
     sample = StringIO(_sample_data())
    

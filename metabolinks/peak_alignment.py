@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from metabolinks.spectra import (Spectrum, 
-                                 AlignedSpectra,
+                                 MSDataSet,
                                  read_spectra_from_xcel,
                                  read_spectrum)
 
@@ -68,7 +68,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     # Compute sample names and labels of the resulting table
     samplenames = []
     for s in inputs:
-        if isinstance(s, AlignedSpectra):
+        if isinstance(s, MSDataSet):
             samplenames.append(s.sample_names)
         elif isinstance(s, Spectrum):
             samplenames.append([s.sample_name])
@@ -80,7 +80,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
 
     no_labels = False
     for s in inputs:
-        if isinstance(s, AlignedSpectra):
+        if isinstance(s, MSDataSet):
             if s.labels is None:
                 no_labels = True
                 break
@@ -93,7 +93,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     else:
         labels = []
         for s in inputs:
-            if isinstance(s, AlignedSpectra):
+            if isinstance(s, MSDataSet):
                 labels.extend(s.labels)
             else:
                 labels.append(s.label)
@@ -185,7 +185,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
         range_ppm = range_ppm[nsamples >= min_samples]
         nsamples = nsamples[nsamples >= min_samples]
     
-    result = AlignedSpectra(result, 
+    result = MSDataSet(result, 
                             sample_names=all_samplenames,
                             labels=labels)
 
@@ -306,7 +306,7 @@ def save_aligned_to_excel(fname, aligned_dict):
         results.index.name = 'm/z'
         results = results.reset_index(level=0)
         
-        n_compounds, ncols = results.shape
+        _, ncols = results.shape
 
         # write Pandas DataFrame
         results.to_excel(writer, sheet_name=sname,
