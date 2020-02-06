@@ -51,14 +51,6 @@ class MSDataSet(object):
     def data(self):
         """The Pandas DataFrame holding the MS data."""
         return self._df
-    
-    def set_labels(self, lbs=None):
-        if lbs is None:
-            self.labels = None
-        elif _is_string(lbs):
-            self.labels = [lbs] * len(self.sample_names)
-        else:
-            self.labels = list(lbs[:len(self.sample_names)])
 
     def __len__(self):
         return len(self.data)
@@ -66,7 +58,17 @@ class MSDataSet(object):
     @property
     def sample_count(self):
         """Get the number of samples."""
-        return len(self.sample_names)
+        il_sample = self.data.columns.names.index('sample')
+        return len(self.data.columns.levels[il_sample])
+
+
+    def set_labels(self, lbs=None):
+        if lbs is None:
+            self.labels = None
+        elif _is_string(lbs):
+            self.labels = [lbs] * len(self.sample_names)
+        else:
+            self.labels = list(lbs[:len(self.sample_names)])
 
     @property
     def mz(self):
@@ -362,7 +364,16 @@ if __name__ == '__main__':
     
 
     sample = StringIO(_sample_data())
-   
+
+    data = pd.read_csv(sample, sep='\t').set_index('m/z')
+    print('-----------------------')
+    print(f'data = \n{data}')
+    print('-----------------------')
+    dataset = MSDataSet(data)
+    print('dataset.data =')
+    print(dataset.data)
+    print('-----------------------')
+
     print('Reading one spectrum (from aligned reads only first) ------------')
     spectrum = read_spectrum(sample)
     print(spectrum,'\n')
