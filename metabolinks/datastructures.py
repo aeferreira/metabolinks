@@ -1,12 +1,11 @@
 """Classes representing MS data."""
 
-from collections import OrderedDict
 import six
 
 import numpy as np
 import pandas as pd
 
-from metabolinks.datasetup import gen_df
+from metabolinks import dataio
 from metabolinks.utils import _is_string
 from metabolinks.similarity import mz_similarity
 
@@ -40,7 +39,7 @@ class MSDataSet(object):
         `data` function argument can be a numpy array, a pandas DataFrames or structures with a DataFrame member `data`.
         """
 
-        self._df = gen_df(data, features=features,
+        self._df = dataio.gen_df(data, features=features,
                                 samples=samples,
                                 labels=labels,
                                 info_types=info_types,
@@ -56,38 +55,64 @@ class MSDataSet(object):
         return len(self.data)
 
     @property
-    def sample_count(self):
-        """Get the number of samples."""
-        il_sample = self.data.columns.names.index('sample')
-        return len(self.data.columns.levels[il_sample])
-
-
-    def set_labels(self, lbs=None):
-        if lbs is None:
-            self.labels = None
-        elif _is_string(lbs):
-            self.labels = [lbs] * len(self.sample_names)
-        else:
-            self.labels = list(lbs[:len(self.sample_names)])
+    def labels(self):
+        """Get the different data labels (no repetitions)."""
+        il_labels = self.data.columns.names.index('label')
+        return self.data.columns.levels[il_labels]
 
     @property
-    def mz(self):
-        """Get m/z values as a numpy array"""
-        res = self.data.index.values
-        return res
+    def samples(self):
+        """Get the different sample names."""
+        il_sample = self.data.columns.names.index('sample')
+        return self.data.columns.levels[il_sample]
+
+    @property
+    def features(self):
+        """Get the features array."""
+        return self.data.index.values.copy()
+
+    @property
+    def feature_count(self):
+        """Get the number of features."""
+        return len(self.data.index)
+
+    @property
+    def sample_count(self):
+        """Get the number of samples."""
+        return len(self.samples)
+
+    @property
+    def label_count(self):
+        """Get the number of labels."""
+        # 'no label' still counts as one (global) label
+        return len(self.labels)
+
+    @property
+    def no_labels(self):
+        """True if there is only one (global) label 'no label'."""
+        return len(self.labels) == 1 and self.labels[0] == 'no label'
+
+    # def set_labels(self, lbs=None):
+    #     if lbs is None:
+    #         self.labels = None
+    #     elif _is_string(lbs):
+    #         self.labels = [lbs] * len(self.sample_names)
+    #     else:
+    #         self.labels = list(lbs[:len(self.sample_names)])
+
     
     def __str__(self):
         return '\n'.join(
                ('{} samples:'.format(self.sample_count),
-               str(self.sample_names),
-               'Labels: {}'.format(self.labels),
-               'Size: {}'.format(len(self.data)),
+               str(list(self.samples)),
+               'Labels: {}'.format(list(self.labels)),
+               '{} features'.format(self.feature_count),
                str(self.data))
                ) # No, I will not become a js freak
 
     def info(self):
         res = ['Number of peaks: {}'.format(len(self.data))]
-        for name in self.sample_names:
+        for name in self.samples:
             sample = self.sample(name)
             label = sample.label
             peaks = len(sample)
@@ -103,235 +128,122 @@ class MSDataSet(object):
                 return lbl
         return None
 
-    def default_header_csv(self, s, sep=None, with_labels=False):
-        # this returns a header suitable for various metabolomics tools
-        if sep is None:
-            sep = '\t'
-        lines = []
-        line = ['Sample'] + s.sample_names
-        line = sep.join(['"{}"'.format(n) for n in line])
-        lines.append(line)
-        if with_labels and s.labels is not None:
-            line = ['Label'] + s.labels
-            line = sep.join(['"{}"'.format(n) for n in line])
-            lines.append(line)
-        return '\n'.join(lines)
+    # def default_header_csv(self, s, sep=None, with_labels=False):
+    #     # this returns a header suitable for various metabolomics tools
+    #     if sep is None:
+    #         sep = '\t'
+    #     lines = []
+    #     line = ['Sample'] + s.sample_names
+    #     line = sep.join(['"{}"'.format(n) for n in line])
+    #     lines.append(line)
+    #     if with_labels and s.labels is not None:
+    #         line = ['Label'] + s.labels
+    #         line = sep.join(['"{}"'.format(n) for n in line])
+    #         lines.append(line)
+    #     return '\n'.join(lines)
 
-    def to_csv(self, filename, header_func=None, sep=None, with_labels=False,
-               no_meta_columns=True, **kwargs):
-        if sep is None:
-            sep = '\t'
-        out_df = self._df.copy()
-        if no_meta_columns:
-            out_df = out_df.iloc[:, :len(self.sample_names)]
-        if header_func is None:
-            header_func = self.default_header_csv
-        # prepend output with result of header_func
-        needs_to_close = False
-        if _is_string(filename):
-            of = open(filename, 'w') 
-            needs_to_close = True
-        else:
-            of = filename
+    # def to_csv(self, filename, header_func=None, sep=None, with_labels=False,
+    #            no_meta_columns=True, **kwargs):
+    #     if sep is None:
+    #         sep = '\t'
+    #     out_df = self._df.copy()
+    #     if no_meta_columns:
+    #         out_df = out_df.iloc[:, :len(self.sample_names)]
+    #     if header_func is None:
+    #         header_func = self.default_header_csv
+    #     # prepend output with result of header_func
+    #     needs_to_close = False
+    #     if _is_string(filename):
+    #         of = open(filename, 'w') 
+    #         needs_to_close = True
+    #     else:
+    #         of = filename
 
-        header = header_func(self, sep=sep, with_labels=with_labels) + '\n'
-        of.write(header)
-        out_df.to_csv(of, header=False, index=True, sep=sep, **kwargs)
+    #     header = header_func(self, sep=sep, with_labels=with_labels) + '\n'
+    #     of.write(header)
+    #     out_df.to_csv(of, header=False, index=True, sep=sep, **kwargs)
 
-        if needs_to_close:
-            of.close()
+    #     if needs_to_close:
+    #         of.close()
 
-    def fillna(self, value):
-        """Substitute missing values for a given value."""
-        return MSDataSet(self.data.fillna(value),
-                              sample_names=self.sample_names,
-                              labels=self.labels)
+    # def fillna(self, value):
+    #     """Substitute missing values for a given value."""
+    #     return MSDataSet(self.data.fillna(value),
+    #                           sample_names=self.sample_names,
+    #                           labels=self.labels)
 
-    def sample(self, sample):
-        """Get data for a given sample name, as a Spectrum."""
-        df = self.data[[sample]].dropna()
-        return Spectrum(df, sample_name=sample, label=self.label_of(sample))
+    # def sample(self, sample):
+    #     """Get data for a given sample name, as a Spectrum."""
+    #     df = self.data[[sample]].dropna()
+    #     return Spectrum(df, sample_name=sample, label=self.label_of(sample))
 
-    def unfold(self):
-        """Return a list of Spectrum objects, unfolding the peak lists."""
-        return [self.sample(name) for name in self.sample_names]
+    # def unfold(self):
+    #     """Return a list of Spectrum objects, unfolding the peak lists."""
+    #     return [self.sample(name) for name in self.sample_names]
 
-    def label(self, label):
-        """Get data for a given label, as an AlignedSpectra object."""
-        # build a list grouping samples with a given label
-        lcolumns = []
-        for c, l in zip(self.data.columns, self.labels):
-            if l == label:
-                lcolumns.append(c)
-        df = self.data[lcolumns].dropna(how='all', subset=lcolumns)
-        return MSDataSet(df, sample_names=lcolumns,
-                                  labels=[label]*len(lcolumns))
+    # def label(self, label):
+    #     """Get data for a given label, as an AlignedSpectra object."""
+    #     # build a list grouping samples with a given label
+    #     lcolumns = []
+    #     for c, l in zip(self.data.columns, self.labels):
+    #         if l == label:
+    #             lcolumns.append(c)
+    #     df = self.data[lcolumns].dropna(how='all', subset=lcolumns)
+    #     return MSDataSet(df, sample_names=lcolumns,
+    #                               labels=[label]*len(lcolumns))
     
-    def unique_labels(self):
-        if self.labels is None:
-            return None
-        ulabels = []
-        for lbl in self.labels:
-            if lbl not in ulabels:
-                ulabels.append(lbl)
-        return ulabels
+    # def unique_labels(self):
+    #     if self.labels is None:
+    #         return None
+    #     ulabels = []
+    #     for lbl in self.labels:
+    #         if lbl not in ulabels:
+    #             ulabels.append(lbl)
+    #     return ulabels
     
-    def rep_at_least(self, minimum=1):
-        df = self._df.copy()
-        # build list of unique labels
-        unique_labels = list(set(self.labels))
-        for label in unique_labels:
-            # build a list grouping samples with each given label
-            lcolumns = []
-            for c, l in zip(self.data.columns, self.labels):
-                if l == label:
-                    lcolumns.append(c)
-            lessthanmin = df[lcolumns].count(axis=1) < minimum
-            df.loc[lessthanmin, lcolumns] = np.nan
-        df = df.dropna(how='all')
-        return MSDataSet(df, sample_names=self.sample_names,
-                                  labels=self.labels)
+    # def rep_at_least(self, minimum=1):
+    #     df = self._df.copy()
+    #     # build list of unique labels
+    #     unique_labels = list(set(self.labels))
+    #     for label in unique_labels:
+    #         # build a list grouping samples with each given label
+    #         lcolumns = []
+    #         for c, l in zip(self.data.columns, self.labels):
+    #             if l == label:
+    #                 lcolumns.append(c)
+    #         lessthanmin = df[lcolumns].count(axis=1) < minimum
+    #         df.loc[lessthanmin, lcolumns] = np.nan
+    #     df = df.dropna(how='all')
+    #     return MSDataSet(df, sample_names=self.sample_names,
+    #                               labels=self.labels)
 
-    def common_label_mz(self, label1, label2):
-        mz1 = self.label(label1).mz
-        mz2 = self.label(label2).mz
-        u = np.intersect1d(mz1, mz2)
-        return u
+    # def common_label_mz(self, label1, label2):
+    #     mz1 = self.label(label1).mz
+    #     mz2 = self.label(label2).mz
+    #     u = np.intersect1d(mz1, mz2)
+    #     return u
     
-    def exclusive_label_mz(self, label):
-        # build list of unique other labels
-        slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+    # def exclusive_label_mz(self, label):
+    #     # build list of unique other labels
+    #     slabels = [lbl for lbl in self.unique_labels() if lbl != label]
 
-        remaining = self.label(label).mz
-        for lbl in slabels:
-            remaining = np.setdiff1d(remaining, self.label(lbl).mz)
-        return remaining
+    #     remaining = self.label(label).mz
+    #     for lbl in slabels:
+    #         remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+    #     return remaining
 
-    @property
-    def exclusive_mz(self):
-        res = OrderedDict()
-        for label in self.labels:
-            slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+    # @property
+    # def exclusive_mz(self):
+    #     res = OrderedDict()
+    #     for label in self.labels:
+    #         slabels = [lbl for lbl in self.unique_labels() if lbl != label]
 
-            remaining = self.label(label).mz
-            for lbl in slabels:
-                remaining = np.setdiff1d(remaining, self.label(lbl).mz)
-            res[label] = remaining
-        return res
+    #         remaining = self.label(label).mz
+    #         for lbl in slabels:
+    #             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+    #         res[label] = remaining
+    #     return res
 
-def read_spectrum(filename, label=None):
-    s = pd.read_table(filename, index_col=False)
-    # keep only the first two columns
-    s = s.iloc[:, [0,1]]
-    s = s.set_index(s.columns[0])
-    return Spectrum(s, label=label)
-
-
-def read_aligned_spectra(filename, labels=None, **kwargs):
-    if labels == True:
-        s = pd.read_table(filename, header=[0,1], **kwargs)
-    else:
-        s = pd.read_table(filename, index_col=False, **kwargs)
-    
-    if labels == True:
-        snames = s.columns.get_level_values(0)
-        lnames = s.columns.get_level_values(1)[1:]
-        s.columns = snames
-        labels = lnames
-
-    s = s.set_index(s.columns[0])
-    s.index.name = 'features'
-    return MSDataSet(s, labels=labels)
-
-
-def read_spectra_from_xcel(file_name,
-                           sample_names=None,
-                           labels=None,
-                           header_row=1,
-                           common_mz= False,
-                           verbose=True):
-
-    spectra_table = OrderedDict()
-
-    wb = pd.ExcelFile(file_name).book
-    header = header_row - 1
-
-    if verbose:
-        print ('------ Reading MS-Excel file - {}'.format(file_name))
-
-    for sheetname in wb.sheet_names():
-
-        # if sample_names argument if present (not None) then
-        # if an integer, read row with sample names,
-        # otherwise sample_names must a list of names for samples
-        snames = []
-        if sample_names is not None:
-            if isinstance(sample_names, six.integer_types):
-                sh = wb.sheet_by_name(sheetname)
-                snames = sh.row_values(sample_names - 1)
-                snames = [s for s in snames if len(s.strip()) > 0]
-            else:
-                snames = sample_names
-
-        # read data (and discard empty xl columns)
-        df = pd.read_excel(file_name,
-                           sheet_name=sheetname,
-                           header=header)
-        df = df.dropna(axis=1, how='all')
-
-        # if sample names are not set then
-        # use "2nd columns" headers as sample names
-        # if common_mz then use headers from position 1
-        if len(snames) > 0:
-            pass # already fetched
-        else:
-            if common_mz:
-                snames = df.columns[1:]
-            else:
-                snames = df.columns[1::2]
-
-        # split in groups of two (each group is a spectrum)
-        results = []
-        if not common_mz:
-            j = 0
-            for i in range(0, len(df.columns), 2):
-                spectrum = df.iloc[:, i: i+2]
-                spectrum.index = range(len(spectrum))
-                spectrum = spectrum.dropna()
-                spectrum = spectrum.set_index(spectrum.columns[0])
-                spectrum = Spectrum(spectrum, sample_name=snames[j])
-                results.append(spectrum)
-
-                j = j + 1
-        else:
-            j = 0
-            for i in range(1, len(df.columns)):
-                spectrum = df.iloc[:, [0, i]]
-                spectrum.index = range(len(spectrum))
-                spectrum = spectrum.dropna()
-                spectrum = spectrum.set_index(spectrum.columns[0])
-                spectrum = Spectrum(spectrum, sample_name=snames[j])
-                results.append(spectrum)
-
-                j = j + 1
-
-
-        if labels is not None:
-            if _is_string(labels):
-                labels = [labels] * len(results)
-            for lbl, spectrum in zip(labels, results):
-                spectrum.set_label(lbl)
-
-        if verbose:
-            print ('- {} spectra found in sheet "{}":'.format(len(results), sheetname))
-            for spectrum in results:
-                name = spectrum.sample_name
-                label = spectrum.label
-                size = len(spectrum)
-                print ('{:5d} peaks in sample {}, with label {}'.format(size, name, label))
-        spectra_table[sheetname] = results
-
-    return spectra_table
 
 
 
@@ -361,121 +273,113 @@ def _sample_data():
 if __name__ == '__main__':
     from six import StringIO
 
-    
-
     sample = StringIO(_sample_data())
 
     data = pd.read_csv(sample, sep='\t').set_index('m/z')
-    print('-----------------------')
-    print(f'data = \n{data}')
-    print('-----------------------')
+    # print('-----------------------')
+    # print(f'data = \n{data}')
+    # print('-----------------------')
     dataset = MSDataSet(data)
-    print('dataset.data =')
-    print(dataset.data)
-    print('-----------------------')
+    # print('dataset.data =')
+    # print(dataset.data)
+    # print('-----------------------')
+    print('MSDataSet from string data (as io stream) ------------')
+    print(dataset)
 
-    print('Reading one spectrum (from aligned reads only first) ------------')
-    spectrum = read_spectrum(sample)
-    print(spectrum,'\n')
-    spectrum.data.info()
+    # print('\nSpectrum with missing values filled with zeros ----------')
+    # spectrumzero = spectrum.fillna(0)
+    # print(spectrumzero.data)
 
-    print('\nm/z values (excluding missing data) ----------')
-    print(spectrum.mz)
+    # print('\nSaving  mz into a file ----------')
+    # mzfile = StringIO()    
+    # spectrum.mz_to_csv(mzfile, mz_name='moverz')
+    # print('\n--- Resulting file:')
+    # print(mzfile.getvalue())
 
-    print('\nSpectrum with missing values filled with zeros ----------')
-    spectrumzero = spectrum.fillna(0)
-    print(spectrumzero.data)
+    # print('\nReading aligned spectra (all of them) no labels ----------')
+    # sample.seek(0)
+    # spectra = read_aligned_spectra(sample)
+    # print(spectra,'\n')
+    # spectra.data.info()
+    # print(spectra.info())
 
-    print('\nSaving  mz into a file ----------')
-    mzfile = StringIO()    
-    spectrum.mz_to_csv(mzfile, mz_name='moverz')
-    print('\n--- Resulting file:')
-    print(mzfile.getvalue())
+    # print('\nSaving aligned spectra into a file ----------')
+    # samplefile = StringIO()    
+    # spectra.to_csv(samplefile, sep=',')
+    # print('\n--- Resulting file:')
+    # print(samplefile.getvalue())
 
-    print('\nReading aligned spectra (all of them) no labels ----------')
-    sample.seek(0)
-    spectra = read_aligned_spectra(sample)
-    print(spectra,'\n')
-    spectra.data.info()
-    print(spectra.info())
+    # print('\n--- Reading back:')
+    # samplefile.seek(0)
+    # spectra2 = read_aligned_spectra(samplefile, sep=',')
+    # print(spectra2,'\n')
+    # spectra2.data.info()
+    # print(spectra2.info())
 
-    print('\nSaving aligned spectra into a file ----------')
-    samplefile = StringIO()    
-    spectra.to_csv(samplefile, sep=',')
-    print('\n--- Resulting file:')
-    print(samplefile.getvalue())
+    # print('\nReading aligned spectra (all of them) ----------')
+    # labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
+    # sample.seek(0)
+    # spectra = read_aligned_spectra(sample, labels=labels)
+    # print(spectra,'\n')
+    # spectra.data.info()
+    # print(spectra.info())
 
-    print('\n--- Reading back:')
-    samplefile.seek(0)
-    spectra2 = read_aligned_spectra(samplefile, sep=',')
-    print(spectra2,'\n')
-    spectra2.data.info()
-    print(spectra2.info())
-
-    print('\nReading aligned spectra (all of them) ----------')
-    labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
-    sample.seek(0)
-    spectra = read_aligned_spectra(sample, labels=labels)
-    print(spectra,'\n')
-    spectra.data.info()
-    print(spectra.info())
-
-    print('\nData of sample s38 ----------')
-    print(spectra.sample('s38'))
+    # print('\nData of sample s38 ----------')
+    # print(spectra.sample('s38'))
     
-    print('\nm/z of sample s38 ----------')
-    print(spectra.sample('s38').mz)
+    # print('\nm/z of sample s38 ----------')
+    # print(spectra.sample('s38').mz)
     
-    print('\nData of label v1 ----------')
-    print(spectra.label('v1'))
+    # print('\nData of label v1 ----------')
+    # print(spectra.label('v1'))
     
-    print('\nm/z of label v1 ----------')
-    print(spectra.label('v1').mz)
+    # print('\nm/z of label v1 ----------')
+    # print(spectra.label('v1').mz)
 
-    print('\nFiltered fewer than 2 per label')
-    print('\n-- Original\n')
-    print(spectra)
-    print('\n-- With a minimum of 2 replicates\n')
-    print(spectra.rep_at_least(minimum=2))
+    # print('\nFiltered fewer than 2 per label')
+    # print('\n-- Original\n')
+    # print(spectra)
+    # print('\n-- With a minimum of 2 replicates\n')
+    # print(spectra.rep_at_least(minimum=2))
 
-    print('\nSpectra with missing values filled with zeros ----------')
-    spectrazero = spectra.fillna(0)
-    print(spectrazero.data)
+    # print('\nSpectra with missing values filled with zeros ----------')
+    # spectrazero = spectra.fillna(0)
+    # print(spectrazero.data)
 
-    print('\nUnfolding spectra ----------')
-    unfolded = spectra.unfold()
+    # print('\nUnfolding spectra ----------')
+    # unfolded = spectra.unfold()
     
-    for u in unfolded:
-        print(u)
-        print('+++++')
+    # for u in unfolded:
+    #     print(u)
+    #     print('+++++')
     
-    print('\nSaving aligned spectra into a file ----------')
-    samplefile = StringIO()    
-    spectra.to_csv(samplefile, sep=',', with_labels=True)
-    print('\n--- Resulting file:')
-    print(samplefile.getvalue())
+    # print('\nSaving aligned spectra into a file ----------')
+    # samplefile = StringIO()    
+    # spectra.to_csv(samplefile, sep=',', with_labels=True)
+    # print('\n--- Resulting file:')
+    # print(samplefile.getvalue())
 
-    print('\n--- Reading back:')
-    samplefile.seek(0)
-    spectra2 = read_aligned_spectra(samplefile, labels=True, sep=',')
-    print(spectra2,'\n')
-    spectra2.data.info()
-    print(spectra2.info())
+    # print('\n--- Reading back:')
+    # samplefile.seek(0)
+    # spectra2 = read_aligned_spectra(samplefile, labels=True, sep=',')
+    # print(spectra2,'\n')
+    # spectra2.data.info()
+    # print(spectra2.info())
 
-    print('\nCommon m/z between labels (v1,v2) ----------')
-    print(spectra.common_label_mz('v1', 'v2'))
+    # print('\nCommon m/z between labels (v1,v2) ----------')
+    # print(spectra.common_label_mz('v1', 'v2'))
 
-    print('\nm/z values exclusive to label v1 ----------')
-    print(spectra.exclusive_label_mz('v1'))
+    # print('\nm/z values exclusive to label v1 ----------')
+    # print(spectra.exclusive_label_mz('v1'))
 
-    print('\nm/z values exclusive to each label ----------')
-    for label, values in spectra.exclusive_mz.items():
-        print('label:', label)
-        print(values)
+    # print('\nm/z values exclusive to each label ----------')
+    # for label, values in spectra.exclusive_mz.items():
+    #     print('label:', label)
+    #     print(values)
 
-    print('\nComputing similarity measures ----------')
+    # print('\nComputing similarity measures ----------')
     
-    print(mz_similarity(spectra))
+    # print(mz_similarity(spectra))
     
 ##     print('\nReading from Excel ----------')
 ##     file_name='data_to_align.xlsx'

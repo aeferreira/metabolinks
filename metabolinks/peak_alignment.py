@@ -7,9 +7,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from metabolinks.datastructures import (MSDataSet, 
-                                 read_spectra_from_xcel,
-                                 read_spectrum)
+from metabolinks.datastructures import MSDataSet
 
 from metabolinks.similarity import mz_similarity
 from metabolinks.utils import s2HMS

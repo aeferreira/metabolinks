@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import pandas as pd
 import numpy as np
 
@@ -98,6 +100,122 @@ def gen_df(data, **kwargs):
 
     # build pandas DataFrame
     return pd.DataFrame(data, index=fi, columns=ci)
+
+
+def read_spectrum(filename, label=None):
+    s = pd.read_table(filename, index_col=False)
+    # keep only the first two columns
+    s = s.iloc[:, [0,1]]
+    s = s.set_index(s.columns[0])
+    return Spectrum(s, label=label)
+
+
+def read_aligned_spectra(filename, labels=None, **kwargs):
+    if labels == True:
+        s = pd.read_table(filename, header=[0,1], **kwargs)
+    else:
+        s = pd.read_table(filename, index_col=False, **kwargs)
+    
+    if labels == True:
+        snames = s.columns.get_level_values(0)
+        lnames = s.columns.get_level_values(1)[1:]
+        s.columns = snames
+        labels = lnames
+
+    s = s.set_index(s.columns[0])
+    s.index.name = 'features'
+    return MSDataSet(s, labels=labels)
+
+
+def read_spectra_from_xcel(file_name,
+                           sample_names=None,
+                           labels=None,
+                           header_row=1,
+                           common_mz= False,
+                           verbose=True):
+
+    spectra_table = OrderedDict()
+
+    wb = pd.ExcelFile(file_name).book
+    header = header_row - 1
+
+    if verbose:
+        print ('------ Reading MS-Excel file - {}'.format(file_name))
+
+    for sheetname in wb.sheet_names():
+
+        # if sample_names argument if present (not None) then
+        # if an integer, read row with sample names,
+        # otherwise sample_names must a list of names for samples
+        snames = []
+        if sample_names is not None:
+            if isinstance(sample_names, six.integer_types):
+                sh = wb.sheet_by_name(sheetname)
+                snames = sh.row_values(sample_names - 1)
+                snames = [s for s in snames if len(s.strip()) > 0]
+            else:
+                snames = sample_names
+
+        # read data (and discard empty xl columns)
+        df = pd.read_excel(file_name,
+                           sheet_name=sheetname,
+                           header=header)
+        df = df.dropna(axis=1, how='all')
+
+        # if sample names are not set then
+        # use "2nd columns" headers as sample names
+        # if common_mz then use headers from position 1
+        if len(snames) > 0:
+            pass # already fetched
+        else:
+            if common_mz:
+                snames = df.columns[1:]
+            else:
+                snames = df.columns[1::2]
+
+        # split in groups of two (each group is a spectrum)
+        results = []
+        if not common_mz:
+            j = 0
+            for i in range(0, len(df.columns), 2):
+                spectrum = df.iloc[:, i: i+2]
+                spectrum.index = range(len(spectrum))
+                spectrum = spectrum.dropna()
+                spectrum = spectrum.set_index(spectrum.columns[0])
+                spectrum = Spectrum(spectrum, sample_name=snames[j])
+                results.append(spectrum)
+
+                j = j + 1
+        else:
+            j = 0
+            for i in range(1, len(df.columns)):
+                spectrum = df.iloc[:, [0, i]]
+                spectrum.index = range(len(spectrum))
+                spectrum = spectrum.dropna()
+                spectrum = spectrum.set_index(spectrum.columns[0])
+                spectrum = Spectrum(spectrum, sample_name=snames[j])
+                results.append(spectrum)
+
+                j = j + 1
+
+
+        if labels is not None:
+            if _is_string(labels):
+                labels = [labels] * len(results)
+            for lbl, spectrum in zip(labels, results):
+                spectrum.set_label(lbl)
+
+        if verbose:
+            print ('- {} spectra found in sheet "{}":'.format(len(results), sheetname))
+            for spectrum in results:
+                name = spectrum.sample_name
+                label = spectrum.label
+                size = len(spectrum)
+                print ('{:5d} peaks in sample {}, with label {}'.format(size, name, label))
+        spectra_table[sheetname] = results
+
+    return spectra_table
+
 
 if __name__ == '__main__':
     print('test construction from numpy array')

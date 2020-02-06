@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import pandas as pd
-from metabolinks.datasetup import gen_df
+from metabolinks.dataio import gen_df
 
 def assert_almost_equal(x, y):
     if abs(x-y) < 0.0001:
