@@ -53,28 +53,37 @@ class MSDataSet(object):
 
     def __len__(self):
         return len(self.data)
+    
+    def _get_sample_pos(self):
+        return self._df.columns.names.index('sample')
+
+    def _get_label_pos(self):
+        return self._df.columns.names.index('label')
+    
+    def _get_zip_labels_samples(self):
+        return zip(self._df.columns.get_level_values('label'), self._df.columns.get_level_values('sample'))
 
     @property
     def labels(self):
         """Get the different data labels (no repetitions)."""
-        il_labels = self.data.columns.names.index('label')
-        return self.data.columns.levels[il_labels]
+        il_labels = self._get_label_pos()
+        return self._df.columns.levels[il_labels]
 
     @property
     def samples(self):
         """Get the different sample names."""
-        il_sample = self.data.columns.names.index('sample')
-        return self.data.columns.levels[il_sample]
+        il_sample = self._get_sample_pos()
+        return self._df.columns.levels[il_sample]
 
     @property
     def features(self):
         """Get the features array."""
-        return self.data.index.values.copy()
+        return self._df.index.values.copy()
 
     @property
     def feature_count(self):
         """Get the number of features."""
-        return len(self.data.index)
+        return len(self._df.index)
 
     @property
     def sample_count(self):
@@ -90,7 +99,7 @@ class MSDataSet(object):
     @property
     def no_labels(self):
         """True if there is only one (global) label 'no label'."""
-        return len(self.labels) == 1 and self.labels[0] == 'no label'
+        return self.label_count == 1 and self.labels[0] == 'no label'
 
     # def set_labels(self, lbs=None):
     #     if lbs is None:
@@ -102,13 +111,18 @@ class MSDataSet(object):
 
     
     def __str__(self):
-        return '\n'.join(
-               ('{} samples:'.format(self.sample_count),
-               str(list(self.samples)),
-               'Labels: {}'.format(list(self.labels)),
-               '{} features'.format(self.feature_count),
-               str(self.data))
-               ) # No, I will not become a js freak
+        resstr = []
+        ls_table = list(self._get_zip_labels_samples())
+        if self.no_labels:
+            samplelist = ', '.join([f"'{s}'" for l,s in ls_table])
+        else:
+            samplelist = ', '.join([f"'{s}' ('{l}')" for l,s in ls_table])
+        resstr.append(f'{self.sample_count} samples:')
+        resstr.append(samplelist)
+        resstr.append(f'{self.feature_count} features')
+        resstr.append('----')
+        resstr.append(str(self.data))
+        return '\n'.join(resstr)
 
     def info(self):
         res = ['Number of peaks: {}'.format(len(self.data))]
@@ -283,7 +297,7 @@ if __name__ == '__main__':
     # print('dataset.data =')
     # print(dataset.data)
     # print('-----------------------')
-    print('MSDataSet from string data (as io stream) ------------')
+    print('MSDataSet from string data (as io stream) ------------\n')
     print(dataset)
 
     # print('\nSpectrum with missing values filled with zeros ----------')
