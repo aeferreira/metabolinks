@@ -47,12 +47,22 @@ class MSDataSet(object):
                                 info_name=info_name)
 
     @property
-    def data(self):
+    def data_table(self):
         """The Pandas DataFrame holding the MS data."""
         return self._df
 
+    @property
+    def table(self):
+        """The Pandas DataFrame holding the MS data."""
+        return self._df
+
+    @property
+    def data_matrix(self):
+        """The Pandas DataFrame holding the MS data, transposed to be usable as tidy"""
+        return self._df.transpose(copy=True)
+
     def __len__(self):
-        return len(self.data)
+        return len(self._df)
     
     def _get_sample_pos(self):
         return self._df.columns.names.index('sample')
@@ -121,26 +131,37 @@ class MSDataSet(object):
         resstr.append(samplelist)
         resstr.append(f'{self.feature_count} features')
         resstr.append('----')
-        resstr.append(str(self.data))
+        resstr.append(str(self.data_table))
         return '\n'.join(resstr)
 
-    def info(self):
-        res = ['Number of peaks: {}'.format(len(self.data))]
-        for name in self.samples:
-            sample = self.sample(name)
-            label = sample.label
-            peaks = len(sample)
-            res.append('{:5d} peaks in sample {}, with label {}'.format(peaks, name, label))
-        return '\n'.join(res)
+    # TODO: consider rewrite info to return a dataframe
+    # def info(self):
+    #     res = ['Number of peaks: {}'.format(len(self.data))]
+    #     for name in self.samples:
+    #         sample = self.sample(name)
+    #         label = sample.label
+    #         peaks = len(sample)
+    #         res.append('{:5d} peaks in sample {}, with label {}'.format(peaks, name, label))
+    #     return '\n'.join(res)
 
-    def label_of(self,sample):
+    def label_of(self, sample):
         """Get label from sample name"""
-        if self.labels is None:
-            return None
-        for s, lbl in zip(self.sample_names, self.labels):
+        for s, lbl in self._get_zip_labels_samples():
             if s == sample:
                 return lbl
         return None
+
+    def samples_of(self, label):
+        """Get a list of sample names from label"""
+        snames = [lbl for s, lbl in self._get_zip_labels_samples() if lbl == label]
+        return snames
+
+    def _get_col_indexers(self, sample=None, info=None, label=None):
+        if sample is None and info is None and label is None:
+            return None
+        
+        
+        
 
     # def default_header_csv(self, s, sep=None, with_labels=False):
     #     # this returns a header suitable for various metabolomics tools
@@ -156,29 +177,6 @@ class MSDataSet(object):
     #         lines.append(line)
     #     return '\n'.join(lines)
 
-    # def to_csv(self, filename, header_func=None, sep=None, with_labels=False,
-    #            no_meta_columns=True, **kwargs):
-    #     if sep is None:
-    #         sep = '\t'
-    #     out_df = self._df.copy()
-    #     if no_meta_columns:
-    #         out_df = out_df.iloc[:, :len(self.sample_names)]
-    #     if header_func is None:
-    #         header_func = self.default_header_csv
-    #     # prepend output with result of header_func
-    #     needs_to_close = False
-    #     if _is_string(filename):
-    #         of = open(filename, 'w') 
-    #         needs_to_close = True
-    #     else:
-    #         of = filename
-
-    #     header = header_func(self, sep=sep, with_labels=with_labels) + '\n'
-    #     of.write(header)
-    #     out_df.to_csv(of, header=False, index=True, sep=sep, **kwargs)
-
-    #     if needs_to_close:
-    #         of.close()
 
     # def fillna(self, value):
     #     """Substitute missing values for a given value."""

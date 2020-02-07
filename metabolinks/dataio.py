@@ -13,8 +13,8 @@ def extract_info_from_ds(data):
     
     # ensure data is a DataFrame, otherwise return numpy array as 'data' in info dict
     if not isinstance(data, pd.DataFrame):
-        if hasattr(data, 'data') and isinstance(data.data, pd.DataFrame):
-            data = data.data
+        if hasattr(data, 'data_table') and isinstance(data.data_table, pd.DataFrame):
+            data = data.data_table
     if not isinstance(data, pd.DataFrame):
         info['data'] = np.array(data)
         return info
@@ -100,6 +100,31 @@ def gen_df(data, **kwargs):
 
     # build pandas DataFrame
     return pd.DataFrame(data, index=fi, columns=ci)
+
+
+    # def to_csv(self, filename, header_func=None, sep=None, with_labels=False,
+    #            no_meta_columns=True, **kwargs):
+    #     if sep is None:
+    #         sep = '\t'
+    #     out_df = self._df.copy()
+    #     if no_meta_columns:
+    #         out_df = out_df.iloc[:, :len(self.sample_names)]
+    #     if header_func is None:
+    #         header_func = self.default_header_csv
+    #     # prepend output with result of header_func
+    #     needs_to_close = False
+    #     if _is_string(filename):
+    #         of = open(filename, 'w') 
+    #         needs_to_close = True
+    #     else:
+    #         of = filename
+
+    #     header = header_func(self, sep=sep, with_labels=with_labels) + '\n'
+    #     of.write(header)
+    #     out_df.to_csv(of, header=False, index=True, sep=sep, **kwargs)
+
+    #     if needs_to_close:
+    #         of.close()
 
 
 def read_spectrum(filename, label=None):
