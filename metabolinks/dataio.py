@@ -15,6 +15,8 @@ def extract_info_from_ds(data):
     if not isinstance(data, pd.DataFrame):
         if hasattr(data, 'data_table') and isinstance(data.data_table, pd.DataFrame):
             data = data.data_table
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
     if not isinstance(data, pd.DataFrame):
         info['data'] = np.array(data)
         return info
@@ -29,8 +31,8 @@ def extract_info_from_ds(data):
     # labels, samples and information types
     ncl = len(data.columns.names)
     if ncl in [2, 3]:
-        info['labels'] = data.columns.levels[0]
-        info['samples'] = data.columns.levels[1]
+        info['labels'] = data.columns.get_level_values(0)
+        info['samples'] = data.columns.get_level_values(1)
     if ncl == 1:
         info['samples'] = data.columns
     if ncl == 3:
@@ -323,3 +325,9 @@ if __name__ == '__main__':
     print(df.columns.names)
     print(df.index.names)
     print(df.columns.levels)
+
+##     print('\nReading from Excel ----------')
+##     file_name='data_to_align.xlsx'
+##     spectra3 = read_spectra_from_xcel(file_name,
+##                            sample_names=1, header_row=1)
+

@@ -88,7 +88,7 @@ class MSDataSet(object):
     @property
     def features(self):
         """Get the features array."""
-        return self._df.index.values.copy()
+        return self._df.index
 
     @property
     def feature_count(self):
@@ -110,6 +110,14 @@ class MSDataSet(object):
     def no_labels(self):
         """True if there is only one (global) label 'no label'."""
         return self.label_count == 1 and self.labels[0] == 'no label'
+
+    @property
+    def info_types(self):
+        ncl = len(self._df.columns.names)
+        if ncl == 3:
+            return tuple(self._df.columns.levels[3])
+        else:
+            return tuple()
 
     # def set_labels(self, lbs=None):
     #     if lbs is None:
@@ -146,22 +154,61 @@ class MSDataSet(object):
 
     def label_of(self, sample):
         """Get label from sample name"""
-        for s, lbl in self._get_zip_labels_samples():
+        for lbl, s in self._get_zip_labels_samples():
             if s == sample:
                 return lbl
-        return None
+        raise KeyError(f"No label found for '{sample}'")
 
     def samples_of(self, label):
         """Get a list of sample names from label"""
         snames = [lbl for s, lbl in self._get_zip_labels_samples() if lbl == label]
         return snames
 
-    def _get_col_indexers(self, sample=None, info=None, label=None):
+    def _get_subset_data(self, sample=None, info=None, label=None, no_drop_na=False):
         if sample is None and info is None and label is None:
-            return None
-        
-        
-        
+            return self._df.copy()
+        if sample is not None:
+            if _is_string(sample):
+                samples = [sample]
+            else:
+                samples = list(sample)
+            indexer = []
+            for s in samples:
+                if s not in self.samples:
+                    raise KeyError(f"'{s}' is not a sample name")
+                lbl = self.label_of(s)
+                indexer.append((lbl, s))
+            if len(indexer) == 1:
+                indexer = indexer[0]
+            df = self._df.loc[:, indexer]
+        elif sample is None and label is not None:
+            if _is_string(label):
+                labels = [label]
+            else:
+                labels = list(label)
+            indexer = []
+            for s in labels:
+                if s not in self.labels:
+                    raise KeyError(f"'{s}' is not a sample name")
+                indexer.append(s)
+            df = self._df.loc[:, (indexer,)]
+        else:
+            raise KeyError("Sample name or label not found")
+        if no_drop_na:
+            df = df.copy()
+        else:
+            df = df.dropna(how='all')
+        if isinstance(df, pd.DataFrame):
+            df.columns = df.columns.remove_unused_levels()
+        return df
+
+    def data(self, **kwargs):
+        return self._get_subset_data(**kwargs)
+
+    def take(self, **kwargs):
+        df = self._get_subset_data(**kwargs)
+        return MSDataSet(df)
+
 
     # def default_header_csv(self, s, sep=None, with_labels=False):
     #     # this returns a header suitable for various metabolomics tools
@@ -184,35 +231,10 @@ class MSDataSet(object):
     #                           sample_names=self.sample_names,
     #                           labels=self.labels)
 
-    # def sample(self, sample):
-    #     """Get data for a given sample name, as a Spectrum."""
-    #     df = self.data[[sample]].dropna()
-    #     return Spectrum(df, sample_name=sample, label=self.label_of(sample))
-
     # def unfold(self):
     #     """Return a list of Spectrum objects, unfolding the peak lists."""
     #     return [self.sample(name) for name in self.sample_names]
 
-    # def label(self, label):
-    #     """Get data for a given label, as an AlignedSpectra object."""
-    #     # build a list grouping samples with a given label
-    #     lcolumns = []
-    #     for c, l in zip(self.data.columns, self.labels):
-    #         if l == label:
-    #             lcolumns.append(c)
-    #     df = self.data[lcolumns].dropna(how='all', subset=lcolumns)
-    #     return MSDataSet(df, sample_names=lcolumns,
-    #                               labels=[label]*len(lcolumns))
-    
-    # def unique_labels(self):
-    #     if self.labels is None:
-    #         return None
-    #     ulabels = []
-    #     for lbl in self.labels:
-    #         if lbl not in ulabels:
-    #             ulabels.append(lbl)
-    #     return ulabels
-    
     # def rep_at_least(self, minimum=1):
     #     df = self._df.copy()
     #     # build list of unique labels
@@ -257,9 +279,7 @@ class MSDataSet(object):
     #     return res
 
 
-
-
-def _sample_data():
+def _sample_data1():
     return """m/z	s38	s39	s40	s32	s33	s34
 97.58868	1073218	1049440	1058971	2351567	1909877	2197036
 97.59001	637830	534900	582966	1440216	1124346	1421899
@@ -281,22 +301,86 @@ def _sample_data():
 98.57899		1877649	1864650	1573559		1829208
 99.28772	2038979				3476845	"""
 
+def _sample_data2():
+    return """label	l1	l2	l1	l2	l2	l2
+sample	s38	s39	s40	s32	s33	s34
+97.58868	1073218	1049440	1058971	2351567	1909877	2197036
+97.59001	637830	534900	582966	1440216	1124346	1421899
+97.59185	460092	486631		1137139	926038	1176756
+97.72992			506345			439583
+98.34894	2232032	2165052	1966283			
+98.35078	3255288		2516386			
+98.35122		2499163	2164976			
+98.36001			1270764	1463557	1390574	
+98.57354				4627491	6142759	
+98.57382		3721991	3338506			4208438
+98.57497	6229543	3347404	2327096			
+98.57528				2510001	1989197	4377331
+98.57599	6897403	3946118				
+98.57621			3242232	2467520		4314818
+98.57692	8116811	5708658	3899578			
+98.57712				2418202	986128	4946201
+98.57790	3891025	3990442	3888258	2133404		3643682
+98.57899		1877649	1864650	1573559		1829208
+99.28772	2038979				3476845	"""
+
 
 if __name__ == '__main__':
     from six import StringIO
 
-    sample = StringIO(_sample_data())
-
-    data = pd.read_csv(sample, sep='\t').set_index('m/z')
+    print('MSDataSet from string data (as io stream) ------------\n')
+    data = pd.read_csv(StringIO(_sample_data1()), sep='\t').set_index('m/z')
     # print('-----------------------')
     # print(f'data = \n{data}')
     # print('-----------------------')
     dataset = MSDataSet(data)
-    # print('dataset.data =')
-    # print(dataset.data)
+    # print('dataset.table =')
+    # print(dataset.table)
     # print('-----------------------')
-    print('MSDataSet from string data (as io stream) ------------\n')
     print(dataset)
+
+    print('\nretrieving subset of data ----------')
+    print('--- sample s39 ----------')
+    asample = dataset.data(sample='s39')
+    print(asample)
+    print(type(asample))
+    print(asample[98.34894])
+    print('--- samples s39 s33 ----------')
+    asample = dataset.data(sample=('s39', 's33'))
+    print(asample)
+    print(type(asample))
+
+    print('\nMSDataSet from string data with labels (as io stream) ------------\n')
+    data = pd.read_csv(StringIO(_sample_data2()), sep='\t', header=[0,1], index_col=0)
+    # print('-----------------------')
+    # print(f'data = \n{data}')
+    # print('-----------------------')
+    dataset = MSDataSet(data)
+    # print('dataset.table =')
+    # print(dataset.table)
+    # print('-----------------------')
+    print(dataset)
+
+    print('\nretrieving subsets of data ----------')
+    print('--- sample s39 ----------')
+    asample = dataset.data(sample='s39')
+    print(asample)
+    print(type(asample))
+    #print(asample[97.59185])
+    print('--- label l2 ----------')
+    asample = dataset.data(label='l2')
+    print(asample)
+    print(type(asample))
+
+    print('\nretrieving subsets of data using take')
+    print('--- sample s39 ----------')
+    asample = dataset.take(sample='s39')
+    print(asample)
+    print(type(asample))
+    print('--- label l2 ----------')
+    asample = dataset.take(label='l2')
+    print(asample)
+    print(type(asample))
 
     # print('\nSpectrum with missing values filled with zeros ----------')
     # spectrumzero = spectrum.fillna(0)
@@ -307,13 +391,6 @@ if __name__ == '__main__':
     # spectrum.mz_to_csv(mzfile, mz_name='moverz')
     # print('\n--- Resulting file:')
     # print(mzfile.getvalue())
-
-    # print('\nReading aligned spectra (all of them) no labels ----------')
-    # sample.seek(0)
-    # spectra = read_aligned_spectra(sample)
-    # print(spectra,'\n')
-    # spectra.data.info()
-    # print(spectra.info())
 
     # print('\nSaving aligned spectra into a file ----------')
     # samplefile = StringIO()    
@@ -335,18 +412,6 @@ if __name__ == '__main__':
     # print(spectra,'\n')
     # spectra.data.info()
     # print(spectra.info())
-
-    # print('\nData of sample s38 ----------')
-    # print(spectra.sample('s38'))
-    
-    # print('\nm/z of sample s38 ----------')
-    # print(spectra.sample('s38').mz)
-    
-    # print('\nData of label v1 ----------')
-    # print(spectra.label('v1'))
-    
-    # print('\nm/z of label v1 ----------')
-    # print(spectra.label('v1').mz)
 
     # print('\nFiltered fewer than 2 per label')
     # print('\n-- Original\n')
@@ -392,9 +457,4 @@ if __name__ == '__main__':
     # print('\nComputing similarity measures ----------')
     
     # print(mz_similarity(spectra))
-    
-##     print('\nReading from Excel ----------')
-##     file_name='data_to_align.xlsx'
-##     spectra3 = read_spectra_from_xcel(file_name,
-##                            sample_names=1, header_row=1)
     
