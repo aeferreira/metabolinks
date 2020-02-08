@@ -58,6 +58,17 @@ class MSDataSet(object):
         return self._df
 
     @property
+    def columns(self):
+        return self._df.columns
+
+    @property
+    def index(self):
+        return self._df.index
+
+    def __getitem__(self, key):
+        return self._df.__getitem__(key)
+
+    @property
     def data_matrix(self):
         """The Pandas DataFrame holding the MS data, transposed to be usable as tidy"""
         return self._df.transpose(copy=True)
@@ -416,9 +427,11 @@ if __name__ == '__main__':
     new_data = dataset.transform(trans)
     print(new_data)
 
-    # print('\nSpectrum with missing values filled with zeros ----------')
-    # spectrumzero = spectrum.fillna(0)
-    # print(spectrumzero.data)
+    print('\niterating columns ----')
+    for c in dataset.columns:
+        print(c)
+        # print('-----')
+        # print(dataset[c])
 
     # print('\nSaving  mz into a file ----------')
     # mzfile = StringIO()    
