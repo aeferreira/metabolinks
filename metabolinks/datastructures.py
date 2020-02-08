@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from metabolinks import dataio
+from metabolinks import transformations
 from metabolinks.utils import _is_string
 from metabolinks.similarity import mz_similarity
 
@@ -80,15 +81,14 @@ class MSDataSet(object):
         return self._df.columns.levels[il_labels]
 
     @property
+    def iterlabels(self):
+        return self._df.columns.get_level_values('label')
+
+    @property
     def samples(self):
         """Get the different sample names."""
         il_sample = self._get_sample_pos()
         return self._df.columns.levels[il_sample]
-
-    @property
-    def features(self):
-        """Get the features array."""
-        return self._df.index
 
     @property
     def feature_count(self):
@@ -99,6 +99,14 @@ class MSDataSet(object):
     def sample_count(self):
         """Get the number of samples."""
         return len(self.samples)
+
+    @property
+    def itersamples(self):
+        return self._df.columns.get_level_values('sample')
+
+    @property
+    def iter_labels_samples(self):
+        return self._get_zip_labels_samples()
 
     @property
     def label_count(self):
@@ -209,6 +217,18 @@ class MSDataSet(object):
         df = self._get_subset_data(**kwargs)
         return MSDataSet(df)
 
+    def features(self, **kwargs):
+        df = self._get_subset_data(**kwargs)
+        return df.index
+
+    def transform(self, func, no_drop_na=True):
+        df = func(self._df)
+        if not no_drop_na:
+            df = df.dropna(how='all')
+        if isinstance(df, pd.DataFrame):
+            df.columns = df.columns.remove_unused_levels()
+        return MSDataSet(df)
+
 
     # def default_header_csv(self, s, sep=None, with_labels=False):
     #     # this returns a header suitable for various metabolomics tools
@@ -224,12 +244,6 @@ class MSDataSet(object):
     #         lines.append(line)
     #     return '\n'.join(lines)
 
-
-    # def fillna(self, value):
-    #     """Substitute missing values for a given value."""
-    #     return MSDataSet(self.data.fillna(value),
-    #                           sample_names=self.sample_names,
-    #                           labels=self.labels)
 
     # def unfold(self):
     #     """Return a list of Spectrum objects, unfolding the peak lists."""
@@ -381,6 +395,26 @@ if __name__ == '__main__':
     asample = dataset.take(label='l2')
     print(asample)
     print(type(asample))
+
+    print('\nretrieving features')
+    print('--- whole data ----------')
+    print(list(dataset.features()))
+    print('--- sample s39 ----------')
+    asample = dataset.features(sample='s39')
+    print(list(asample))
+    print('--- label l2 ----------')
+    asample = dataset.features(label='l2')
+    print(asample.values)
+
+    print('\nData transformations using transform ----')
+    print('--- using fillna_zero ----------')
+    trans = transformations.fillna_zero
+    new_data = dataset.transform(trans)
+    print(new_data)
+    print('--- using fillna_value ----------')
+    trans = transformations.fillna_value(10)
+    new_data = dataset.transform(trans)
+    print(new_data)
 
     # print('\nSpectrum with missing values filled with zeros ----------')
     # spectrumzero = spectrum.fillna(0)
