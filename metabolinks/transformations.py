@@ -13,5 +13,8 @@ def fillna_zero(df):
 def _fillna_value(df, value):
     return df.fillna(value)
 
-def fillna_value(value=0.0):
-    return partial(_fillna_value, value=value)
+# def fillna_value(value=0.0):
+#     return partial(_fillna_value, value=value)
+
+def fillna_value(df, value=0.0):
+    return df.fillna(value)

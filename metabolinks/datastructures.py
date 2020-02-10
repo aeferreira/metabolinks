@@ -232,8 +232,17 @@ class MSDataSet(object):
         df = self._get_subset_data(**kwargs)
         return df.index
 
-    def transform(self, func, no_drop_na=True):
-        df = func(self._df)
+    # def transform(self, func, no_drop_na=True):
+    #     df = func(self._df)
+    #     if not no_drop_na:
+    #         df = df.dropna(how='all')
+    #     if isinstance(df, pd.DataFrame):
+    #         df.columns = df.columns.remove_unused_levels()
+    #     return MSDataSet(df)
+
+    def transform(self, func, no_drop_na=True, **kwargs):
+        df = self._df
+        df = df.pipe(func, **kwargs)
         if not no_drop_na:
             df = df.dropna(how='all')
         if isinstance(df, pd.DataFrame):
@@ -423,8 +432,8 @@ if __name__ == '__main__':
     new_data = dataset.transform(trans)
     print(new_data)
     print('--- using fillna_value ----------')
-    trans = transformations.fillna_value(10)
-    new_data = dataset.transform(trans)
+    trans = transformations.fillna_value
+    new_data = dataset.transform(trans, value=10)
     print(new_data)
 
     print('\niterating columns ----')
