@@ -5,7 +5,11 @@
 
 """
 from io import open
-from setuptools import setup, find_packages
+
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
 
 def read_file(filename, encoding='utf-8'):
     with open(filename, encoding=encoding) as f:
@@ -34,33 +38,31 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering :: Information Analysis"
 ]
 
-if __name__ == "__main__":
-    setup(
-        name="metabolinks",
-        license="MIT",
-        url='https://github.com/aeferreira/metabolinks',
-        download_url='https://github.com/aeferreira/metabolinks',
-        version='0.51',
-        zip_safe=False,
-        author='António Ferreira and Gil Pires',
-        author_email="aeferreira@fc.ul.pt and gilpires071997@gmail.com",
-        maintainer='António Ferreira',
-        maintainer_email="aeferreira@fc.ul.pt",
-        classifiers=CLASSIFIERS,
-        keywords=['Metabolomics', 'Mass Spectrometry',
-                  'Data Analysis', 'Ultra-high resolution MS'],
-        description="A set of tools for high-resolution MS metabolomics data analysis",
-        long_description=read_file('README.rst'),
-        packages=['metabolinks'],
-        package_data={'metabolinks': [
-            'examples/peak_alignment_xcel.ipynb',
-            'examples/taxonomy_annotation_example.ipynb',
-            'data/data_to_align.xlsx',
-            'data/MassTRIX_output.tsv'
-        ]},
-        include_package_data=True,
-        install_requires=['six', 'requests', 'numpy', 
-                          'pandas', 'xlrd', 'xlsxwriter',
-                          'pytest', 'matplotlib>=2.0'],
-    )
+requires = ['six', 'requests', 'numpy',
+            'pandas>=0.25', 'xlrd', 'xlsxwriter', 'pandas-flavor',
+            'pytest', 'matplotlib>=2.0']
+
+packages = ['metabolinks', 'tests', 'notebooks']
+
+setup(
+    name="metabolinks",
+    license="MIT",
+    url='https://github.com/aeferreira/metabolinks',
+    download_url='https://github.com/aeferreira/metabolinks',
+    version='0.60',
+    zip_safe=False,
+    author='António Ferreira',
+    author_email="aeferreira@fc.ul.pt",
+    maintainer='António Ferreira',
+    maintainer_email="aeferreira@fc.ul.pt",
+    classifiers=CLASSIFIERS,
+    keywords=['Metabolomics', 'Mass Spectrometry',
+                'Data Analysis', 'Ultra-high resolution MS'],
+    description="A set of tools for high-resolution MS metabolomics data analysis",
+    long_description=read_file('README.rst'),
+    packages=['metabolinks'],
+    package_data={'metabolinks': ['data/data_to_align.xlsx', 'data/MassTRIX_output.tsv']},
+    include_package_data=True,
+    install_requires=requires
+)
         
