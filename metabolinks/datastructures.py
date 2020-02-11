@@ -6,7 +6,6 @@ import pandas as pd
 from pandas_flavor import register_dataframe_accessor
 
 from utils import _is_string
-#from metabolinks.similarity import mz_similarity
 
 @register_dataframe_accessor("ms")
 class MSAccessor(object):
@@ -57,6 +56,29 @@ class MSAccessor(object):
         il_labels = self._get_label_pos()
         return self._df.columns.levels[il_labels]
 
+    @labels.setter
+    def labels(self, value):
+        cols = self._df.columns
+        n = len(cols)
+        metanames = cols.names
+        # handle labels
+        if value is None or len(value) == 0:
+            value = ['no label']
+        elif _is_string(value):
+            value = [value]
+        else:
+            value = list(value)
+        nr = n // len(value)
+        alabels = []
+        for s in value:
+            alabels.extend([s]*nr)
+        # existing index
+        cols = [list(c) for c in cols]
+        for i, s in enumerate(alabels):
+            cols[i][0] = s # labels are always at level 0
+        newcols = [tuple(c) for c in cols]
+        self._df.columns = pd.MultiIndex.from_tuples(newcols, names=metanames)
+
     @property
     def iterlabels(self):
         return self._df.columns.get_level_values('label')
@@ -68,6 +90,10 @@ class MSAccessor(object):
         return self._df.columns.levels[il_sample]
 
     @property
+    def itersamples(self):
+        return self._df.columns.get_level_values('sample')
+
+    @property
     def feature_count(self):
         """Get the number of features."""
         return len(self._df.index)
@@ -76,10 +102,6 @@ class MSAccessor(object):
     def sample_count(self):
         """Get the number of samples."""
         return len(self.samples)
-
-    @property
-    def itersamples(self):
-        return self._df.columns.get_level_values('sample')
 
     @property
     def iter_labels_samples(self):
@@ -176,12 +198,11 @@ class MSAccessor(object):
             df.columns = df.columns.remove_unused_levels()
         return df
 
-    def data(self, **kwargs):
+    def take(self, **kwargs):
         return self._get_subset_data(**kwargs)
 
-    @property
-    def take(self):
-        return self.data
+    def restrict(self, **kwargs):
+        return self.take(**kwargs)
 
     def features(self, **kwargs):
         df = self._get_subset_data(**kwargs)
@@ -197,77 +218,39 @@ class MSAccessor(object):
         return df
 
 
-def _sample_data1():
-    return """m/z	s38	s39	s40	s32	s33	s34
-97.58868	1073218	1049440	1058971	2351567	1909877	2197036
-97.59001	637830	534900	582966	1440216	1124346	1421899
-97.59185	460092	486631		1137139	926038	1176756
-97.72992			506345			439583
-98.34894	2232032	2165052	1966283			
-98.35078	3255288	2813578	2516386			
-98.35122		2499163	2164976			
-98.36001			1270764	1463557	1390574	
-98.57354				4627491	6142759	
-98.57382		3721991	3338506			4208438
-98.57497	6229543	3347404	2327096			
-98.57528				2510001	1989197	4377331
-98.57599	6897403	3946118				
-98.57621			3242232	2467520		4314818
-98.57692	8116811	5708658	3899578			
-98.57712				2418202	986128	4946201
-98.57790	3891025	3990442	3888258	2133404		3643682
-98.57899		1877649	1864650	1573559		1829208
-99.28772	2038979				3476845	"""
-
-def _sample_data2():
-    return """label	l1	l2	l1	l2	l2	l2
-sample	s38	s39	s40	s32	s33	s34
-97.58868	1073218	1049440	1058971	2351567	1909877	2197036
-97.59001	637830	534900	582966	1440216	1124346	1421899
-97.59185	460092	486631		1137139	926038	1176756
-97.72992			506345			439583
-98.34894	2232032	2165052	1966283			
-98.35078	3255288		2516386			
-98.35122		2499163	2164976			
-98.36001			1270764	1463557	1390574	
-98.57354				4627491	6142759	
-98.57382		3721991	3338506			4208438
-98.57497	6229543	3347404	2327096			
-98.57528				2510001	1989197	4377331
-98.57599	6897403	3946118				
-98.57621			3242232	2467520		4314818
-98.57692	8116811	5708658	3899578			
-98.57712				2418202	986128	4946201
-98.57790	3891025	3990442	3888258	2133404		3643682
-98.57899		1877649	1864650	1573559		1829208
-99.28772	2038979				3476845	"""
-
-
 if __name__ == '__main__':
     from six import StringIO
     import dataio
+    import demodata
 
     print('MSDataSet from string data (as io stream) ------------\n')
-    data = pd.read_csv(StringIO(_sample_data1()), sep='\t').set_index('m/z')
+    data = pd.read_csv(StringIO(demodata.demo_data1()), sep='\t').set_index('m/z')
     # print('-----------------------')
     # print(f'data = \n{data}')
     # print('-----------------------')
     dataset = dataio.gen_df(data)
     print(dataset)
+    print('-- info --------------')
+    print(dataset.ms.info())
+    print('-----------------------')
+    print('-- global info---------')
+    print(dataset.ms.info(all_data=True))
+    print('-----------------------')
+
 
     print('\nretrieving subset of data ----------')
     print('--- sample s39 ----------')
-    asample = dataset.ms.data(sample='s39')
+    asample = dataset.ms.take(sample='s39')
     print(asample)
     print(type(asample))
     print(asample[98.34894])
     print('--- samples s39 s33 ----------')
-    asample = dataset.ms.data(sample=('s39', 's33'))
+    asample = dataset.ms.take(sample=('s39', 's33'))
     print(asample)
     print(type(asample))
 
     print('\nMSDataSet from string data with labels (as io stream) ------------\n')
-    data = pd.read_csv(StringIO(_sample_data2()), sep='\t', header=[0,1], index_col=0)
+    data = pd.read_csv(StringIO(demodata.demo_data2()), sep='\t', header=[0,1], index_col=0)
     # print('-----------------------')
     # print(f'data = \n{data}')
     # print('-----------------------')
@@ -282,20 +265,10 @@ if __name__ == '__main__':
 
     print('\nretrieving subsets of data ----------')
     print('--- sample s39 ----------')
-    asample = dataset.ms.data(sample='s39')
-    print(asample)
-    print(type(asample))
-    #print(asample[97.59185])
-    print('--- label l2 ----------')
-    asample = dataset.ms.data(label='l2')
-    print(asample)
-    print(type(asample))
-
-    print('\nretrieving subsets of data using take')
-    print('--- sample s39 ----------')
     asample = dataset.ms.take(sample='s39')
     print(asample)
     print(type(asample))
+    #print(asample[97.59185])
     print('--- label l2 ----------')
     asample = dataset.ms.take(label='l2')
     print(asample)
@@ -322,120 +295,20 @@ if __name__ == '__main__':
     new_data = dataset.ms.transform(trans, value=10)
     print(new_data)
 
-    print('\niterating columns ----')
-    for c in dataset.columns:
-        print(c)
-        # print('-----')
-        # print(dataset[c])
+    print('\nSetting new labels ----')
+    print('--- L1 L2 L3 ----------')
+    dataset.ms.labels = ['L1', 'L2', 'L3']
+    print(dataset)
+    print(dataset.ms.info())
 
+    print('\nSetting new labels ----')
+    print('--- L1 ----------')
+    dataset.ms.labels = 'L1'
+    print(dataset)
+    print(dataset.ms.info())
 
-
-    # def default_header_csv(self, s, sep=None, with_labels=False):
-    #     # this returns a header suitable for various metabolomics tools
-    #     if sep is None:
-    #         sep = '\t'
-    #     lines = []
-    #     line = ['Sample'] + s.sample_names
-    #     line = sep.join(['"{}"'.format(n) for n in line])
-    #     lines.append(line)
-    #     if with_labels and s.labels is not None:
-    #         line = ['Label'] + s.labels
-    #         line = sep.join(['"{}"'.format(n) for n in line])
-    #         lines.append(line)
-    #     return '\n'.join(lines)
-
-    # def common_label_mz(self, label1, label2):
-    #     mz1 = self.label(label1).mz
-    #     mz2 = self.label(label2).mz
-    #     u = np.intersect1d(mz1, mz2)
-    #     return u
-    
-    # def exclusive_label_mz(self, label):
-    #     # build list of unique other labels
-    #     slabels = [lbl for lbl in self.unique_labels() if lbl != label]
-
-    #     remaining = self.label(label).mz
-    #     for lbl in slabels:
-    #         remaining = np.setdiff1d(remaining, self.label(lbl).mz)
-    #     return remaining
-
-    # @property
-    # def exclusive_mz(self):
-    #     res = OrderedDict()
-    #     for label in self.labels:
-    #         slabels = [lbl for lbl in self.unique_labels() if lbl != label]
-
-    #         remaining = self.label(label).mz
-    #         for lbl in slabels:
-    #             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
-    #         res[label] = remaining
-    #     return res
-
-
-
-    # print('\nSaving aligned spectra into a file ----------')
-    # samplefile = StringIO()    
-    # spectra.to_csv(samplefile, sep=',')
-    # print('\n--- Resulting file:')
-    # print(samplefile.getvalue())
-
-    # print('\n--- Reading back:')
-    # samplefile.seek(0)
-    # spectra2 = read_aligned_spectra(samplefile, sep=',')
-    # print(spectra2,'\n')
-    # spectra2.data.info()
-    # print(spectra2.info())
-
-    # print('\nReading aligned spectra (all of them) ----------')
-    # labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
-    # sample.seek(0)
-    # spectra = read_aligned_spectra(sample, labels=labels)
-    # print(spectra,'\n')
-    # spectra.data.info()
-    # print(spectra.info())
-
-    # print('\nFiltered fewer than 2 per label')
-    # print('\n-- Original\n')
-    # print(spectra)
-    # print('\n-- With a minimum of 2 replicates\n')
-    # print(spectra.rep_at_least(minimum=2))
-
-    # print('\nSpectra with missing values filled with zeros ----------')
-    # spectrazero = spectra.fillna(0)
-    # print(spectrazero.data)
-
-    # print('\nUnfolding spectra ----------')
-    # unfolded = spectra.unfold()
-    
-    # for u in unfolded:
-    #     print(u)
-    #     print('+++++')
-    
-    # print('\nSaving aligned spectra into a file ----------')
-    # samplefile = StringIO()    
-    # spectra.to_csv(samplefile, sep=',', with_labels=True)
-    # print('\n--- Resulting file:')
-    # print(samplefile.getvalue())
-
-    # print('\n--- Reading back:')
-    # samplefile.seek(0)
-    # spectra2 = read_aligned_spectra(samplefile, labels=True, sep=',')
-    # print(spectra2,'\n')
-    # spectra2.data.info()
-    # print(spectra2.info())
-
-    # print('\nCommon m/z between labels (v1,v2) ----------')
-    # print(spectra.common_label_mz('v1', 'v2'))
-
-    # print('\nm/z values exclusive to label v1 ----------')
-    # print(spectra.exclusive_label_mz('v1'))
-
-    # print('\nm/z values exclusive to each label ----------')
-    # for label, values in spectra.exclusive_mz.items():
-    #     print('label:', label)
-    #     print(values)
-
-    # print('\nComputing similarity measures ----------')
-    
-    # print(mz_similarity(spectra))
-    
+    print('\nSetting new labels ----')
+    print('--- None ----------')
+    dataset.ms.labels = None
+    print(dataset)
+    print(dataset.ms.info())

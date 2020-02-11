@@ -1,7 +1,10 @@
+import six
 from collections import OrderedDict
 
 import pandas as pd
 import numpy as np
+
+from metabolinks import MSAccessor
 
 def extract_info_from_ds(data):
     """Retrieves information from data structures building a dictionary.
@@ -103,58 +106,21 @@ def gen_df(data, **kwargs):
     # build pandas DataFrame
     return pd.DataFrame(data, index=fi, columns=ci)
 
-
-    # def to_csv(self, filename, header_func=None, sep=None, with_labels=False,
-    #            no_meta_columns=True, **kwargs):
-    #     if sep is None:
-    #         sep = '\t'
-    #     out_df = self._df.copy()
-    #     if no_meta_columns:
-    #         out_df = out_df.iloc[:, :len(self.sample_names)]
-    #     if header_func is None:
-    #         header_func = self.default_header_csv
-    #     # prepend output with result of header_func
-    #     needs_to_close = False
-    #     if _is_string(filename):
-    #         of = open(filename, 'w') 
-    #         needs_to_close = True
-    #     else:
-    #         of = filename
-
-    #     header = header_func(self, sep=sep, with_labels=with_labels) + '\n'
-    #     of.write(header)
-    #     out_df.to_csv(of, header=False, index=True, sep=sep, **kwargs)
-
-    #     if needs_to_close:
-    #         of.close()
-
-
-def read_spectrum(filename, label=None):
-    s = pd.read_table(filename, index_col=False)
-    # keep only the first two columns
-    s = s.iloc[:, [0,1]]
-    s = s.set_index(s.columns[0])
-    return Spectrum(s, label=label)
-
-
-def read_aligned_spectra(filename, labels=None, **kwargs):
-    if labels == True:
-        s = pd.read_table(filename, header=[0,1], **kwargs)
+def read_data_from_csv(filename, has_labels=False, sep='\t', **kwargs):
+    if has_labels:
+        df = pd.read_csv(filename, header=[0,1], sep=sep, index_col=0, **kwargs)
     else:
-        s = pd.read_table(filename, index_col=False, **kwargs)
-    
-    if labels == True:
-        snames = s.columns.get_level_values(0)
-        lnames = s.columns.get_level_values(1)[1:]
-        s.columns = snames
-        labels = lnames
-
-    s = s.set_index(s.columns[0])
-    s.index.name = 'features'
-    return MSDataSet(s, labels=labels)
+        df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
+    print('*****************************')
+    print(df)
+    print(df.columns.names)
+    print(df.index.names)
+    print(df.columns)
+    print('*****************************')
+    return gen_df(df)
 
 
-def read_spectra_from_xcel(file_name,
+def read_data_from_xcel(file_name,
                            sample_names=None,
                            labels=None,
                            header_row=1,
@@ -326,8 +292,141 @@ if __name__ == '__main__':
     print(df.index.names)
     print(df.columns.levels)
 
+    from six import StringIO
+    import demodata
+
+    print('MSDataSet from string data (as io stream) ------------\n')
+    dataset = read_data_from_csv(StringIO(demodata.demo_data1()))
+    print(dataset)
+    print('-- info --------------')
+    print(dataset.ms.info())
+    print('-- global info---------')
+    print(dataset.ms.info(all_data=True))
+    print('-----------------------')
+
+    print('MSDataSet from string data (as io stream) ------------\n')
+    dataset = read_data_from_csv(StringIO(demodata.demo_data2()), has_labels=True)
+    print(dataset)
+    print('-- info --------------')
+    print(dataset.ms.info())
+    print('-- global info---------')
+    print(dataset.ms.info(all_data=True))
+    print('-----------------------')
+
+
 ##     print('\nReading from Excel ----------')
 ##     file_name='data_to_align.xlsx'
 ##     spectra3 = read_spectra_from_xcel(file_name,
 ##                            sample_names=1, header_row=1)
 
+
+
+    # def default_header_csv(self, s, sep=None, with_labels=False):
+    #     # this returns a header suitable for various metabolomics tools
+    #     if sep is None:
+    #         sep = '\t'
+    #     lines = []
+    #     line = ['Sample'] + s.sample_names
+    #     line = sep.join(['"{}"'.format(n) for n in line])
+    #     lines.append(line)
+    #     if with_labels and s.labels is not None:
+    #         line = ['Label'] + s.labels
+    #         line = sep.join(['"{}"'.format(n) for n in line])
+    #         lines.append(line)
+    #     return '\n'.join(lines)
+
+    # def common_label_mz(self, label1, label2):
+    #     mz1 = self.label(label1).mz
+    #     mz2 = self.label(label2).mz
+    #     u = np.intersect1d(mz1, mz2)
+    #     return u
+    
+    # def exclusive_label_mz(self, label):
+    #     # build list of unique other labels
+    #     slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+
+    #     remaining = self.label(label).mz
+    #     for lbl in slabels:
+    #         remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+    #     return remaining
+
+    # @property
+    # def exclusive_mz(self):
+    #     res = OrderedDict()
+    #     for label in self.labels:
+    #         slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+
+    #         remaining = self.label(label).mz
+    #         for lbl in slabels:
+    #             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+    #         res[label] = remaining
+    #     return res
+
+
+
+    # print('\nSaving aligned spectra into a file ----------')
+    # samplefile = StringIO()    
+    # spectra.to_csv(samplefile, sep=',')
+    # print('\n--- Resulting file:')
+    # print(samplefile.getvalue())
+
+    # print('\n--- Reading back:')
+    # samplefile.seek(0)
+    # spectra2 = read_aligned_spectra(samplefile, sep=',')
+    # print(spectra2,'\n')
+    # spectra2.data.info()
+    # print(spectra2.info())
+
+    # print('\nReading aligned spectra (all of them) ----------')
+    # labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
+    # sample.seek(0)
+    # spectra = read_aligned_spectra(sample, labels=labels)
+    # print(spectra,'\n')
+    # spectra.data.info()
+    # print(spectra.info())
+
+    # print('\nFiltered fewer than 2 per label')
+    # print('\n-- Original\n')
+    # print(spectra)
+    # print('\n-- With a minimum of 2 replicates\n')
+    # print(spectra.rep_at_least(minimum=2))
+
+    # print('\nSpectra with missing values filled with zeros ----------')
+    # spectrazero = spectra.fillna(0)
+    # print(spectrazero.data)
+
+    # print('\nUnfolding spectra ----------')
+    # unfolded = spectra.unfold()
+    
+    # for u in unfolded:
+    #     print(u)
+    #     print('+++++')
+    
+    # print('\nSaving aligned spectra into a file ----------')
+    # samplefile = StringIO()    
+    # spectra.to_csv(samplefile, sep=',', with_labels=True)
+    # print('\n--- Resulting file:')
+    # print(samplefile.getvalue())
+
+    # print('\n--- Reading back:')
+    # samplefile.seek(0)
+    # spectra2 = read_aligned_spectra(samplefile, labels=True, sep=',')
+    # print(spectra2,'\n')
+    # spectra2.data.info()
+    # print(spectra2.info())
+
+    # print('\nCommon m/z between labels (v1,v2) ----------')
+    # print(spectra.common_label_mz('v1', 'v2'))
+
+    # print('\nm/z values exclusive to label v1 ----------')
+    # print(spectra.exclusive_label_mz('v1'))
+
+    # print('\nm/z values exclusive to each label ----------')
+    # for label, values in spectra.exclusive_mz.items():
+    #     print('label:', label)
+    #     print(values)
+
+    # print('\nComputing similarity measures ----------')
+    
+    # print(mz_similarity(spectra))
+    
