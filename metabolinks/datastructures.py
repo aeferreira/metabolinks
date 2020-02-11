@@ -1,81 +1,47 @@
 """Classes representing MS data."""
 
-import six
-
 import numpy as np
 import pandas as pd
 
-from metabolinks import dataio
-from metabolinks import transformations
-from metabolinks.utils import _is_string
-from metabolinks.similarity import mz_similarity
+from pandas_flavor import register_dataframe_accessor
 
+from utils import _is_string
+#from metabolinks.similarity import mz_similarity
 
-class MSDataSet(object):
-    """A general container for MS data.
+@register_dataframe_accessor("ms")
+class MSAccessor(object):
+    """An accessor to Pandas DataFrame to interpret content as MS data.
 
-    This is a wrapper around a Pandas DataFrame (the `data` property).
+    The following convention is enforced for the DataFrame:
 
-    Direct metadata is stored in the (hierarquical) column index of `data`:
-    The (row) index contains one level, the "features", often labels of spectral entities. Examples are
-    m/z values, formulae or any format-specific labeling scheme.
-    
-    Columns contain three levels (outwards from the data):
+    Direct metadata is stored in the (hierarquical) column index.
+    This index contain three levels (outwards from the data):
 
     - `info_type` describes the type of data in each column. The default is "I". A common example is
        the pair "RT", "I" for each sample
     - `sample` contains the names of samples
     - `label` contains the labels of each sample
-    
-    In the display of data, if the all entries of a given level are equal then that level will
-    be absent from the output.
 
+    The (row) index contains one level, the "features", often labels of spectral entities. Examples are
+    m/z values, formulae or any format-specific labeling scheme.
     """
 
-    def __init__(self, data, features=None, samples=None, labels=None, info_types=None, features_name=None, info_name=None):
-        """Build member `_df`, aliased as `data` as a pandas DataFrame with appropriate index and columns from data and keyword arguments.
-
-        Information is retrieved from `data` function argument, keyword arguments may overwrite it and, if needed,
-        default values are provided.
-        `data` function argument can be a numpy array, a pandas DataFrames or structures with a DataFrame member `data`.
-        """
-
-        self._df = dataio.gen_df(data, features=features,
-                                samples=samples,
-                                labels=labels,
-                                info_types=info_types,
-                                features_name=features_name,
-                                info_name=info_name)
-
-    @property
-    def data_table(self):
-        """The Pandas DataFrame holding the MS data."""
-        return self._df
-
-    @property
-    def table(self):
-        """The Pandas DataFrame holding the MS data."""
-        return self._df
-
-    @property
-    def columns(self):
-        return self._df.columns
-
-    @property
-    def index(self):
-        return self._df.index
-
-    def __getitem__(self, key):
-        return self._df.__getitem__(key)
+    def __init__(self, df):
+        self._validate(df)
+        self._df = df
+    
+    @staticmethod
+    def _validate(df):
+        if not isinstance(df, pd.DataFrame):
+            raise AttributeError("'ms' must be used with a Pandas DataFrame")
+        if len(df.columns.names) < 2:
+            raise AttributeError('Must have at least label and sample metadata on columns')
 
     @property
     def data_matrix(self):
         """The Pandas DataFrame holding the MS data, transposed to be usable as tidy"""
         return self._df.transpose(copy=True)
 
-    def __len__(self):
-        return len(self._df)
-    
     def _get_sample_pos(self):
         return self._df.columns.names.index('sample')
 
@@ -138,38 +104,27 @@ class MSDataSet(object):
         else:
             return tuple()
 
-    # def set_labels(self, lbs=None):
-    #     if lbs is None:
-    #         self.labels = None
-    #     elif _is_string(lbs):
-    #         self.labels = [lbs] * len(self.sample_names)
-    #     else:
-    #         self.labels = list(lbs[:len(self.sample_names)])
+    def info(self, all_data=False):
+        if all_data:
+            dfres = [('samples', self.sample_count),
+                     ('labels', self.label_count),
+                     ('features', self.feature_count)]
+            return dict(dfres)
+        ls_table = [(s,l) for (l,s) in self._get_zip_labels_samples()]
+        ls_table.append((self.sample_count, self.label_count))
+        indx_strs = [str(i) for i in range(self.sample_count)] + ['global']
+        return pd.DataFrame(ls_table, columns=['sample', 'label'], index=indx_strs)
 
-    
-    def __str__(self):
-        resstr = []
-        ls_table = list(self._get_zip_labels_samples())
-        if self.no_labels:
-            samplelist = ', '.join([f"'{s}'" for l,s in ls_table])
-        else:
-            samplelist = ', '.join([f"'{s}' ('{l}')" for l,s in ls_table])
-        resstr.append(f'{self.sample_count} samples:')
-        resstr.append(samplelist)
-        resstr.append(f'{self.feature_count} features')
-        resstr.append('----')
-        resstr.append(str(self.data_table))
-        return '\n'.join(resstr)
-
-    # TODO: consider rewrite info to return a dataframe
-    # def info(self):
-    #     res = ['Number of peaks: {}'.format(len(self.data))]
-    #     for name in self.samples:
-    #         sample = self.sample(name)
-    #         label = sample.label
-    #         peaks = len(sample)
-    #         res.append('{:5d} peaks in sample {}, with label {}'.format(peaks, name, label))
-    #     return '\n'.join(res)
+        # if self.no_labels:
+        #     samplelist = ', '.join([f"'{s}'" for l,s in ls_table])
+        # else:
+        #     samplelist = ', '.join([f"'{s}' ('{l}')" for l,s in ls_table])
+        # resstr.append(f'{self.sample_count} samples:')
+        # resstr.append(samplelist)
+        # resstr.append(f'{self.feature_count} features')
+        # resstr.append('----')
+        # resstr.append(str(self._df))
+        # return '\n'.join(resstr)
 
     def label_of(self, sample):
         """Get label from sample name"""
@@ -224,93 +179,22 @@ class MSDataSet(object):
     def data(self, **kwargs):
         return self._get_subset_data(**kwargs)
 
-    def take(self, **kwargs):
-        df = self._get_subset_data(**kwargs)
-        return MSDataSet(df)
+    @property
+    def take(self):
+        return self.data
 
     def features(self, **kwargs):
         df = self._get_subset_data(**kwargs)
         return df.index
 
-    # def transform(self, func, no_drop_na=True):
-    #     df = func(self._df)
-    #     if not no_drop_na:
-    #         df = df.dropna(how='all')
-    #     if isinstance(df, pd.DataFrame):
-    #         df.columns = df.columns.remove_unused_levels()
-    #     return MSDataSet(df)
-
-    def transform(self, func, no_drop_na=True, **kwargs):
+    def transform(self, func, drop_na=True, **kwargs):
         df = self._df
         df = df.pipe(func, **kwargs)
-        if not no_drop_na:
+        if drop_na:
             df = df.dropna(how='all')
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
-        return MSDataSet(df)
-
-
-    # def default_header_csv(self, s, sep=None, with_labels=False):
-    #     # this returns a header suitable for various metabolomics tools
-    #     if sep is None:
-    #         sep = '\t'
-    #     lines = []
-    #     line = ['Sample'] + s.sample_names
-    #     line = sep.join(['"{}"'.format(n) for n in line])
-    #     lines.append(line)
-    #     if with_labels and s.labels is not None:
-    #         line = ['Label'] + s.labels
-    #         line = sep.join(['"{}"'.format(n) for n in line])
-    #         lines.append(line)
-    #     return '\n'.join(lines)
-
-
-    # def unfold(self):
-    #     """Return a list of Spectrum objects, unfolding the peak lists."""
-    #     return [self.sample(name) for name in self.sample_names]
-
-    # def rep_at_least(self, minimum=1):
-    #     df = self._df.copy()
-    #     # build list of unique labels
-    #     unique_labels = list(set(self.labels))
-    #     for label in unique_labels:
-    #         # build a list grouping samples with each given label
-    #         lcolumns = []
-    #         for c, l in zip(self.data.columns, self.labels):
-    #             if l == label:
-    #                 lcolumns.append(c)
-    #         lessthanmin = df[lcolumns].count(axis=1) < minimum
-    #         df.loc[lessthanmin, lcolumns] = np.nan
-    #     df = df.dropna(how='all')
-    #     return MSDataSet(df, sample_names=self.sample_names,
-    #                               labels=self.labels)
-
-    # def common_label_mz(self, label1, label2):
-    #     mz1 = self.label(label1).mz
-    #     mz2 = self.label(label2).mz
-    #     u = np.intersect1d(mz1, mz2)
-    #     return u
-    
-    # def exclusive_label_mz(self, label):
-    #     # build list of unique other labels
-    #     slabels = [lbl for lbl in self.unique_labels() if lbl != label]
-
-    #     remaining = self.label(label).mz
-    #     for lbl in slabels:
-    #         remaining = np.setdiff1d(remaining, self.label(lbl).mz)
-    #     return remaining
-
-    # @property
-    # def exclusive_mz(self):
-    #     res = OrderedDict()
-    #     for label in self.labels:
-    #         slabels = [lbl for lbl in self.unique_labels() if lbl != label]
-
-    #         remaining = self.label(label).mz
-    #         for lbl in slabels:
-    #             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
-    #         res[label] = remaining
-    #     return res
+        return df
 
 
 def _sample_data1():
@@ -361,26 +245,24 @@ sample	s38	s39	s40	s32	s33	s34
 
 if __name__ == '__main__':
     from six import StringIO
+    import dataio
 
     print('MSDataSet from string data (as io stream) ------------\n')
     data = pd.read_csv(StringIO(_sample_data1()), sep='\t').set_index('m/z')
     # print('-----------------------')
     # print(f'data = \n{data}')
     # print('-----------------------')
-    dataset = MSDataSet(data)
-    # print('dataset.table =')
-    # print(dataset.table)
-    # print('-----------------------')
+    dataset = dataio.gen_df(data)
     print(dataset)
 
     print('\nretrieving subset of data ----------')
     print('--- sample s39 ----------')
-    asample = dataset.data(sample='s39')
+    asample = dataset.ms.data(sample='s39')
     print(asample)
     print(type(asample))
     print(asample[98.34894])
     print('--- samples s39 s33 ----------')
-    asample = dataset.data(sample=('s39', 's33'))
+    asample = dataset.ms.data(sample=('s39', 's33'))
     print(asample)
     print(type(asample))
 
@@ -389,51 +271,55 @@ if __name__ == '__main__':
     # print('-----------------------')
     # print(f'data = \n{data}')
     # print('-----------------------')
-    dataset = MSDataSet(data)
-    # print('dataset.table =')
-    # print(dataset.table)
-    # print('-----------------------')
+    dataset = dataio.gen_df(data)
     print(dataset)
+    print('-- info --------------')
+    print(dataset.ms.info())
+    print('-----------------------')
+    print('-- global info---------')
+    print(dataset.ms.info(all_data=True))
+    print('-----------------------')
 
     print('\nretrieving subsets of data ----------')
     print('--- sample s39 ----------')
-    asample = dataset.data(sample='s39')
+    asample = dataset.ms.data(sample='s39')
     print(asample)
     print(type(asample))
     #print(asample[97.59185])
     print('--- label l2 ----------')
-    asample = dataset.data(label='l2')
+    asample = dataset.ms.data(label='l2')
     print(asample)
     print(type(asample))
 
     print('\nretrieving subsets of data using take')
     print('--- sample s39 ----------')
-    asample = dataset.take(sample='s39')
+    asample = dataset.ms.take(sample='s39')
     print(asample)
     print(type(asample))
     print('--- label l2 ----------')
-    asample = dataset.take(label='l2')
+    asample = dataset.ms.take(label='l2')
     print(asample)
     print(type(asample))
 
     print('\nretrieving features')
     print('--- whole data ----------')
-    print(list(dataset.features()))
+    print(list(dataset.ms.features()))
     print('--- sample s39 ----------')
-    asample = dataset.features(sample='s39')
+    asample = dataset.ms.features(sample='s39')
     print(list(asample))
     print('--- label l2 ----------')
-    asample = dataset.features(label='l2')
+    asample = dataset.ms.features(label='l2')
     print(asample.values)
 
     print('\nData transformations using transform ----')
+    import transformations
     print('--- using fillna_zero ----------')
     trans = transformations.fillna_zero
-    new_data = dataset.transform(trans)
+    new_data = dataset.ms.transform(trans)
     print(new_data)
     print('--- using fillna_value ----------')
     trans = transformations.fillna_value
-    new_data = dataset.transform(trans, value=10)
+    new_data = dataset.ms.transform(trans, value=10)
     print(new_data)
 
     print('\niterating columns ----')
@@ -442,11 +328,50 @@ if __name__ == '__main__':
         # print('-----')
         # print(dataset[c])
 
-    # print('\nSaving  mz into a file ----------')
-    # mzfile = StringIO()    
-    # spectrum.mz_to_csv(mzfile, mz_name='moverz')
-    # print('\n--- Resulting file:')
-    # print(mzfile.getvalue())
+
+
+    # def default_header_csv(self, s, sep=None, with_labels=False):
+    #     # this returns a header suitable for various metabolomics tools
+    #     if sep is None:
+    #         sep = '\t'
+    #     lines = []
+    #     line = ['Sample'] + s.sample_names
+    #     line = sep.join(['"{}"'.format(n) for n in line])
+    #     lines.append(line)
+    #     if with_labels and s.labels is not None:
+    #         line = ['Label'] + s.labels
+    #         line = sep.join(['"{}"'.format(n) for n in line])
+    #         lines.append(line)
+    #     return '\n'.join(lines)
+
+    # def common_label_mz(self, label1, label2):
+    #     mz1 = self.label(label1).mz
+    #     mz2 = self.label(label2).mz
+    #     u = np.intersect1d(mz1, mz2)
+    #     return u
+    
+    # def exclusive_label_mz(self, label):
+    #     # build list of unique other labels
+    #     slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+
+    #     remaining = self.label(label).mz
+    #     for lbl in slabels:
+    #         remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+    #     return remaining
+
+    # @property
+    # def exclusive_mz(self):
+    #     res = OrderedDict()
+    #     for label in self.labels:
+    #         slabels = [lbl for lbl in self.unique_labels() if lbl != label]
+
+    #         remaining = self.label(label).mz
+    #         for lbl in slabels:
+    #             remaining = np.setdiff1d(remaining, self.label(lbl).mz)
+    #         res[label] = remaining
+    #     return res
+
+
 
     # print('\nSaving aligned spectra into a file ----------')
     # samplefile = StringIO()    
