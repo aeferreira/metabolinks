@@ -1,10 +1,10 @@
-import six
 from collections import OrderedDict
+import six
 
 import pandas as pd
 import numpy as np
 
-from metabolinks import MSAccessor
+from metabolinks import MSAccessor, demodata
 
 def extract_info_from_ds(data):
     """Retrieves information from data structures building a dictionary.
@@ -106,17 +106,17 @@ def gen_df(data, **kwargs):
     # build pandas DataFrame
     return pd.DataFrame(data, index=fi, columns=ci)
 
-def read_data_from_csv(filename, has_labels=False, sep='\t', **kwargs):
+def read_data_csv(filename, has_labels=False, sep='\t', **kwargs):
     if has_labels:
         df = pd.read_csv(filename, header=[0,1], sep=sep, index_col=0, **kwargs)
     else:
         df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
-    print('*****************************')
-    print(df)
-    print(df.columns.names)
-    print(df.index.names)
-    print(df.columns)
-    print('*****************************')
+    # print('*****************************')
+    # print(df)
+    # print(df.columns.names)
+    # print(df.index.names)
+    # print(df.columns)
+    # print('*****************************')
     return gen_df(df)
 
 
@@ -127,13 +127,13 @@ def read_data_from_xcel(file_name,
                            common_mz= False,
                            verbose=True):
 
-    spectra_table = OrderedDict()
+    datasets = OrderedDict()
 
     wb = pd.ExcelFile(file_name).book
     header = header_row - 1
 
     if verbose:
-        print ('------ Reading MS-Excel file - {}'.format(file_name))
+        print (f'------ Reading MS-Excel file - {file_name}')
 
     for sheetname in wb.sheet_names():
 
@@ -205,9 +205,9 @@ def read_data_from_xcel(file_name,
                 label = spectrum.label
                 size = len(spectrum)
                 print ('{:5d} peaks in sample {}, with label {}'.format(size, name, label))
-        spectra_table[sheetname] = results
+        datasets[sheetname] = results
 
-    return spectra_table
+    return datasets
 
 
 if __name__ == '__main__':
@@ -292,11 +292,8 @@ if __name__ == '__main__':
     print(df.index.names)
     print(df.columns.levels)
 
-    from six import StringIO
-    import demodata
-
     print('MSDataSet from string data (as io stream) ------------\n')
-    dataset = read_data_from_csv(StringIO(demodata.demo_data1()))
+    dataset = read_data_csv(six.StringIO(demodata.demo_data1()))
     print(dataset)
     print('-- info --------------')
     print(dataset.ms.info())
@@ -305,7 +302,7 @@ if __name__ == '__main__':
     print('-----------------------')
 
     print('MSDataSet from string data (as io stream) ------------\n')
-    dataset = read_data_from_csv(StringIO(demodata.demo_data2()), has_labels=True)
+    dataset = read_data_csv(six.StringIO(demodata.demo_data2()), has_labels=True)
     print(dataset)
     print('-- info --------------')
     print(dataset.ms.info())
