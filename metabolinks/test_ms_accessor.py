@@ -65,6 +65,9 @@ trans = transformations.fillna_value
 new_data = dataset.ms.transform(trans, value=10)
 print(new_data)
 
+print('\nExisting labels ----')
+print(dataset.ms.labels)
+
 print('\nSetting new labels ----')
 print('--- L1 L2 L3 ----------')
 dataset.ms.labels = ['L1', 'L2', 'L3']

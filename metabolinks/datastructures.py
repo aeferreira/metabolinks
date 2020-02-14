@@ -47,7 +47,7 @@ class MSAccessor(object):
     @property
     def labels(self):
         """Get the different data labels (no repetitions)."""
-        return self._df.columns.levels[0]
+        return tuple(self._df.columns.levels[0])
 
     @labels.setter
     def labels(self, value):
@@ -60,7 +60,7 @@ class MSAccessor(object):
     @property
     def samples(self):
         """Get the different sample names."""
-        return self._df.columns.levels[1]
+        return tuple(self._df.columns.levels[1])
 
     @samples.setter
     def samples(self, value):
