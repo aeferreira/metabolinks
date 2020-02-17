@@ -8,7 +8,7 @@ from metabolinks import MSAccessor, demodata
 from metabolinks.utils import _is_string
 
 
-def extract_info_from_ds(data):
+def extract_info_from_ds(data, has_labels=False):
     """Retrieves information from data structures building a dictionary.
 
        Accepts numpy array, pandas DataFrames or structures with a DataFrame member `data`.
@@ -35,18 +35,23 @@ def extract_info_from_ds(data):
 
     # labels, samples and information types
     ncl = len(data.columns.names)
-    if ncl in [2, 3]:
-        info['labels'] = data.columns.get_level_values(0)
-        info['samples'] = data.columns.get_level_values(1)
     if ncl == 1:
         info['samples'] = data.columns
-    if ncl == 3:
-        info['info_types'] = data.columns.levels[2]
-        info['info_name'] = data.columns.names[2]
+    elif ncl > 1:
+        if has_labels:
+            info['labels'] = data.columns.get_level_values(0)
+            info['samples'] = data.columns.get_level_values(1)
+            if ncl == 3:
+                info['info_types'] = data.columns.levels[2]
+                info['info_name'] = data.columns.names[2]
+        else:
+            info['samples'] = data.columns.get_level_values(0)
+            info['info_types'] = data.columns.levels[1]
+            info['info_name'] = data.columns.names[1]
     return info
 
 
-def gen_df(data, **kwargs):
+def gen_df(data, has_labels=False, **kwargs):
     """Generate a pandas DataFrame with appropriate index and columns from data and function arguments.
 
        Information is first retrieved from `data`. Next, arguments overwrite information
@@ -55,7 +60,7 @@ def gen_df(data, **kwargs):
     """
 
     # "Parse" data to retrieve information
-    info = extract_info_from_ds(data)
+    info = extract_info_from_ds(data, has_labels)
 
     # overwrite using function arguments
     # function arguments to consider...
@@ -122,37 +127,66 @@ def gen_df(data, **kwargs):
 
 
 def read_data_csv(filename, has_labels=False, sep='\t', **kwargs):
-    if has_labels:
-        df = pd.read_csv(filename, header=[0, 1], sep=sep, index_col=0, **kwargs)
-    else:
-        df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
+    if has_labels and 'header' not in kwargs:
+        kwargs['header'] = [0,1]
+
+    df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
     # print('*****************************')
     # print(df)
     # print(df.columns.names)
     # print(df.index.names)
     # print(df.columns)
     # print('*****************************')
-    return gen_df(df)
+    return gen_df(df, has_labels)
 
 
 def read_data_from_xcel(
     file_name,
-    sample_row=None,
-    labels=None,
-    header_row=1,
-    common_features=False,
+    has_labels=False,
     verbose=True,
+    **kwargs
 ):
 
     datasets = OrderedDict()
 
     wb = pd.ExcelFile(file_name).book
-    header = header_row -1
+    #header = header_row -1
 
     if verbose:
         print(f'------ Reading MS-Excel file - {file_name}')
 
     for sheetname in wb.sheet_names():
+        if has_labels and 'header' not in kwargs:
+            kwargs['header'] = [0,1]
+        
+        # compute header to pass to read_excel and first_data_row
+        # if 'header' in kwargs:
+        #     cheader = kwargs['header']
+        # else:
+        #     cheader = 0
+        # if cheader is not None:
+        #     cheader = sorted(list(cheader))
+        #     first_data_row = cheader + 1
+        # else:
+        #     first_data_row = 0
+        # print('+++++++++++++++++++++++')
+        # print('first_data_row')
+        # print(first_data_row)
+        # print('+++++++++++++++++++++++')
+
+        # read data (and discard empty xl columns)
+        df = pd.read_excel(file_name, sheet_name=sheetname, **kwargs)
+        df = df.dropna(axis=1, how='all')
+        print('+++++++++++++++++++++++')
+        print(df)
+        print('+++++++++++++++++++++++')
+        print(df.columns.names)
+        print(df.index.names)
+        print(df.columns)
+        print('*****************************')
+
+        data_locs = []
+
 
         # if sample_row argument is present (not None) then, read row with sample names.
         # for setting new sample names, use .ms.set_samples(new_names) on the values of the result
@@ -165,10 +199,6 @@ def read_data_from_xcel(
         # read data (and discard empty xl columns)
         df = pd.read_excel(file_name, sheet_name=sheetname, header=header)
         df = df.dropna(axis=1, how='all')
-        print('+++++++++++++++++++++++')
-        print(df)
-        print('+++++++++++++++++++++++')
-
         # if sample names are not set then
         # use "2nd columns" headers as sample names
         # if common_features then use headers from position 1
@@ -337,7 +367,7 @@ if __name__ == '__main__':
 
     _THIS_DIR, _ = os.path.split(os.path.abspath(__file__))
     fname = os.path.join(_THIS_DIR, 'data', file_name)
-    data_sets = read_data_from_xcel(fname, sample_row=1, header_row=1, verbose=True)
+    data_sets = read_data_from_xcel(fname, header=[0,1], verbose=True)
 
     for d in data_sets:
         print(d)
