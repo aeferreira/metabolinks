@@ -83,8 +83,6 @@ def gen_df(data, has_labels=False, **kwargs):
         if (a in arg_names_nonOK) or (v is not None)
     }
     info.update(overwrite_dict)
-    # print('updated info\n',info)
-    # print('###############################')
 
     # get data values
     data = info['data']  # data must always exist
@@ -103,8 +101,6 @@ def gen_df(data, has_labels=False, **kwargs):
     asamples = []
     for s in samples:
         asamples.extend([s] * nr)
-    # print('asamples\n',asamples)
-    # print('###############################')
 
     # handle info types and build column index from (labels, samples, info_types)
     if 'info_types' not in info:
@@ -129,61 +125,33 @@ def gen_df(data, has_labels=False, **kwargs):
 
 def read_data_csv(filename, has_labels=False, sep='\t', **kwargs):
     if has_labels and 'header' not in kwargs:
-        kwargs['header'] = [0,1]
+        kwargs['header'] = [0, 1]
 
     df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
-    # print('*****************************')
-    # print(df)
-    # print(df.columns.names)
-    # print(df.index.names)
-    # print(df.columns)
-    # print('*****************************')
     return gen_df(df, has_labels)
 
 
-def read_data_from_xcel(
-    file_name,
-    has_labels=False,
-    verbose=True,
-    **kwargs
-):
+def read_data_from_xcel(file_name, has_labels=False, verbose=True, **kwargs):
 
     datasets = OrderedDict()
-
     wb = pd.ExcelFile(file_name).book
-    #header = header_row -1
 
     if verbose:
         print(f'------ Reading MS-Excel file - {file_name}')
 
     for sheetname in wb.sheet_names():
         if has_labels and 'header' not in kwargs:
-            kwargs['header'] = [0,1]
-        
-        # compute header to pass to read_excel and first_data_row
-        # if 'header' in kwargs:
-        #     cheader = kwargs['header']
-        # else:
-        #     cheader = 0
-        # if cheader is not None:
-        #     cheader = sorted(list(cheader))
-        #     first_data_row = cheader + 1
-        # else:
-        #     first_data_row = 0
-        # print('+++++++++++++++++++++++')
-        # print('first_data_row')
-        # print(first_data_row)
-        # print('+++++++++++++++++++++++')
+            kwargs['header'] = [0, 1]
 
         # read data, first as a whole df. May have empty columns
         df = pd.read_excel(file_name, sheet_name=sheetname, **kwargs)
         all_columns = list(df.columns)
         d_columns = list(df.dropna(axis=1, how='all').columns)
-        
+
         # find non-empty columns to split data in several tables
         # if necessary
         data_locs = []
-        building=False
+        building = False
         for i, c in enumerate(all_columns):
             if c not in d_columns:
                 building = False
@@ -194,20 +162,19 @@ def read_data_from_xcel(
                 else:
                     data_locs[-1].append(i)
                 building = True
-        
+
         # now split in several tables if empty columns exist
         results = []
         for loc in data_locs:
             dataset = df.iloc[:, loc]
             dataset = dataset.dropna().set_index(dataset.columns[0])
-            print(dataset)
-            print('+++++++++++++++++++++++')
-            print(dataset.columns.names)
-            print(dataset.index.names)
-            print(dataset.columns)
-            print('*****************************')
             results.append(gen_df(dataset, has_labels))
-
+            # print(dataset)
+            # print('+++++++++++++++++++++++')
+            # print(dataset.columns.names)
+            # print(dataset.index.names)
+            # print(dataset.columns)
+            # print('*****************************')
 
         if verbose:
             print('\n- {} tables found in sheet "{}":'.format(len(results), sheetname))
@@ -340,23 +307,22 @@ if __name__ == '__main__':
     print(dataset.ms.info(all_data=True))
     print('-----------------------')
 
-
     # Reading from Excel ----------
-    file_name='sample_data.xlsx'
+    file_name = 'sample_data.xlsx'
     import os
 
     _THIS_DIR, _ = os.path.split(os.path.abspath(__file__))
     fname = os.path.join(_THIS_DIR, 'data', file_name)
-    data_sets = read_data_from_xcel(fname, header=[0,1], verbose=True)
+    data_sets = read_data_from_xcel(fname, header=[0, 1], verbose=True)
 
     for d in data_sets:
         print(d)
-        print('-----------------------------')
+        print('+++++++++++++++++++++++++++++')
         for t in data_sets[d]:
-            print('\n----- table')
-            print(t.columns.names)
-            print(t.index.names)
-            print(t.columns.levels)
+            print('\n----- table -----------')
+            # print(t.columns.names)
+            # print(t.index.names)
+            # print(t.columns.levels)
             print(t)
         print('#############################')
 
@@ -402,37 +368,11 @@ if __name__ == '__main__':
 #         res[label] = remaining
 #     return res
 
-
-# print('\nSaving aligned spectra into a file ----------')
-# samplefile = StringIO()
-# spectra.to_csv(samplefile, sep=',')
-# print('\n--- Resulting file:')
-# print(samplefile.getvalue())
-
-# print('\n--- Reading back:')
-# samplefile.seek(0)
-# spectra2 = read_aligned_spectra(samplefile, sep=',')
-# print(spectra2,'\n')
-# spectra2.data.info()
-# print(spectra2.info())
-
-# print('\nReading aligned spectra (all of them) ----------')
-# labels=['v1', 'v1', 'v1', 'v2', 'v2', 'v2', 'v3', 'v3'] # last 2 exceed
-# sample.seek(0)
-# spectra = read_aligned_spectra(sample, labels=labels)
-# print(spectra,'\n')
-# spectra.data.info()
-# print(spectra.info())
-
 # print('\nFiltered fewer than 2 per label')
 # print('\n-- Original\n')
 # print(spectra)
 # print('\n-- With a minimum of 2 replicates\n')
 # print(spectra.rep_at_least(minimum=2))
-
-# print('\nSpectra with missing values filled with zeros ----------')
-# spectrazero = spectra.fillna(0)
-# print(spectrazero.data)
 
 # print('\nUnfolding spectra ----------')
 # unfolded = spectra.unfold()
