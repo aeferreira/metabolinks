@@ -38,15 +38,16 @@ def extract_info_from_ds(data, has_labels=False):
     if ncl == 1:
         info['samples'] = data.columns
     elif ncl > 1:
+        data.columns = data.columns.remove_unused_levels()
         if has_labels:
             info['labels'] = data.columns.get_level_values(0)
             info['samples'] = data.columns.get_level_values(1)
             if ncl == 3:
-                info['info_types'] = data.columns.levels[2]
+                info['info_types'] = list(data.columns.levels[2])
                 info['info_name'] = data.columns.names[2]
         else:
             info['samples'] = data.columns.get_level_values(0)
-            info['info_types'] = data.columns.levels[1]
+            info['info_types'] = list(data.columns.levels[1])
             info['info_name'] = data.columns.names[1]
     return info
 
@@ -174,60 +175,39 @@ def read_data_from_xcel(
         # print(first_data_row)
         # print('+++++++++++++++++++++++')
 
-        # read data (and discard empty xl columns)
+        # read data, first as a whole df. May have empty columns
         df = pd.read_excel(file_name, sheet_name=sheetname, **kwargs)
-        df = df.dropna(axis=1, how='all')
-        print('+++++++++++++++++++++++')
-        print(df)
-        print('+++++++++++++++++++++++')
-        print(df.columns.names)
-        print(df.index.names)
-        print(df.columns)
-        print('*****************************')
-
+        all_columns = list(df.columns)
+        d_columns = list(df.dropna(axis=1, how='all').columns)
+        
+        # find non-empty columns to split data in several tables
+        # if necessary
         data_locs = []
-
-
-        # if sample_row argument is present (not None) then, read row with sample names.
-        # for setting new sample names, use .ms.set_samples(new_names) on the values of the result
-        snames = []
-        if sample_row is not None:  #must be an integer
-            sh = wb.sheet_by_name(sheetname)
-            snames = sh.row_values(sample_row - 1)
-            snames = [s for s in snames if len(s.strip()) > 0]
-
-        # read data (and discard empty xl columns)
-        df = pd.read_excel(file_name, sheet_name=sheetname, header=header)
-        df = df.dropna(axis=1, how='all')
-        # if sample names are not set then
-        # use "2nd columns" headers as sample names
-        # if common_features then use headers from position 1
-        if len(snames) > 0:
-            pass  # already fetched
-        else:
-            if common_features:
-                snames = df.columns[1:]
+        building=False
+        for i, c in enumerate(all_columns):
+            if c not in d_columns:
+                building = False
+                continue
             else:
-                snames = df.columns[1::2]
-
-        # split in groups of two (each group is a different table)
+                if not building:
+                    data_locs.append([i])
+                else:
+                    data_locs[-1].append(i)
+                building = True
+        
+        # now split in several tables if empty columns exist
         results = []
-        if not common_features:
-            j = 0
-            for i in range(0, len(df.columns), 2):
-                spectrum = df.iloc[:, i : i + 2]
-                spectrum.index = range(len(spectrum))
-                spectrum = spectrum.dropna().set_index(spectrum.columns[0])
-                results.append(gen_df(spectrum, samples=[snames[j]]))
-                j = j + 1
-        else:
-            j = 0
-            for i in range(1, len(df.columns)):
-                spectrum = df.iloc[:, [0, i]]
-                spectrum.index = range(len(spectrum))
-                spectrum = spectrum.dropna().set_index(spectrum.columns[0])
-                results.append(gen_df(spectrum, samples=[snames[j]]))
-                j = j + 1
+        for loc in data_locs:
+            dataset = df.iloc[:, loc]
+            dataset = dataset.dropna().set_index(dataset.columns[0])
+            print(dataset)
+            print('+++++++++++++++++++++++')
+            print(dataset.columns.names)
+            print(dataset.index.names)
+            print(dataset.columns)
+            print('*****************************')
+            results.append(gen_df(dataset, has_labels))
+
 
         if verbose:
             print('\n- {} tables found in sheet "{}":'.format(len(results), sheetname))
