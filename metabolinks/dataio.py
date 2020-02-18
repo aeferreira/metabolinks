@@ -186,6 +186,28 @@ def read_data_from_xcel(file_name, has_labels=False, verbose=True, **kwargs):
 
     return datasets
 
+# --------------------- MassTRIX search result files ---------
+
+def read_MassTRIX(fname, unfolded=False):
+    """Reads a MassTRIX file into a Pandas DataFrame object.
+       
+       On the process, the last line is moved to the beginning and
+       is read as the header."""
+    
+    # store lines in a list
+    with open(fname) as f:
+        lines = [line.strip() for line in f]
+    
+    if not unfolded:
+        # move the last line to the beginning
+        moved_list = [lines[-1]]
+        moved_list.extend(lines[:-1]) # last line is not included
+        lines = moved_list
+
+    # read from the list of strings in memory
+    return pd.read_csv(six.StringIO('\n'.join(lines)), sep='\t')
+
+# -----------------------------------------------------------
 
 if __name__ == '__main__':
     print('test construction from numpy array')

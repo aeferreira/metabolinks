@@ -11,18 +11,24 @@ from .utils import _is_string
 class MSAccessor(object):
     """An accessor to Pandas DataFrame to interpret content as MS data.
 
-    The following convention is enforced for the DataFrame:
+    This interpretation assumes that the **column** index stores the essential
+    metadata, namely, sample names (almost mandatory) and group labels. This index is
+    ususally hierarquical and other levels are optional.
 
-    Direct metadata is stored in the (hierarquical) column index.
-    This index contain three levels (outwards from the data):
+    Interpretation is based on the following conventions :
 
-    - `info_type` describes the type of data in each column. The default is "I". A common example is
-       the pair "RT", "I" for each sample
-    - `sample` contains the names of samples
-    - `label` contains the labels of each sample
+    - For the accessor to work, the column index must have at leat two levels.
 
-    The (row) index contains one level, the "features", often labels of spectral entities. Examples are
-    m/z values, formulae or any format-specific labeling scheme.
+    - Level 1 is interpreted as sample names by the accessor.
+      Default name for this level is 'sample' and default values are 'Sample {i}'.
+      .samples is a property to access this level.
+
+    - Level 0 is interpreted as labels. .labels is a property to access labels.
+
+    - More levels are possible, if they are read from data sources or added by Pandas index manipulation.
+
+    The (row) index is interpreted as "features", often labels of spectral entities. Examples are
+    m/z values, formulae or any format-specific labeling scheme. It may be hierarquical.
     """
 
     def __init__(self, df):
@@ -121,20 +127,9 @@ class MSAccessor(object):
         """True if there is only one (global) label 'no label'."""
         return self.label_count == 1 and self.labels[0] == 'no label'
 
-    @property
-    def info_types(self):
-        ncl = len(self._df.columns.names)
-        if ncl == 3:
-            return tuple(self._df.columns.levels[3])
-        else:
-            return tuple()
-
     def info(self, all_data=False):
         if all_data:
-            dfres = [('samples', self.sample_count),
-                     ('labels', self.label_count),
-                     ('features', self.feature_count)]
-            return dict(dfres)
+            return dict(samples=self.sample_count, labels=self.label_count, features=self.feature_count)
         ls_table = [(s,l) for (l,s) in self._get_zip_labels_samples()]
         ls_table.append((self.sample_count, self.label_count))
         indx_strs = [str(i) for i in range(self.sample_count)] + ['global']
@@ -193,14 +188,14 @@ class MSAccessor(object):
     def take(self, **kwargs):
         return self._get_subset_data(**kwargs)
 
-    def restrict(self, **kwargs):
+    def subset(self, **kwargs):
         return self.take(**kwargs)
 
     def features(self, **kwargs):
         df = self._get_subset_data(**kwargs)
         return df.index
 
-    def transform(self, func, drop_na=True, **kwargs):
+    def pipe(self, func, drop_na=True, **kwargs):
         df = self._df
         df = df.pipe(func, **kwargs)
         if drop_na:
@@ -208,3 +203,13 @@ class MSAccessor(object):
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
         return df
+    
+    def erase_labels(self):
+        """Erase the labels level (level 0) in the column MultiIndex.
+
+           CAUTION: the accessor will no longer work or misinterpret levels."""
+        
+        self._df.columns = self._df.columns.droplevel(level=0)
+        if len(self._df.columns.names) > 1:
+            self._df.columns = self._df.columns.remove_unused_levels()
+        return self._df.copy()

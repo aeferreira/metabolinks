@@ -55,14 +55,14 @@ print('--- label l2 ----------')
 asample = dataset.ms.features(label='l2')
 print(asample.values)
 
-print('\nData transformations using transform ----')
+print('\nData transformations using pipe ----')
 print('--- using fillna_zero ----------')
 trans = transformations.fillna_zero
-new_data = dataset.ms.transform(trans)
+new_data = dataset.ms.pipe(trans)
 print(new_data)
-print('--- using fillna_value ----------')
+print('--- features using fillna_value ----------')
 trans = transformations.fillna_value
-new_data = dataset.ms.transform(trans, value=10)
+new_data = dataset.ms.pipe(trans, value=10).ms.features().to_list()
 print(new_data)
 
 print('\nExisting labels ----')
@@ -94,3 +94,6 @@ dataset.ms.samples = None
 print(dataset)
 print(dataset.ms.info())
 
+print('\nTesting ms.erase_labels() ----')
+dataset_unlabeled = dataset.ms.erase_labels()
+print(dataset_unlabeled)
