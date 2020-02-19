@@ -1,4 +1,6 @@
-"""An accessor to Pandas DataFrame to interpret content as MS data."""
+"""Accessors to Pandas DataFrame to interpret content as MS data.
+
+   Two versions: 'ms' assumes labeled data, 'ums' assumes unlabeled data"""
 
 import numpy as np
 import pandas as pd
@@ -12,8 +14,9 @@ class MSAccessor(object):
     """An accessor to Pandas DataFrame to interpret content as MS data.
 
     This interpretation assumes that the **column** index stores the essential
-    metadata, namely, sample names (almost mandatory) and group labels. This index is
-    ususally hierarquical and other levels are optional.
+    metadata, namely, sample names and group labels. This index is
+    ususally hierarquical and other levels are optional. Accessor 'ums' for unlabeled data
+    where level 0 are assumed to be sample names is also available in this module.
 
     Interpretation is based on the following conventions :
 
@@ -48,24 +51,29 @@ class MSAccessor(object):
         return self._df.transpose(copy=True)
 
     def _get_zip_labels_samples(self):
+        self._df.columns = self._df.columns.remove_unused_levels()
         return zip(self._df.columns.get_level_values(0), self._df.columns.get_level_values(1))
 
     @property
     def labels(self):
         """Get the different data labels (no repetitions)."""
+        self._df.columns = self._df.columns.remove_unused_levels()
         return tuple(self._df.columns.levels[0])
 
     @labels.setter
     def labels(self, value):
+        self._df.columns = self._df.columns.remove_unused_levels()
         self._rebuild_col_level(value, 0)
 
     @property
     def iterlabels(self):
+        self._df.columns = self._df.columns.remove_unused_levels()
         return self._df.columns.get_level_values(0)
 
     @property
     def samples(self):
         """Get the different sample names."""
+        self._df.columns = self._df.columns.remove_unused_levels()
         return tuple(self._df.columns.levels[1])
 
     @samples.setter
@@ -73,7 +81,7 @@ class MSAccessor(object):
         self._rebuild_col_level(value, 1)
 
     def _rebuild_col_level(self, value, level):
-        cols = self._df.columns
+        cols = self._df.columns.remove_unused_levels()
         n = len(cols)
         metanames = cols.names
         # handle value
@@ -100,6 +108,7 @@ class MSAccessor(object):
 
     @property
     def itersamples(self):
+        self._df.columns = self._df.columns.remove_unused_levels()
         return self._df.columns.get_level_values(1)
 
     @property
@@ -213,3 +222,134 @@ class MSAccessor(object):
         if len(self._df.columns.names) > 1:
             self._df.columns = self._df.columns.remove_unused_levels()
         return self._df.copy()
+
+@register_dataframe_accessor("ums")
+class UMSAccessor(object):
+    """An accessor to Pandas DataFrame to interpret content as MS data.
+
+    This interpretation assumes that the **column** index stores the sample names
+    on level 0. This index is optionally hierarquical. Accessor 'ms' for labeled data
+    where level 0 are assumed to be sample labels is also available in this module.
+
+    The (row) index is interpreted as "features", often labels of spectral entities. Examples are
+    m/z values, formulae or any format-specific labeling scheme. It may be hierarquical.
+    """
+
+    def __init__(self, df):
+        self._validate(df)
+        self._df = df
+    
+    @staticmethod
+    def _validate(df):
+        if not isinstance(df, pd.DataFrame):
+            raise AttributeError("'ms' must be used with a Pandas DataFrame")
+
+    @property
+    def data_matrix(self):
+        """The Pandas DataFrame holding the MS data, transposed to be usable as tidy"""
+        return self._df.transpose(copy=True)
+
+    @property
+    def samples(self):
+        """Get the different sample names."""
+        return tuple(self._df.columns.levels[0])
+
+    @samples.setter
+    def samples(self, value):
+        self._rebuild_col_level(value, 0)
+
+    def _rebuild_col_level(self, value, level):
+        cols = self._df.columns
+        n = len(cols)
+        metanames = cols.names
+        # handle value
+        if value is None or len(value) == 0:
+            if level == 0:
+                value = [f'Sample {i}' for i in range(1, n + 1)]
+            else:
+                value = [f'Info {i}' for i in range(1, n + 1)]
+        elif _is_string(value):
+            value = [value]
+        else:
+            value = list(value)
+        nr = n // len(value)
+        newstrs = []
+        for s in value:
+            newstrs.extend([s]*nr)
+        cols = [list(c) for c in cols]
+        for i, s in enumerate(newstrs):
+            cols[i][level] = s
+        newcols = [tuple(c) for c in cols]
+        self._df.columns = pd.MultiIndex.from_tuples(newcols, names=metanames)
+
+    @property
+    def itersamples(self):
+        return self._df.columns.get_level_values(0)
+
+    @property
+    def feature_count(self):
+        """Get the number of features."""
+        return len(self._df.index)
+
+    @property
+    def sample_count(self):
+        """Get the number of samples."""
+        return len(self.samples)
+
+    @property
+    def no_labels(self):
+        """True if there is only one (global) label 'no label'."""
+        return True
+
+    def info(self, all_data=False):
+        if all_data:
+            return dict(samples=self.sample_count, features=self.feature_count)
+        s_table = {'sample': list(self.itersamples)}
+        s_table['sample'].append((self.sample_count))
+        indx_strs = [str(i) for i in range(self.sample_count)] + ['global']
+        return pd.DataFrame(s_table, index=indx_strs)
+
+    def _get_subset_data(self, sample=None, info=None, no_drop_na=False):
+        if sample is None and info is None:
+            return self._df.copy()
+        if sample is not None:
+            if _is_string(sample):
+                samples = [sample]
+            else:
+                samples = list(sample)
+            indexer = []
+            for s in samples:
+                if s not in self.samples:
+                    raise KeyError(f"'{s}' is not a sample name")
+                indexer.append(s)
+            if len(indexer) == 1:
+                indexer = indexer[0]
+            df = self._df.loc[:, indexer]
+        else:
+            raise KeyError("Sample name not found")
+        if no_drop_na:
+            df = df.copy()
+        else:
+            df = df.dropna(how='all')
+        if isinstance(df, pd.DataFrame):
+            df.columns = df.columns.remove_unused_levels()
+        return df
+
+    def take(self, **kwargs):
+        return self._get_subset_data(**kwargs)
+
+    def subset(self, **kwargs):
+        return self.take(**kwargs)
+
+    def features(self, **kwargs):
+        df = self._get_subset_data(**kwargs)
+        return df.index
+
+    def pipe(self, func, drop_na=True, **kwargs):
+        df = self._df
+        df = df.pipe(func, **kwargs)
+        if drop_na:
+            df = df.dropna(how='all')
+        if isinstance(df, pd.DataFrame):
+            df.columns = df.columns.remove_unused_levels()
+        return df
