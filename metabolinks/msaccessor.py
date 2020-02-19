@@ -57,12 +57,10 @@ class MSAccessor(object):
     @property
     def labels(self):
         """Get the different data labels (no repetitions)."""
-        self._df.columns = self._df.columns.remove_unused_levels()
         return tuple(self._df.columns.levels[0])
 
     @labels.setter
     def labels(self, value):
-        self._df.columns = self._df.columns.remove_unused_levels()
         self._rebuild_col_level(value, 0)
 
     @property
@@ -73,7 +71,6 @@ class MSAccessor(object):
     @property
     def samples(self):
         """Get the different sample names."""
-        self._df.columns = self._df.columns.remove_unused_levels()
         return tuple(self._df.columns.levels[1])
 
     @samples.setter
@@ -123,6 +120,7 @@ class MSAccessor(object):
 
     @property
     def iter_labels_samples(self):
+        self._df.columns = self._df.columns.remove_unused_levels()
         return self._get_zip_labels_samples()
 
     @property
@@ -252,7 +250,10 @@ class UMSAccessor(object):
     @property
     def samples(self):
         """Get the different sample names."""
-        return tuple(self._df.columns.levels[0])
+        if len(self._df.columns.names) > 1:
+            return tuple(self._df.columns.levels[0])
+        else:
+            return tuple(self._df.columns)
 
     @samples.setter
     def samples(self, value):
@@ -262,6 +263,7 @@ class UMSAccessor(object):
         cols = self._df.columns
         n = len(cols)
         metanames = cols.names
+        nnames = len(metanames)
         # handle value
         if value is None or len(value) == 0:
             if level == 0:
@@ -276,6 +278,9 @@ class UMSAccessor(object):
         newstrs = []
         for s in value:
             newstrs.extend([s]*nr)
+        if nnames == 1:
+            self._df.columns = newstrs
+            return
         cols = [list(c) for c in cols]
         for i, s in enumerate(newstrs):
             cols[i][level] = s
@@ -284,7 +289,11 @@ class UMSAccessor(object):
 
     @property
     def itersamples(self):
-        return self._df.columns.get_level_values(0)
+        if len(self._df.columns.names) > 1:
+            self._df.columns = self._df.columns.remove_unused_levels()
+            return self._df.columns.get_level_values(0)
+        else:
+            return tuple(self._df.columns)
 
     @property
     def feature_count(self):
@@ -332,7 +341,8 @@ class UMSAccessor(object):
         else:
             df = df.dropna(how='all')
         if isinstance(df, pd.DataFrame):
-            df.columns = df.columns.remove_unused_levels()
+            if len(df.columns.names) > 1:
+                df.columns = df.columns.remove_unused_levels()
         return df
 
     def take(self, **kwargs):
