@@ -4,17 +4,14 @@ import six
 import pandas as pd
 import numpy as np
 
-from metabolinks import MSAccessor, demodata
+from metabolinks import MSAccessor, UMSAccessor, demodata
+from metabolinks.msaccessor import create_multiindex_with_labels
 from metabolinks.utils import _is_string
 
-
-def extract_info_from_ds(data, has_labels=False):
+def _ensure_data_frame(data):
     """Retrieves information from data structures building a dictionary.
 
-       Accepts numpy array, pandas DataFrames or structures with a DataFrame member `data`.
-    """
-
-    info = {}
+       Accepts numpy array, pandas DataFrames or structures with a DataFrame member `data`."""
 
     # ensure data is a DataFrame, otherwise return numpy array as 'data' in info dict
     if not isinstance(data, pd.DataFrame):
@@ -23,112 +20,23 @@ def extract_info_from_ds(data, has_labels=False):
     if isinstance(data, pd.Series):
         data = data.to_frame()
     if not isinstance(data, pd.DataFrame):
-        info['data'] = np.array(data)
-        return info
+        data = pd.DataFrame(np.array(data))
+    return data
 
-    # data values
-    info['data'] = np.array(data)
+def gen_df(data, add_labels=None):
+    """Ensure a Pandas DataFrame from data, create label level in columns if needed."""
 
-    # features and features_name
-    info['features'] = data.index.values
-    info['features_name'] = data.index.names[0]  # this may be None
-
-    # labels, samples and information types
-    ncl = len(data.columns.names)
-    if ncl == 1:
-        info['samples'] = data.columns
-    elif ncl > 1:
-        data.columns = data.columns.remove_unused_levels()
-        if has_labels:
-            info['labels'] = data.columns.get_level_values(0)
-            info['samples'] = data.columns.get_level_values(1)
-            if ncl == 3:
-                info['info_types'] = list(data.columns.levels[2])
-                info['info_name'] = data.columns.names[2]
-        else:
-            info['samples'] = data.columns.get_level_values(0)
-            info['info_types'] = list(data.columns.levels[1])
-            info['info_name'] = data.columns.names[1]
-    return info
-
-
-def gen_df(data, has_labels=False, **kwargs):
-    """Generate a pandas DataFrame with appropriate index and columns from data and function arguments.
-
-       Information is first retrieved from `data`. Next, arguments overwrite information
-       and, lastly, default values are provided.
-       `data` can be a numpy array, a pandas DataFrames or structures with a DataFrame member `data`.
-    """
-
-    # "Parse" data to retrieve information
-    info = extract_info_from_ds(data, has_labels)
-
-    # overwrite using function arguments
-    # function arguments to consider...
-    arg_names = (
-        'features',
-        'samples',
-        'labels',
-        'info_types',
-        'features_name',
-        'info_name',
-    )
-    # A None value for the following is meaningful: overwrite.
-    # if others are None, ignore them...
-    arg_names_nonOK = ('features_name', 'info_name')
-    overwrite_dict = {a: kwargs[a] for a in arg_names if a in kwargs}
-    overwrite_dict = {
-        a: v
-        for (a, v) in overwrite_dict.items()
-        if (a in arg_names_nonOK) or (v is not None)
-    }
-    info.update(overwrite_dict)
-
-    # get data values
-    data = info['data']  # data must always exist
-    nrows, n = data.shape
-
-    # handle labels
-    labels = info.setdefault('labels', ['no label'])
-    nr = n // len(labels)
-    alabels = []
-    for s in labels:
-        alabels.extend([s] * nr)
-
-    # handle samples
-    samples = info.setdefault('samples', [f'Sample {i}' for i in range(1, n + 1)])
-    nr = n // len(samples)
-    asamples = []
-    for s in samples:
-        asamples.extend([s] * nr)
-
-    # handle info types and build column index from (labels, samples, info_types)
-    if 'info_types' not in info:
-        ci = pd.MultiIndex.from_arrays((alabels, asamples), names=['label', 'sample'])
-    else:
-        atypes = info['info_types'] * len(samples)
-        info_name = info.setdefault('info_name', '')
-        if info_name is None:
-            info_name = ''
-        ci = pd.MultiIndex.from_arrays(
-            (alabels, asamples, atypes), names=['label', 'sample', info_name]
-        )
-
-    # handle features (row index)
-    features = info.setdefault('features', [f'F{i}' for i in range(nrows)])
-    features_name = info.setdefault('features_name', None)
-    fi = pd.Index(features, name=features_name)
-
-    # build pandas DataFrame
-    return pd.DataFrame(data, index=fi, columns=ci)
+    data = _ensure_data_frame(data)
+    if add_labels is not None:
+        data.columns = create_multiindex_with_labels(data, labels=add_labels)
+    return data
 
 
 def read_data_csv(filename, has_labels=False, sep='\t', **kwargs):
     if has_labels and 'header' not in kwargs:
         kwargs['header'] = [0, 1]
-
     df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
-    return gen_df(df, has_labels)
+    return gen_df(df)
 
 
 def read_data_from_xcel(file_name, has_labels=False, verbose=True, **kwargs):

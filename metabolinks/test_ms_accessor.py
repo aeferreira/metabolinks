@@ -128,3 +128,8 @@ print(list(dataset_unlabeled.ums.features()))
 print('--- sample s39 ----------')
 asample = dataset_unlabeled.ums.features(sample='s39')
 print(list(asample))
+
+print('\nadding labels again')
+print('--- adding L1, L2 ----------')
+newdataset = dataset_unlabeled.ums.add_labels(labels=['L1', 'L2'])
+print(newdataset)
