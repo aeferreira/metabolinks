@@ -4,6 +4,7 @@ from metabolinks.dataio import read_MassTRIX
 from metabolinks.transformations import unfold_MassTRIX
 from metabolinks.elementcomp import element_composition
 
+
 def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
     """Removes the 'uniqueID' and the 'isotope presence' columns."""
     col_names = []
@@ -28,8 +29,10 @@ def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
         col_names.extend(columns)
     return df.drop(col_names, axis=1)
 
+
 file_name = "MassTRIX_output.tsv"
 import os
+
 _THIS_DIR, _ = os.path.split(os.path.abspath(__file__))
 testfile_name = os.path.join(_THIS_DIR, "data", file_name)
 
@@ -62,4 +65,3 @@ unfolded.info()
 
 print("---------------------")
 print(unfolded.head(10))
-

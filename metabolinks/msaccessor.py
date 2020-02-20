@@ -9,12 +9,13 @@ from pandas_flavor import register_dataframe_accessor
 
 from .utils import _is_string
 
-def create_multiindex_with_labels(df, labels=['no label'], level_name='label'):
+
+def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
     cols = df.columns
     n = len(cols)
     metanames = cols.names
     if not labels:
-        labels = ['no label']
+        labels = ["no label"]
     elif _is_string(labels):
         labels = [labels]
     else:
@@ -27,8 +28,9 @@ def create_multiindex_with_labels(df, labels=['no label'], level_name='label'):
         tcols = [list(c) for c in cols.to_flat_index()]
     else:
         tcols = [[c] for c in cols]
-    newcols = [tuple([ns]+c) for (ns, c) in zip(newstrs, tcols)]
-    return pd.MultiIndex.from_tuples(newcols, names=[level_name]+metanames)
+    newcols = [tuple([ns] + c) for (ns, c) in zip(newstrs, tcols)]
+    return pd.MultiIndex.from_tuples(newcols, names=[level_name] + metanames)
+
 
 @register_dataframe_accessor("ms")
 class MSAccessor(object):
@@ -58,14 +60,16 @@ class MSAccessor(object):
     def __init__(self, df):
         self._validate(df)
         self._df = df
-    
+
     @staticmethod
     def _validate(df):
         """Require a pandas DataFrame with at least two levels in column MultiIndex to work."""
         if not isinstance(df, pd.DataFrame):
             raise AttributeError("'ms' must be used with a Pandas DataFrame")
         if len(df.columns.names) < 2:
-            raise AttributeError('Must have at least label and sample metadata on columns')
+            raise AttributeError(
+                "Must have at least label and sample metadata on columns"
+            )
 
     @property
     def data_matrix(self):
@@ -74,7 +78,9 @@ class MSAccessor(object):
 
     def _get_zip_labels_samples(self):
         self._df.columns = self._df.columns.remove_unused_levels()
-        return zip(self._df.columns.get_level_values(0), self._df.columns.get_level_values(1))
+        return zip(
+            self._df.columns.get_level_values(0), self._df.columns.get_level_values(1)
+        )
 
     @property
     def labels(self):
@@ -109,11 +115,11 @@ class MSAccessor(object):
         # handle value
         if value is None or len(value) == 0:
             if level == 0:
-                value = ['no label']
+                value = ["no label"]
             elif level == 1:
-                value = [f'Sample {i}' for i in range(1, n + 1)]
+                value = [f"Sample {i}" for i in range(1, n + 1)]
             else:
-                value = [f'Info {i}' for i in range(1, n + 1)]
+                value = [f"Info {i}" for i in range(1, n + 1)]
         elif _is_string(value):
             value = [value]
         else:
@@ -121,7 +127,7 @@ class MSAccessor(object):
         nr = n // len(value)
         newstrs = []
         for s in value:
-            newstrs.extend([s]*nr)
+            newstrs.extend([s] * nr)
         cols = [list(c) for c in cols]
         for i, s in enumerate(newstrs):
             cols[i][level] = s
@@ -159,16 +165,20 @@ class MSAccessor(object):
     @property
     def no_labels(self):
         """True if there is only one (global) label 'no label'."""
-        return self.label_count == 1 and self.labels[0] == 'no label'
+        return self.label_count == 1 and self.labels[0] == "no label"
 
     def info(self, all_data=False):
         """A dicionary of global counts or a DataFrame with info for each sample"""
         if all_data:
-            return dict(samples=self.sample_count, labels=self.label_count, features=self.feature_count)
-        ls_table = [(s,l) for (l,s) in self._get_zip_labels_samples()]
+            return dict(
+                samples=self.sample_count,
+                labels=self.label_count,
+                features=self.feature_count,
+            )
+        ls_table = [(s, l) for (l, s) in self._get_zip_labels_samples()]
         ls_table.append((self.sample_count, self.label_count))
-        indx_strs = [str(i) for i in range(self.sample_count)] + ['global']
-        return pd.DataFrame(ls_table, columns=['sample', 'label'], index=indx_strs)
+        indx_strs = [str(i) for i in range(self.sample_count)] + ["global"]
+        return pd.DataFrame(ls_table, columns=["sample", "label"], index=indx_strs)
 
     def label_of(self, sample):
         """Get label from sample name"""
@@ -215,7 +225,7 @@ class MSAccessor(object):
         if no_drop_na:
             df = df.copy()
         else:
-            df = df.dropna(how='all')
+            df = df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
         return df
@@ -238,7 +248,7 @@ class MSAccessor(object):
         df = self._df
         df = df.pipe(func, **kwargs)
         if drop_na:
-            df = df.dropna(how='all')
+            df = df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
         return df
@@ -253,6 +263,7 @@ class MSAccessor(object):
         if len(self._df.columns.names) > 1:
             self._df.columns = self._df.columns.remove_unused_levels()
         return self._df.copy()
+
 
 @register_dataframe_accessor("ums")
 class UMSAccessor(object):
@@ -269,7 +280,7 @@ class UMSAccessor(object):
     def __init__(self, df):
         self._validate(df)
         self._df = df
-    
+
     @staticmethod
     def _validate(df):
         if not isinstance(df, pd.DataFrame):
@@ -300,9 +311,9 @@ class UMSAccessor(object):
         # handle value
         if value is None or len(value) == 0:
             if level == 0:
-                value = [f'Sample {i}' for i in range(1, n + 1)]
+                value = [f"Sample {i}" for i in range(1, n + 1)]
             else:
-                value = [f'Info {i}' for i in range(1, n + 1)]
+                value = [f"Info {i}" for i in range(1, n + 1)]
         elif _is_string(value):
             value = [value]
         else:
@@ -310,7 +321,7 @@ class UMSAccessor(object):
         nr = n // len(value)
         newstrs = []
         for s in value:
-            newstrs.extend([s]*nr)
+            newstrs.extend([s] * nr)
         if nnames == 1:
             self._df.columns = newstrs
             return
@@ -346,9 +357,9 @@ class UMSAccessor(object):
     def info(self, all_data=False):
         if all_data:
             return dict(samples=self.sample_count, features=self.feature_count)
-        s_table = {'sample': list(self.itersamples)}
-        s_table['sample'].append((self.sample_count))
-        indx_strs = [str(i) for i in range(self.sample_count)] + ['global']
+        s_table = {"sample": list(self.itersamples)}
+        s_table["sample"].append((self.sample_count))
+        indx_strs = [str(i) for i in range(self.sample_count)] + ["global"]
         return pd.DataFrame(s_table, index=indx_strs)
 
     def _get_subset_data(self, sample=None, info=None, no_drop_na=False):
@@ -378,7 +389,7 @@ class UMSAccessor(object):
         if no_drop_na:
             df = df.copy()
         else:
-            df = df.dropna(how='all')
+            df = df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             if len(df.columns.names) > 1:
                 df.columns = df.columns.remove_unused_levels()
@@ -398,12 +409,14 @@ class UMSAccessor(object):
         df = self._df
         df = df.pipe(func, **kwargs)
         if drop_na:
-            df = df.dropna(how='all')
+            df = df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
         return df
 
-    def add_labels(self, labels=None, level_name='label'):
-        newcols = create_multiindex_with_labels(self._df, labels=labels, level_name=level_name)
+    def add_labels(self, labels=None, level_name="label"):
+        newcols = create_multiindex_with_labels(
+            self._df, labels=labels, level_name=level_name
+        )
         self._df.columns = newcols
         return self._df.copy()
