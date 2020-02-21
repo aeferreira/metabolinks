@@ -1,12 +1,12 @@
 from six import StringIO
 import pandas as pd
 import metabolinks.dataio as dataio
-import metabolinks.demodata as demodata
+import metabolinks.datasets as datasets
 import metabolinks.transformations as transformations
 
 
 print('\nReading sample data (as io stream) ------------\n')
-dataset = dataio.read_data_csv(StringIO(demodata.demo_data1()))
+dataset = dataio.read_data_csv(StringIO(datasets.demo_data1()))
 print(dataset)
 print('-- info --------------')
 print(dataset.ums.info())
@@ -26,7 +26,7 @@ print(asample)
 print(type(asample))
 
 print('\nReading sample data with labels (as io stream) ------------\n')
-data = dataset = dataio.read_data_csv(StringIO(demodata.demo_data2()), has_labels=True)
+data = dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
 print(dataset)
 print('-- info --------------')
 print(dataset.ms.info())
@@ -92,7 +92,7 @@ print(dataset)
 print(dataset.ms.info())
 
 print('\nReading again sample data with labels (as io stream) ------------\n')
-dataset = dataio.read_data_csv(StringIO(demodata.demo_data2()), has_labels=True)
+dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
 print(dataset)
 print('-- info --------------')
 print(dataset.ms.info())

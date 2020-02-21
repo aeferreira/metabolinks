@@ -4,7 +4,7 @@ import six
 import pandas as pd
 import numpy as np
 
-from metabolinks import MSAccessor, UMSAccessor, demodata
+from metabolinks import MSAccessor, UMSAccessor, datasets
 from metabolinks.msaccessor import create_multiindex_with_labels
 from metabolinks.utils import _is_string
 
@@ -105,24 +105,18 @@ def read_data_from_xcel(
 # --------------------- MassTRIX search result files ---------
 
 
-def read_MassTRIX(fname, unfolded=False):
+def read_MassTRIX(io, unfolded=False):
     """Reads a MassTRIX file into a Pandas DataFrame object.
        
        On the process, the last line is moved to the beginning and
        is read as the header."""
-
-    # store lines in a list
-    with open(fname) as f:
-        lines = [line.strip() for line in f]
-
-    if not unfolded:
-        # move the last line to the beginning
-        moved_list = [lines[-1]]
-        moved_list.extend(lines[:-1])  # last line is not included
-        lines = moved_list
-
-    # read from the list of strings in memory
-    return pd.read_csv(six.StringIO('\n'.join(lines)), sep='\t')
+    if unfolded:
+        return pd.read_csv(io, sep='\t')
+    else:
+        df = pd.read_csv(io, sep='\t', header=None)
+        df.columns = list(df.iloc[-1])
+        df = df.iloc[0:-1, :]
+        return df
 
 
 # -----------------------------------------------------------
@@ -163,7 +157,7 @@ if __name__ == '__main__':
     printdfstructure(df)
     print('-------------------------')
     print('Reading from string data (as io stream) ------------\n')
-    dataset = read_data_csv(six.StringIO(demodata.demo_data1()))
+    dataset = read_data_csv(six.StringIO(datasets.demo_data1()))
     printdfstructure(dataset)
     print('-- info --------------')
     print(dataset.ums.info())
@@ -172,7 +166,7 @@ if __name__ == '__main__':
     print('-----------------------')
 
     print('Reading from string data (as io stream) with labels------------\n')
-    dataset = read_data_csv(six.StringIO(demodata.demo_data2()), has_labels=True)
+    dataset = read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
     printdfstructure(dataset)
     print('-- info --------------')
     print(dataset.ms.info())
