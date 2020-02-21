@@ -13,18 +13,20 @@ from metabolinks.utils import _is_string
 def fillna_zero(df):
     return df.fillna(0.0)
 
-def _fillna_value(df, value):
-    return df.fillna(value)
-
-# def fillna_value(value=0.0):
-#     return partial(_fillna_value, value=value)
-
 def fillna_value(df, value=0.0):
     return df.fillna(value)
 
+def fillna_frac_min(df, fraction=0.5):
+    minimum = df.min().min()
+    # print(minimum)
+    minimum = minimum * fraction
+    return df.fillna(minimum)
+
+# ---------- filters for reproducibility
+
 
 # ----------------------------------------
-# Unfold functions
+# MassTRIX related functions
 #
 # these relate to the two MassTRIX formats:
 #
@@ -86,3 +88,31 @@ def unfold_MassTRIX(df):
         unfold_dict[k] = [_clean_value(v) for v in unfold_dict[k]]
     
     return pd.DataFrame(unfold_dict, columns=df.columns)
+
+###################################################################
+
+if __name__ == "__main__":
+    import six
+    from metabolinks import datasets
+    from metabolinks import dataio
+    # read sample data set
+    print('\nReading sample data with labels (as io stream) ------------\n')
+    data = dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
+    print(dataset)
+    print('-- info --------------')
+    print(dataset.ms.info())
+    print('-- global info---------')
+    print(dataset.ms.info(all_data=True))
+    print('-----------------------')
+
+    print('--- fillna_zero ----------')
+    new_data = fillna_zero(dataset)
+    print(new_data)
+    print('--- fillna_value  10 ----------')
+    new_data = fillna_value(dataset, value=10)
+    print(new_data)
+    print('--- fillna_value ----------')
+    new_data = fillna_frac_min(dataset)
+    print(new_data)
+
+
