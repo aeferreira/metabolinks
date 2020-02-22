@@ -55,6 +55,18 @@ print('--- label l2 ----------')
 asample = dataset.ms.features(label='l2')
 print(asample.values)
 
+print('\nUsing subset_where to double label l2 ----')
+print(dataset)
+print('\n--original data with sorted column index -')
+dataset = dataset.sort_index(axis='columns')
+print(dataset)
+print('\n-- label l2 replaced by double -------------')
+double = dataset.ms.subset(label='l2') * 2
+bool_loc = dataset.ms.subset_where(label='l2')
+dataset = dataset.mask(bool_loc, double)
+#dataset[bool_loc] = double
+print(dataset)
+
 print('\nData transformations using pipe ----')
 print('--- using fillna_zero ----------')
 trans = transformations.fillna_zero

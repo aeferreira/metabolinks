@@ -192,9 +192,9 @@ class MSAccessor(object):
         snames = [lbl for s, lbl in self._get_zip_labels_samples() if lbl == label]
         return snames
 
-    def _get_subset_data(self, sample=None, info=None, label=None, no_drop_na=False):
-        if sample is None and info is None and label is None:
-            return self._df.copy()
+    def _get_subset_data_indexer(self, sample=None, label=None, no_drop_na=False):
+        if sample is None and label is None:
+            return list(self._df.columns)
         if sample is not None:
             if _is_string(sample):
                 samples = [sample]
@@ -208,7 +208,7 @@ class MSAccessor(object):
                 indexer.append((lbl, s))
             if len(indexer) == 1:
                 indexer = indexer[0]
-            df = self._df.loc[:, indexer]
+            return indexer
         elif sample is None and label is not None:
             if _is_string(label):
                 labels = [label]
@@ -217,21 +217,26 @@ class MSAccessor(object):
             indexer = []
             for s in labels:
                 if s not in self.labels:
-                    raise KeyError(f"'{s}' is not a sample name")
+                    raise KeyError(f"'{s}' is not a label")
                 indexer.append(s)
-            df = self._df.loc[:, (indexer,)]
+            indexer = (indexer,)
+            return indexer
         else:
             raise KeyError("Sample name or label not found")
-        if no_drop_na:
-            df = df.copy()
+
+    def _get_subset_data(self, sample=None, label=None, no_drop_na=False):
+        if sample is None and label is None:
+            df = self._df
         else:
-            df = df.dropna(how="all")
+            col_indexer = self._get_subset_data_indexer(sample=sample, label=label)
+            df = self._df.loc[:, col_indexer]
+        df = df.copy() if no_drop_na else df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
         return df
 
     def take(self, **kwargs):
-        """The function that indexes data by sample name or label."""
+        """Retrieves subset of data by sample name or label."""
         return self._get_subset_data(**kwargs)
 
     def subset(self, **kwargs):
@@ -243,8 +248,14 @@ class MSAccessor(object):
         df = self._get_subset_data(**kwargs)
         return df.index
 
+    def subset_where(self, sample=None, label=None):
+        df = pd.DataFrame(False, index=self._df.index, columns=self._df.columns)
+        col_indexer = self._get_subset_data_indexer(sample=sample, label=label)
+        df.loc[:, col_indexer] = True
+        return df
+
     def pipe(self, func, drop_na=True, **kwargs):
-        """Thin wrapper arounf DataFrame.pipe() with automatic dropna and housekeeping."""
+        """Thin wrapper around DataFrame.pipe() with automatic dropna and housekeeping."""
         df = self._df
         df = df.pipe(func, **kwargs)
         if drop_na:
@@ -362,9 +373,9 @@ class UMSAccessor(object):
         indx_strs = [str(i) for i in range(self.sample_count)] + ["global"]
         return pd.DataFrame(s_table, index=indx_strs)
 
-    def _get_subset_data(self, sample=None, info=None, no_drop_na=False):
-        if sample is None and info is None:
-            return self._df.copy()
+    def _get_subset_data_indexer(self, sample=None):
+        if sample is None:
+            return list(self._df.columns)
         if sample is not None:
             if _is_string(sample):
                 samples = [sample]
@@ -377,25 +388,24 @@ class UMSAccessor(object):
                 indexer.append(s)
             if len(indexer) == 1:
                 indexer = indexer[0]
-            # print('++++++++++++++++++')
-            # print('indexer')
-            # print(indexer)
-            # print('++++++++++++++++++')
-            df = self._df.loc[:, indexer]
-            # print('++++++++++++++++++')
-            # print('resulting df')
-            # print(df)
-            # print('++++++++++++++++++')
-        if no_drop_na:
-            df = df.copy()
+            return indexer
         else:
-            df = df.dropna(how="all")
+            raise KeyError("Sample name not found")
+
+    def _get_subset_data(self, sample=None, no_drop_na=False):
+        if sample is None:
+            df =  self._df
+        else:
+            col_indexer =  self._get_subset_data_indexer(sample=sample)
+            df = self._df.loc[:, col_indexer]
+        df = df.copy() if no_drop_na else df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             if len(df.columns.names) > 1:
                 df.columns = df.columns.remove_unused_levels()
         return df
 
     def take(self, **kwargs):
+        """Retrieves subset of data by sample name."""
         return self._get_subset_data(**kwargs)
 
     def subset(self, **kwargs):
@@ -404,6 +414,12 @@ class UMSAccessor(object):
     def features(self, **kwargs):
         df = self._get_subset_data(**kwargs)
         return df.index
+
+    def subset_where(self, sample=None):
+        df = pd.DataFrame(False, index=self._df.index, columns=self._df.columns)
+        col_indexer = self._get_subset_data_indexer(sample=sample)
+        df.loc[:, col_indexer] = True
+        return df
 
     def pipe(self, func, drop_na=True, **kwargs):
         df = self._df
