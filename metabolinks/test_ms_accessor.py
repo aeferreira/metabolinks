@@ -78,7 +78,7 @@ new_data = dataset.ms.pipe(trans, value=10).ms.features().to_list()
 print(new_data)
 
 print('\nExisting labels ----')
-print(dataset.ms.labels)
+print(dataset.ms.unique_labels)
 
 print('\nSetting new labels -- L1 L2 L3 --')
 dataset.ms.labels = ['L1', 'L2', 'L3']
@@ -142,3 +142,12 @@ print('\nadding labels again')
 print('--- adding L1, L2 ----------')
 newdataset = dataset_unlabeled.ums.add_labels(labels=['L1', 'L2'])
 print(newdataset)
+
+print('-----++++++ ML data ++++++------')
+print('\nReading sample data with labels (as io stream) ------------\n')
+data = dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
+print(dataset)
+print('-- ML data --------------')
+print(dataset.ms.data)
+
+

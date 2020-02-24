@@ -72,9 +72,13 @@ class MSAccessor(object):
             )
 
     @property
-    def data_matrix(self):
+    def data(self):
         """The Pandas DataFrame holding the data, transposed to be usable as tidy"""
-        return self._df.transpose(copy=True)
+        res = {'X_matrix': self._df.transpose(copy=True).values,
+               'target': self.labels.values.copy(),
+               'names': self.samples.values.copy(),
+               'feature_names': self.features().values}
+        return res
 
     def _get_zip_labels_samples(self):
         self._df.columns = self._df.columns.remove_unused_levels()
@@ -83,9 +87,15 @@ class MSAccessor(object):
         )
 
     @property
-    def labels(self):
+    def unique_labels(self):
         """Get the different data labels (with no repetitions)."""
         return tuple(self._df.columns.levels[0])
+
+    @property
+    def labels(self):
+        """iterate over labels of each DataFrame column."""
+        self._df.columns = self._df.columns.remove_unused_levels()
+        return self._df.columns.get_level_values(0)
 
     @labels.setter
     def labels(self, value):
@@ -93,20 +103,31 @@ class MSAccessor(object):
         self._rebuild_col_level(value, 0)
 
     @property
-    def iterlabels(self):
-        """iterate over labels of each DataFrame column."""
-        self._df.columns = self._df.columns.remove_unused_levels()
-        return self._df.columns.get_level_values(0)
+    def label_count(self):
+        """Get the number of labels."""
+        # 'no label' still counts as one (global) label
+        return len(self.unique_labels)
+
+    @property
+    def unique_samples(self):
+        """Get the different sample names (with no repetitions in case the number of levels > 2)."""
+        return tuple(self._df.columns.levels[1])
 
     @property
     def samples(self):
-        """Get the different sample names (with no repetitions in case the number of levels > 2)."""
-        return tuple(self._df.columns.levels[1])
+        """iterate over sample names of each DataFrame column."""
+        self._df.columns = self._df.columns.remove_unused_levels()
+        return self._df.columns.get_level_values(1)
 
     @samples.setter
     def samples(self, value):
         """Setter for sample names."""
         self._rebuild_col_level(value, 1)
+
+    @property
+    def sample_count(self):
+        """Get the number of samples."""
+        return len(self.unique_samples)
 
     def _rebuild_col_level(self, value, level):
         cols = self._df.columns.remove_unused_levels()
@@ -135,32 +156,15 @@ class MSAccessor(object):
         self._df.columns = pd.MultiIndex.from_tuples(newcols, names=metanames)
 
     @property
-    def itersamples(self):
-        """iterate over sample names of each DataFrame column."""
-        self._df.columns = self._df.columns.remove_unused_levels()
-        return self._df.columns.get_level_values(1)
-
-    @property
     def feature_count(self):
         """Get the number of features."""
         return len(self._df.index)
-
-    @property
-    def sample_count(self):
-        """Get the number of samples."""
-        return len(self.samples)
 
     @property
     def iter_labels_samples(self):
         """iterate over pairs of (label, sample name) for each DataFrame column."""
         self._df.columns = self._df.columns.remove_unused_levels()
         return self._get_zip_labels_samples()
-
-    @property
-    def label_count(self):
-        """Get the number of labels."""
-        # 'no label' still counts as one (global) label
-        return len(self.labels)
 
     @property
     def no_labels(self):
@@ -303,16 +307,37 @@ class UMSAccessor(object):
         return self._df.transpose(copy=True)
 
     @property
-    def samples(self):
+    def unique_labels(self):
+        """Get the different data labels (with no repetitions)."""
+        return tuple(self._df.columns.levels[0])
+
+    @property
+    def unique_samples(self):
+        """Get the different sample names (with no repetitions in case the number of levels > 2)."""
         """Get the different sample names."""
         if len(self._df.columns.names) > 1:
             return tuple(self._df.columns.levels[0])
         else:
             return tuple(self._df.columns)
 
+    @property
+    def samples(self):
+        """iterate over sample names of each DataFrame column."""
+        if len(self._df.columns.names) > 1:
+            self._df.columns = self._df.columns.remove_unused_levels()
+            return self._df.columns.get_level_values(0)
+        else:
+            return tuple(self._df.columns)
+
     @samples.setter
     def samples(self, value):
+        """Setter for sample names."""
         self._rebuild_col_level(value, 0)
+
+    @property
+    def sample_count(self):
+        """Get the number of samples."""
+        return len(self.unique_samples)
 
     def _rebuild_col_level(self, value, level):
         cols = self._df.columns
@@ -343,22 +368,9 @@ class UMSAccessor(object):
         self._df.columns = pd.MultiIndex.from_tuples(newcols, names=metanames)
 
     @property
-    def itersamples(self):
-        if len(self._df.columns.names) > 1:
-            self._df.columns = self._df.columns.remove_unused_levels()
-            return self._df.columns.get_level_values(0)
-        else:
-            return tuple(self._df.columns)
-
-    @property
     def feature_count(self):
         """Get the number of features."""
         return len(self._df.index)
-
-    @property
-    def sample_count(self):
-        """Get the number of samples."""
-        return len(self.samples)
 
     @property
     def no_labels(self):
@@ -368,7 +380,7 @@ class UMSAccessor(object):
     def info(self, all_data=False):
         if all_data:
             return dict(samples=self.sample_count, features=self.feature_count)
-        s_table = {"sample": list(self.itersamples)}
+        s_table = {"sample": list(self.samples)}
         s_table["sample"].append((self.sample_count))
         indx_strs = [str(i) for i in range(self.sample_count)] + ["global"]
         return pd.DataFrame(s_table, index=indx_strs)
