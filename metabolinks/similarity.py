@@ -3,13 +3,22 @@
 import numpy as np
 import pandas as pd
 
-def mz_similarity(aligned):
+import metabolinks.dataio as dataio
+import metabolinks.datasets as datasets
+
+def mz_similarity(dataset, has_labels=False):
     """Compute counts and Jaccard index by samples."""
-    similarities = SimilarityMeasures()
+    if has_labels:
+        acc = dataset.ms
+    else:
+        acc = dataset.ums
     
-    n = len(aligned.sample_names)
-    mzs = [aligned.sample(n).mz for n in aligned.sample_names]
-    similarities.sample_names = aligned.sample_names[:]
+    similarities = SimilarityMeasures()
+    sample_names = list(acc.unique_samples)
+
+    n = len(sample_names)
+    mzs = [acc.features(sample=name) for name in sample_names]
+    similarities.sample_names = sample_names[:]
     
     common_matrix = np.zeros((n, n), dtype=int)
     jaccard_matrix = np.zeros((n,n))
@@ -35,15 +44,12 @@ def mz_similarity(aligned):
     similarities.sample_intersection_counts = common_matrix
     similarities.sample_similarity_jaccard = jaccard_matrix
     
-    if aligned.labels is not None:
-        # build list of unique labels
-        slabels = [aligned.labels[0]]
-        for label in aligned.labels[1:]:
-            if label not in slabels:
-                slabels.append(label)
-        mzs = [aligned.label(lbl).mz for lbl in slabels]
+    if has_labels:
+        labels = acc.unique_labels
+
+        mzs = [acc.features(label=lbl) for lbl in labels]
         # compute intersection counts and Jaccard index
-        n = len(slabels)
+        n = len(labels)
         common_matrix = np.zeros((n, n), dtype=int)
         jaccard_matrix = np.zeros((n,n))
         
@@ -67,7 +73,7 @@ def mz_similarity(aligned):
                 jaccard_matrix[i1, i2] = jaccard
         similarities.label_intersection_counts = common_matrix
         similarities.label_similarity_jaccard = jaccard_matrix
-        similarities.unique_labels = slabels
+        similarities.unique_labels = labels
     return similarities
 
 class SimilarityMeasures(object):
@@ -106,4 +112,18 @@ class SimilarityMeasures(object):
                               index=self.unique_labels)
             res.append(str(df))
         return "\n".join(res)
+
+if __name__ == "__main__":
+    import six
+    print('Reading from string data (as io stream) with labels------------\n')
+    dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
+    print(dataset)
+    print('-- info --------------')
+    print(dataset.ms.info())
+    print('-- global info---------')
+    print(dataset.ms.info(all_data=True))
+    print('-----------------------')
+    print('***** SIMILARITY MEASURES ****')
+    similarities = mz_similarity(dataset, has_labels=True)
+    print(similarities)
 

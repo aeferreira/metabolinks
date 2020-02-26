@@ -42,8 +42,7 @@ def read_data_csv(filename, has_labels=False, sep='\t', **kwargs):
 
 
 def read_data_from_xcel(
-    file_name, has_labels=False, drop_header_levels=None, verbose=True, **kwargs
-):
+    file_name, has_labels=False, drop_header_levels=None, verbose=False, **kwargs):
 
     datasets = OrderedDict()
     wb = pd.ExcelFile(file_name).book
@@ -101,9 +100,7 @@ def read_data_from_xcel(
 
     return datasets
 
-
 # --------------------- MassTRIX search result files ---------
-
 
 def read_MassTRIX(io, unfolded=False):
     """Reads a MassTRIX file into a Pandas DataFrame object.

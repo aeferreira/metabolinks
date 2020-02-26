@@ -7,16 +7,15 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from metabolinks.msaccessor import MSAccessor
+from metabolinks.msaccessor import MSAccessor, UMSAccessor
 
-from metabolinks.similarity import mz_similarity
 from metabolinks.utils import s2HMS
 
 def are_near(d1, d2, reltol):
     """Predicate: flags if two entries should belong to the same compound"""
     # two consecutive peaks from the same sample
     # should not belong to the same group
-    if d1['_spectrum'] == d2['_spectrum']:
+    if d1['_sample'] == d2['_sample']:
         return False
     m1, m2 = d1['m/z'], d2['m/z']
     if (m2 - m1) / m2 <= reltol:
@@ -54,382 +53,162 @@ def group_peaks(df, ppmtol=1.0):
 
     return result.groupby('_group')
 
-
 def align(inputs, ppmtol=1.0, min_samples=1,
-          report_similarity_measures=False, verbose=True):
-    """Align peak lists, according to m/z proximity.
-    
-       Returns an instance of AlignedSpectra."""
+          return_alignment_desc=False,
+          verbose=True):
 
-    start_time = time.clock()
-    # Compute sample names and labels of the resulting table
-    samplenames = []
-    for s in inputs:
-        if isinstance(s, MSDataSet):
-            samplenames.append(s.sample_names)
-        elif isinstance(s, Spectrum):
-            samplenames.append([s.sample_name])
-        else:
-            raise ValueError("wrong type of input to align function")
-    # flatten list to get all sample names
+    """Join tables according to feature proximity, interpreting features as m/z values.
     
-    all_samplenames = list(itertools.chain(*samplenames))
+       m/z values should be contained in the (row) index of the input DataFrames.
+       Returns a Pandas DataFrame by outer joining input frames on proximity groups."""
 
-    no_labels = False
-    for s in inputs:
-        if isinstance(s, MSDataSet):
-            if s.labels is None:
-                no_labels = True
-                break
-        else:
-            if s.label is None:
-                no_labels = True
-                break
-    if no_labels:
-        labels = None
-    else:
-        labels = []
-        for s in inputs:
-            if isinstance(s, MSDataSet):
-                labels.extend(s.labels)
-            else:
-                labels.append(s.label)
-    # Compute slices to use in table building
-    ncols = 0
-    tslices = []
-    for namelist in samplenames:
-        n = len(namelist)
-        tslices.append((ncols, ncols+n))
-        ncols += n
-       
+    start_time = time.time()
+
     if verbose:
-        print ('------ Aligning spectra -------------')
-        print ('  Sample names:', samplenames)
-        if not no_labels:
-            print ('  Labels:', labels)
-            
-        print ('- Joining data...', end=' ')
-    
+        print ('------ Aligning tables -------------')
+        print (' Samples to align:', [list(sample.columns) for sample in inputs])
+
+        print('- Extracting all features...')
+
     # Joining data (vertically)
     
     n = len(inputs)
     dfs = []
     
     # tag with sample names, concat vertically and sort by m/z
-    for sindx, s in enumerate(inputs):
+    for i, sample in enumerate(inputs):
         # create DataFrame with columns 'm/z', '_peak_index', and '_spectrum'
         dfs.append(
             pd.DataFrame({
-                'm/z': s.mz,
-                '_peak_index': range(len(s.data)),
-                '_spectrum': sindx
+                'm/z': list(sample.index),
+                '_sample': i,
+                '_feature': range(len(sample))
             })
         )
 
+    # concat vertically
+    cdf = pd.concat(dfs)
     # sort by m/z
-    cdf = pd.concat(dfs) # vertically
     cdf = cdf.sort_values(by='m/z')
-    #reindex with increasing integers
+    # insert a range index
     cdf.index = list(range(len(cdf)))
 
     if verbose:
-        print('done, (total {} peaks in {} spectra)'.format(cdf.shape[0], n))
-        
-    # Grouping data and building resulting table (as an AlignedSpectra instance)
+        print('  Done, (total {} features in {} samples)'.format(cdf.shape[0], n))
+
+    # Grouping data and building resulting table
 
     if verbose:
-        print ('- Aligning...', end=' ')
+        print('- Grouping and joining...')
 
     grouped = group_peaks(cdf, ppmtol=ppmtol)
-    
-    nan = np.nan
-    aligned_array = np.full((len(grouped), len(all_samplenames)), nan)
-    
-    mz_array = [0.0] * len(grouped)
-    mz_range_array = [0.0] * len(grouped)
-    
-    for igroup, (_, g) in enumerate(grouped):
-        group = g.set_index('_spectrum')
 
-        mz_array[igroup] = group['m/z'].mean()
+    # print('*********************************')
+    # for i, g in zip(range(20), grouped):
+    #     print('++++++++++++++++++++++++++++++')
+    #     print(g[0])
+    #     print('++++++++++++++++++++++++++++++')
+    #     print(g[1])
+    # print('*********************************')
 
+    # create new indexes for input DataFrames
+    new_indexes = [[0]*len(sample) for sample in inputs]
+
+    new_features = []
+    mz_range_array = []
+    group_labels = []
+    group_nfeatures = []
+    
+    for (group_label, group) in grouped:
+        group_labels.append(group_label)
+        group_nfeatures.append(len(group))
+        new_features.append(group['m/z'].mean())
         m_min, m_max = group['m/z'].min(), group['m/z'].max()
         range_ppm = 1e6 * (m_max - m_min) / m_min
-        mz_range_array[igroup] = range_ppm
+        mz_range_array.append(range_ppm)
 
-        for i, s in enumerate(inputs):
-            if i in group.index:
-                row = group.loc[i, '_peak_index']
-                start, end = tslices[i][0], tslices[i][1]
-                ndata = end-start
-                aligned_array[igroup, start:end] = s.data.iloc[int(row), :ndata]
+        # populate new_indexes with loc information
+        for _, row in group.iterrows():
+            new_indexes[int(row['_sample'])][int(row['_feature'])] = int(row['_group'])
 
-    result = pd.DataFrame(aligned_array, 
-                          columns=all_samplenames, 
-                          index=mz_array)
-    
-    # Series with sample count
-    nsamples = result.count(axis=1)
-    
-    # Series with range_ppm
-    range_ppm = pd.Series(mz_range_array, index=result.index)
+    # copy over inputs with row indexes indicating groups numbers
+    new_inputs = [pd.DataFrame(sample.values,
+                               index = new_indexes[i],
+                               columns=sample.columns)
+                               for i, sample in enumerate(inputs)]
+    # print('*********************************')
+    # for i, ni in enumerate(new_inputs):
+    #     print('++++++++++++++++++++++++++++++')
+    #     print(i)
+    #     print('++++++++++++++++++++++++++++++')
+    #     print(new_indexes[i])
+    #     print('++++++++++++++++++++++++++++++')
+    #     print(inputs[i])
+    #     print('++++++++++++++++++++++++++++++')
+    #     print(ni)
+    # print('*********************************')
+
+    # perform the join of DataFrames based on indexes containing group numbers
+    result = new_inputs[0]
+    result = result.join(new_inputs[1:], how='outer')
+    result.index = new_features
+
+    alignment_desc = pd.DataFrame({'# features': group_nfeatures,
+                                   'mean m/z': new_features,
+                                   'm/z range (ppm)': mz_range_array},
+                                   index=group_labels)
     
     # Discard rows according to min_samples cutoff
     n_non_discarded = len(result)
 
     if min_samples > 1:
-        result = result[nsamples >= min_samples]
-        range_ppm = range_ppm[nsamples >= min_samples]
-        nsamples = nsamples[nsamples >= min_samples]
-    
-    result = MSDataSet(result, 
-                            sample_names=all_samplenames,
-                            labels=labels)
-
-    alignment_stats = AlignmentStats(result, range_ppm, nsamples, ppmtol)
-    # "inject" alignment_stats in result
-    result.alignment_stats = alignment_stats
+        where_keep = (alignment_desc['# features'] >= min_samples).values
+        result = result[where_keep]
+        alignment_desc = alignment_desc[where_keep]
 
     if verbose:
-        print('done, {} aligned peaks'.format(n_non_discarded))
-        print('Elapsed time:', s2HMS(time.clock() - start_time))
-        print(result.info())
+        print('  Done, {} groups found'.format(n_non_discarded))
+        print('Elapsed time: {}\n'.format(s2HMS(time.time() - start_time)))
+        # print(result.info())
 
         if min_samples > 1:
             n_discarded = n_non_discarded - len(result)
-            msg = '- {} peaks were discarded (#samples < {})'.format
+            msg = '- {} groups were discarded (#samples < {})'.format
             print(msg(n_discarded, min_samples))
 
-        print(alignment_stats)
-        
-        if report_similarity_measures:
-            print(mz_similarity(result))
+        print(alignment_summary(alignment_desc))
 
-    return result
+    if return_alignment_desc:
+        return (result, alignment_desc)
+    else:
+        return result
 
 # Alias
 align_spectra = align
 
-class AlignmentStats(object):
-    """A container that holds descriptive measures of an alignment task.
-    """
-    
-    def __init__(self, result, range_ppm, nsamples, ppmtol):
-        self.result = None
-        self.scounts = None
-        self.range_ppm = None
-        self.excess_ranges = None
-        self.range_hist = None
-        
-        self.result = result
-        
-        # compute table with sample counts
-        self.scounts = nsamples.value_counts().sort_index()
-        # compute ranges greater than ppmtol
-        self.range_ppm = range_ppm
-        self.excess_ranges = range_ppm[range_ppm > ppmtol]
-        # compute histogram of range_ppm
-        self.range_hist = np.histogram(range_ppm.values,
-                                                  bins=10,
-                                                  range=(0.0, ppmtol))
-
-    def __str__(self):
+def alignment_summary(alignment_desc):
         res = []
-        lines=['Sample coverage of peaks']
-        for n, c in self.scounts.items():
-            lines.append('{:5d} peaks in {} samples'.format(c, n))
+        lines=['Sample coverage of features']
+        cov_items = alignment_desc['# features'].value_counts().sort_index().items()
+        for n, c in cov_items:
+            lines.append('{:5d} features in {} samples'.format(c, n))
         res.append('\n'.join(lines))
-        lines = ['m/z range distribution']
-        range_hist = self.range_hist
+        lines = ['m/z range (ppm) distribution']
+        range_hist = np.histogram(alignment_desc['m/z range (ppm)'].values, bins=10, range=(0.0, ppmtol))
         bins = range_hist[1]
         counts = range_hist[0]
         for i, c in enumerate(counts):
             lines.append('  [{:3.1f},{:3.1f}[ : {}'.format(bins[i], bins[i+1], c))
         res.append('\n'.join(lines))
-        excess_ranges = self.excess_ranges
-        if len(excess_ranges) > 0:
+        hist_high = bins[-1]
+        excess_ranges = alignment_desc[alignment_desc['m/z range (ppm)'] > hist_high]
+        n_excess = len(excess_ranges)
+        if n_excess > 0:
             res.append('Peaks with m/z range in excess of tolerance')
             res.append(str(excess_ranges))
         else:
-            res.append('No peaks found with m/z range > {}'.format(bins[-1]))
+            res.append('  > {:<7.1f} : {}'.format(hist_high, n_excess))
         return '\n'.join(res)
-
-
-
-def align_spectra_in_excel(fname,
-                           save_to_excel=None,
-                           ppmtol=1.0, min_samples=1,
-                           sample_names=None, labels=None,
-                           header_row=1,
-                           fillna=None,
-                           verbose=True):
-
-    spectra_table = read_spectra_from_xcel(fname,
-                                           sample_names=sample_names,
-                                           labels=labels,
-                                           header_row=header_row,
-                                           verbose=verbose)
-
-    if verbose:
-        print('\n------ Aligning spectra ------')
-
-    aligned_spectra = OrderedDict()
-    for sheetname, spectra in spectra_table.items():
-        if verbose:
-            print ('\n-- sheet "{}"'.format(sheetname))
-        aligned = align(spectra,
-                        ppmtol=ppmtol, min_samples=min_samples,
-                        verbose=verbose)
-        if fillna is not None:
-            aligned = aligned.fillna(fillna)
-        aligned_spectra[sheetname] = aligned
-
-    if save_to_excel is not None:
-        save_aligned_to_excel(save_to_excel, aligned_spectra)
-    
-    return aligned_spectra
-
-
-def save_aligned_to_excel(fname, aligned_dict):
-    writer = pd.ExcelWriter(fname, engine='xlsxwriter')
-
-    for sname in aligned_dict:
-        
-        aligned_spectra = aligned_dict[sname]
-        
-        sim = mz_similarity(aligned_spectra)
-                                
-        results = aligned_spectra.data
-        results.index.name = 'm/z'
-        results = results.reset_index(level=0)
-        
-        _, ncols = results.shape
-
-        # write Pandas DataFrame
-        results.to_excel(writer, sheet_name=sname,
-                         index=False, startrow=1, startcol=1)
-
-        workbook = writer.book
-        sh = writer.sheets[sname]
-
-        # change displayed precision in 'm/z' column
-        format2 = workbook.add_format({'num_format': '0.0000000'})
-        sh.set_column(1, 1, 15, format2)
-
-        # change widths
-        sh.set_column(2, ncols+1, 25)
-       
-        # Create report sheet
-        rsheetname = sname + ' report'
-        sh = workbook.add_worksheet(rsheetname)
-        
-        row_offset = 1
-        
-        sh.write_string(row_offset, 1, 'Peak reproducibility')
-        
-        row_offset = row_offset + 2
-        
-        # create table of replica counts
-        sh.write_string(row_offset, 2, '#samples')
-        counts = aligned_spectra.alignment_stats.scounts
-        sh.write_column(row_offset + 1, 2, counts.index)
-        sh.write_column(row_offset + 1, 3, counts.values)
-
-        sh.write_string(row_offset + 1 + len(counts), 2, 'total')
-        sh.write_number(row_offset + 1 + len(counts), 3, len(results))
-
-        # Add pie chart of replica counts
-        chart = workbook.add_chart({'type': 'pie'})
-        chart.add_series({'values': [rsheetname, row_offset+1, 3, row_offset + len(counts), 3],
-                          'categories': [rsheetname, row_offset+1, 2, row_offset + len(counts), 2],
-                          'name': '#samples'})
-        chart.set_size({'width': 380, 'height': 288})
-        sh.insert_chart(1, 5, chart)
-
-        row_offset = row_offset + len(counts) + 7
-        sh.write_string(row_offset, 1, 'm/z range distribution (in ppm)')        
-
-        range_hist =  aligned_spectra.alignment_stats.range_hist
-        bins = range_hist[1]
-        counts = range_hist[0]
-        for i, c in enumerate(counts):
-            interval = '[{:3.1f}, {:3.1f}['.format(bins[i], bins[i+1])
-            sh.write_string(row_offset + 1 + i, 2, interval)
-            sh.write(row_offset + 1 + i, 3, c)            
-
-        row_offset = row_offset + len(counts) + 1
-        excess_ranges = aligned_spectra.alignment_stats.excess_ranges
-        if len(excess_ranges) > 0:
-            sh.write_string(row_offset, 1, 'Peaks with m/z range in excess of tolerance')
-            for i, elem in enumerate(excess_ranges.itertuples()):
-                sh.write_string(row_offset + 1 + i, 2, elem[0])
-                sh.write(row_offset + 1 + i, 3, elem[1])
-        else:
-            sh.write_string(row_offset, 1, 'No peaks found with m/z range > {}'.format(bins[-1])) 
-            i = 1
-
-        row_offset = row_offset + i + 3
-
-        sh.write_string(row_offset, 1, 'Sample sizes')        
-
-        row_offset = row_offset + 2
-        
-        sample_intersection_counts = sim.sample_intersection_counts
-        sample_similarity_jaccard = sim.sample_similarity_jaccard
-        label_intersection_counts = sim.label_intersection_counts
-        label_similarity_jaccard = sim.label_similarity_jaccard
-        unique_labels = sim.unique_labels
-        sample_names = sim.sample_names
-
-        sh.write_row(row_offset, 1, aligned_spectra.sample_names)
-        for i in range(sample_intersection_counts.shape[0]):
-            sh.write_number(row_offset + 1, 1 + i, sample_intersection_counts[i, i])
-
-        row_offset = row_offset + 4
-        
-        sh.write_string(row_offset, 1, 'Sample similarity, common peak counts')
-        
-        row_offset = row_offset + 2
-
-        sh.write_row(row_offset, 2, sample_names)
-        sh.write_column(row_offset + 1, 1, sample_names)
-        for i in range(sample_intersection_counts.shape[0]):
-            sh.write_row(row_offset + i + 1, 2, sample_intersection_counts[i, :])
-            
-        sh.write_string(row_offset, 1, 'Sample similarity, Jaccard indexes')
-        
-        row_offset = row_offset + sample_intersection_counts.shape[0] + 3
-
-        sh.write_row(row_offset, 2, sample_names)
-        sh.write_column(row_offset + 1, 1, sample_names)
-        for i in range(sample_similarity_jaccard.shape[0]):
-            sh.write_row(row_offset + i + 1, 2, sample_similarity_jaccard[i, :])
-            
-        if label_intersection_counts is not None:
-            row_offset = row_offset + sample_similarity_jaccard.shape[0] + 3
-            
-            sh.write_string(row_offset, 1, 'Label similarity, common peak counts')
-            
-            row_offset = row_offset + 2
-
-            sh.write_row(row_offset, 2, unique_labels)
-            sh.write_column(row_offset + 1, 1, unique_labels)
-            for i in range(label_intersection_counts.shape[0]):
-                sh.write_row(row_offset + i + 1, 2, label_intersection_counts[i, :])
-
-            row_offset = row_offset + label_intersection_counts.shape[0] + 3
-            
-            sh.write_string(row_offset, 1, 'Label similarity, Jaccard indexes')
-            
-            row_offset = row_offset + 2
-
-            sh.write_row(row_offset, 2, unique_labels)
-            sh.write_column(row_offset + 1, 1, unique_labels)
-            for i in range(label_similarity_jaccard.shape[0]):
-                sh.write_row(row_offset + i + 1, 2, label_similarity_jaccard[i, :])
-
-    writer.save()
-    print('Created file\n{}'.format(fname))
 
 
 if __name__ == '__main__':
@@ -741,71 +520,87 @@ if __name__ == '__main__':
 """
 
     from six import StringIO
+    from metabolinks.dataio import read_data_csv, read_data_from_xcel
 
     sampledata = [StringIO(s()) for s in (_sample1, _sample2, _sample3)]
-    
+
     print('Reading spectra to align ------------')
-    samples = [read_spectrum(s) for s in sampledata]
+    samples = [read_data_csv(s) for s in sampledata]
     for sample in samples:
         print(sample,'\n')
         print('------------')
 
     ppmtol = 1.0
     min_samples = 1
-    
-    inputs = samples
-    
-    aligned = align_spectra(inputs, verbose=True)
+
+    aligned, desc = align_spectra(samples, return_alignment_desc=True, verbose=True)
     print('\n--- Result: --------------------')
     print(aligned)
+    print('\n--- groups: --------------------')
+    print(desc)
     print('=========================')
     print('\n\nTESTING alignment with aligned inputs')
-    
-    inputs = samples[:2]
-    
-    aligned2 = align_spectra(inputs, verbose=True)
+
+    aligned2, desc = align_spectra(samples[:2], return_alignment_desc=True, verbose=True)
     print('\n--- Result: --------------------')
     print(aligned2)
+    print('\n--- groups: --------------------')
+    print(desc)
     print('-----------------------------------------')
     print('Now the final alignment')
-    
-    inputs = [aligned2, samples[2]]
-    
-    aligned_mix = align_spectra(inputs, verbose=True)
-    print('\n--- Result: --------------------')    
+
+    aligned_mix, desc = align_spectra([aligned2, samples[2]], return_alignment_desc=True, verbose=True)
+    print('\n--- Result: --------------------')
     print(aligned_mix)
-       
+    print('\n--- groups: --------------------')
+    print(desc)
+
     print('=========================')
     print('\n\nTESTING alignment with min_samples cutoff')
     inputs = samples
-    
-    aligned = align_spectra(inputs, min_samples=2, verbose=True)
+
+    aligned, desc = align_spectra(samples, min_samples=2, return_alignment_desc=True, verbose=True)
     print('\n--- Result: --------------------')
     print(aligned)
-    
-    
+    print('\n--- groups: --------------------')
+    print(desc)
+
     print('=========================')
     print('\n\nTESTING alignment with several input sets from an Excel file')
+
     ppmtol = 1.0
     min_samples = 1
-    fname = 'data/data_to_align.xlsx'
-    out_fname = 'data/aligned_data.xlsx'
-
-    header_row = 2
-    sample_names = ['S1', 'S2', 'S3']
     labels = ['wt', 'mod', 'mod']
-    sample_names = 1
 
-    aligned = align_spectra_in_excel(fname,
-                           save_to_excel=out_fname,
-                           ppmtol=ppmtol,
-                           min_samples=min_samples,
-                           labels=labels,
-                           header_row=header_row,
-                           sample_names=sample_names)
-        
-    print('+++++++++++++++++++++++++++++++++++++++++++++++++++++')
-    for sheetname in aligned:
-        print(aligned[sheetname])
-        print('-----------------------------------')
+    # Reading from Excel ----------
+    file_name = 'sample_data.xlsx'
+    out_fname = 'aligned_data.xlsx'
+    import os
 
+    _THIS_DIR, _ = os.path.split(os.path.abspath(__file__))
+    fname = os.path.join(_THIS_DIR, 'data', file_name)
+
+    data_sets = read_data_from_xcel(fname, header=[0, 1], drop_header_levels=1)
+
+    print('------ Aligning tables in each Excel sheet...')
+    results_sheets = {}
+    for d in data_sets:
+        print('\n++++++++++++++', d)
+        aligned, desc = align_spectra(data_sets[d], min_samples=min_samples, 
+                                              ppmtol=ppmtol,
+                                              return_alignment_desc=True,
+                                              verbose=True)
+        aligned = aligned.ums.add_labels(labels)
+        aligned.columns.names = ['label', 'sample']
+        # aligned.ms.samples = sample_names
+        print('\n--- Result: --------------------')
+        print(aligned)
+        results_sheets[d] = aligned
+        results_sheets['groups {}'.format(d)] = desc
+        print('+++++++++++++++++++++++++++++')
+
+    ofname = os.path.join(_THIS_DIR, 'data', out_fname)
+
+    with pd.ExcelWriter(ofname) as writer:
+        for sname in results_sheets:
+            results_sheets[sname].to_excel(writer, sheet_name=sname)
