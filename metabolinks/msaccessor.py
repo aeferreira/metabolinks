@@ -279,6 +279,13 @@ class MSAccessor(object):
             self._df.columns = self._df.columns.remove_unused_levels()
         return self._df.copy()
 
+def add_labels(df, labels=None, level_name="label"):
+    newcols = create_multiindex_with_labels(
+        df, labels=labels, level_name=level_name
+    )
+    df.columns = newcols
+    return df.copy()
+
 
 @register_dataframe_accessor("ums")
 class UMSAccessor(object):
@@ -442,9 +449,9 @@ class UMSAccessor(object):
             df.columns = df.columns.remove_unused_levels()
         return df
 
-    def add_labels(self, labels=None, level_name="label"):
-        newcols = create_multiindex_with_labels(
-            self._df, labels=labels, level_name=level_name
-        )
-        self._df.columns = newcols
-        return self._df.copy()
+    # def add_labels(self, labels=None, level_name="label"):
+    #     newcols = create_multiindex_with_labels(
+    #         self._df, labels=labels, level_name=level_name
+    #     )
+    #     self._df.columns = newcols
+    #     return self._df.copy()

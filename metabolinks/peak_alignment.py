@@ -520,7 +520,8 @@ if __name__ == '__main__':
 """
 
     from six import StringIO
-    from metabolinks.dataio import read_data_csv, read_data_from_xcel
+    from metabolinks import add_labels, read_data_csv, read_data_from_xcel
+    #from metabolinks.dataio import read_data_csv, read_data_from_xcel
 
     sampledata = [StringIO(s()) for s in (_sample1, _sample2, _sample3)]
 
@@ -590,7 +591,7 @@ if __name__ == '__main__':
                                               ppmtol=ppmtol,
                                               return_alignment_desc=True,
                                               verbose=True)
-        aligned = aligned.ums.add_labels(labels)
+        aligned = add_labels(aligned, labels)
         aligned.columns.names = ['label', 'sample']
         # aligned.ms.samples = sample_names
         print('\n--- Result: --------------------')

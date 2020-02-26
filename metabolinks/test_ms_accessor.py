@@ -1,5 +1,6 @@
 from six import StringIO
 import pandas as pd
+from metabolinks import add_labels
 import metabolinks.dataio as dataio
 import metabolinks.datasets as datasets
 import metabolinks.transformations as transformations
@@ -140,7 +141,7 @@ print(list(asample))
 
 print('\nadding labels again')
 print('--- adding L1, L2 ----------')
-newdataset = dataset_unlabeled.ums.add_labels(labels=['L1', 'L2'])
+newdataset = add_labels(dataset, labels=['L1', 'L2'])
 print(newdataset)
 
 print('-----++++++ ML data ++++++------')
