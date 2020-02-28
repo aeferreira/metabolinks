@@ -41,8 +41,9 @@ def mz_similarity(dataset, has_labels=False):
             jaccard = ni12 / len(u12)
             jaccard_matrix[i2, i1] = jaccard
             jaccard_matrix[i1, i2] = jaccard
-    similarities.sample_intersection_counts = common_matrix
-    similarities.sample_similarity_jaccard = jaccard_matrix
+
+    similarities.sample_intersection_counts = pd.DataFrame(common_matrix, columns=sample_names, index=sample_names)
+    similarities.sample_similarity_jaccard = pd.DataFrame(jaccard_matrix, columns=sample_names, index=sample_names)
     
     if has_labels:
         labels = acc.unique_labels
@@ -71,8 +72,8 @@ def mz_similarity(dataset, has_labels=False):
                 jaccard = ni12 / len(u12)
                 jaccard_matrix[i2, i1] = jaccard
                 jaccard_matrix[i1, i2] = jaccard
-        similarities.label_intersection_counts = common_matrix
-        similarities.label_similarity_jaccard = jaccard_matrix
+        similarities.label_intersection_counts = pd.DataFrame(common_matrix, columns=labels, index=labels)
+        similarities.label_similarity_jaccard = pd.DataFrame(jaccard_matrix, columns=labels, index=labels)
         similarities.unique_labels = labels
     return similarities
 
@@ -89,28 +90,15 @@ class SimilarityMeasures(object):
     
     def __str__(self):
         res = ['\nSample similarity, counts of common peaks']
-        df = pd.DataFrame(self.sample_intersection_counts,
-                          columns=self.sample_names,
-                          index=self.sample_names)
-        res.append(str(df))
+        res.append(str(self.sample_intersection_counts))
         res.append('\nSample similarity, Jaccard indexes')
-        df = pd.DataFrame(self.sample_similarity_jaccard,
-                          columns=self.sample_names,
-                          index=self.sample_names)
-        res.append(str(df))
-        
-            
+        res.append(str(self.sample_similarity_jaccard))
+
         if self.label_intersection_counts is not None:
             res.append('\nLabel similarity, counts of common peaks')
-            df = pd.DataFrame(self.label_intersection_counts,
-                              columns=self.unique_labels,
-                              index=self.unique_labels)
-            res.append(str(df))
+            res.append(str(self.label_intersection_counts))
             res.append('\nLabel similarity, Jaccard indexes')
-            df = pd.DataFrame(self.label_similarity_jaccard,
-                              columns=self.unique_labels,
-                              index=self.unique_labels)
-            res.append(str(df))
+            res.append(str(self.label_similarity_jaccard))
         return "\n".join(res)
 
 if __name__ == "__main__":
