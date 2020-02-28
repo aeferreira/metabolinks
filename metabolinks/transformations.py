@@ -5,18 +5,22 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from metabolinks import msaccessor
+import metabolinks as mtls
 from metabolinks.utils import _is_string
 
 # ---------- imputation of missing values -------
 
 def fillna_zero(df):
+    """Set NaN to zero."""
     return df.fillna(0.0)
 
 def fillna_value(df, value=0.0):
+    """Set NaN to value."""
     return df.fillna(value)
 
 def fillna_frac_min(df, fraction=0.5):
+    """Set NaN to a fraction of the minimum value in whole DataFrame."""
+
     minimum = df.min().min()
     # print(minimum)
     minimum = minimum * fraction
@@ -24,6 +28,55 @@ def fillna_frac_min(df, fraction=0.5):
 
 # ---------- filters for reproducibility
 
+def keep_atleast(df, min_samples=1):
+    """Keep only features wich occur at least in min_samples.
+
+       If 0 < min_samples < 1, this should be interpreted as a fraction."""
+
+    counts = df.count(axis=1)
+    # a float in (0,1) means a fraction
+    if 0.0 < min_samples < 1.0:
+        n = len(df.columns)
+        min_samples = min_samples * float(n)
+
+    return df[counts >= min_samples]
+
+def keep_atleast_inlabels(df, min_samples=1):
+    """Keep only features wich occur at least in min_samples in each label.
+
+       If 0 < min_samples < 1, this should be interpreted as a fraction.
+       Features may not be removed: they are marked as NaN in each label
+       with less than min_samples, but can be kept because of their presence
+       in other labels. Nevertheless, a final removal of 'all Nan' features is performed."""
+
+    # print('****** df *********')
+    # print(df)
+    # print('*******************')
+    for label in df.ms.unique_labels:
+        # get a copy of label data
+        df_label = df.ms.subset(label=label)
+        old_index = df_label.index.copy()
+        # print('----- Label {} -------'.format(label))
+        # print('------------------------')
+        # print(df_label)
+
+        counts = df_label.count(axis=1)
+        # a float in (0,1) means a fraction
+        if 0.0 < min_samples < 1.0:
+            n = len(df_label.columns)
+            min_samples = min_samples * float(n)
+        df_label = df_label[counts >= min_samples].reindex(old_index, method=None)
+        # print('------ after removal ---')
+        # print(df_label)
+        bool_loc = df.ms.subset_where(label=label)
+        df = df.mask(bool_loc, df_label)
+        # print('+++++++ current df +++++++')
+        # print(df)
+        # print('++++++++++++++++++++++++++')
+    # print('****** final df *********')
+    # print(df.dropna(how='all'))
+    # print('*************************')
+    return df.dropna(how='all')
 
 # ----------------------------------------
 # MassTRIX related functions
@@ -105,14 +158,24 @@ if __name__ == "__main__":
     print(dataset.ms.info(all_data=True))
     print('-----------------------')
 
-    print('--- fillna_zero ----------')
+    print('\n--- fillna_zero ----------')
     new_data = fillna_zero(dataset)
     print(new_data)
     print('--- fillna_value  10 ----------')
     new_data = fillna_value(dataset, value=10)
     print(new_data)
-    print('--- fillna_value ----------')
+    print('--- fillna_frac_min default fraction=0.5 minimum ----------')
     new_data = fillna_frac_min(dataset)
+    print(new_data)
+
+    print('\n--- keep_atleast min_samples=3 ----------')
+    new_data = keep_atleast(dataset, min_samples=3)
+    print(new_data)
+    print('--- keep_atleast min_samples=5/6 ----------')
+    new_data = keep_atleast(dataset, min_samples=5/6)
+    print(new_data)
+    print('\n--- keep_atleast_inlabels min_samples=2 ----------')
+    new_data = keep_atleast_inlabels(dataset, min_samples=2)
     print(new_data)
 
 
