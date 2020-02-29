@@ -56,17 +56,44 @@ print('--- label l2 ----------')
 asample = dataset.ms.features(label='l2')
 print(asample.values)
 
-print('\nUsing subset_where to double label l2 ----')
-print(dataset)
-print('\n--original data with sorted column index -')
-dataset = dataset.sort_index(axis='columns')
-print(dataset)
+print('\nUsing subset_iloc to double label l2 ----')
+newdataset = dataset.copy()
+print(newdataset)
 print('\n-- label l2 replaced by double -------------')
-double = dataset.ms.subset(label='l2') * 2
-bool_loc = dataset.ms.subset_where(label='l2')
-dataset = dataset.mask(bool_loc, double)
+double = newdataset.ms.subset(label='l2') * 2
+iloc = newdataset.ms.subset_iloc(label='l2')
+print(iloc)
+newdataset.iloc[:, iloc] = double
+print(newdataset)
+print(newdataset.ms.info())
+
+print('\nUsing subset_loc to double label l2 ----')
+newdataset = dataset.copy()
+print(newdataset)
+# print('\n--original data with sorted column index -')
+# newdataset = newdataset.sort_index(axis='columns')
+# print(newdataset)
+print('\n-- label l2 replaced by double -------------')
+double = newdataset.ms.subset(label='l2') * 2
+loc = newdataset.ms.subset_loc(label='l2')
+print(loc)
+newdataset.loc[:, loc] = double
+print(newdataset)
+print(newdataset.ms.info())
+
+print('\nUsing subset_where to double label l2 ----')
+newdataset = dataset.copy()
+print(newdataset)
+print('\n--original data with sorted column index -')
+newdataset = newdataset.sort_index(axis='columns')
+print(newdataset)
+print('\n-- label l2 replaced by double -------------')
+double = newdataset.ms.subset(label='l2') * 2
+bool_loc = newdataset.ms.subset_where(label='l2')
+newdataset = newdataset.mask(bool_loc, double)
 #dataset[bool_loc] = double
-print(dataset)
+print(newdataset)
+print(newdataset.ms.info())
 
 print('\nData transformations using pipe ----')
 print('--- using fillna_zero ----------')
@@ -144,7 +171,7 @@ print('--- adding L1, L2 ----------')
 newdataset = add_labels(dataset, labels=['L1', 'L2'])
 print(newdataset)
 
-print('-----++++++ ML data ++++++------')
+print('\n\n-----++++++ ML data ++++++------')
 print('\nReading sample data with labels (as io stream) ------------\n')
 data = dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
 print(dataset)

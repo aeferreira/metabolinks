@@ -223,7 +223,7 @@ class MSAccessor(object):
                 if s not in self.labels:
                     raise KeyError(f"'{s}' is not a label")
                 indexer.append(s)
-            indexer = (indexer,)
+            #indexer = (indexer,)
             return indexer
         else:
             raise KeyError("Sample name or label not found")
@@ -232,8 +232,10 @@ class MSAccessor(object):
         if sample is None and label is None:
             df = self._df
         else:
-            col_indexer = self._get_subset_data_indexer(sample=sample, label=label)
-            df = self._df.loc[:, col_indexer]
+            col_indexer = self.subset_iloc(sample=sample, label=label)
+            df = self._df.iloc[:, col_indexer]
+            # col_indexer = self._get_subset_data_indexer(sample=sample, label=label)
+            # df = self._df.loc[:, col_indexer]
         df = df.copy() if no_drop_na else df.dropna(how="all")
         if isinstance(df, pd.DataFrame):
             df.columns = df.columns.remove_unused_levels()
@@ -253,10 +255,57 @@ class MSAccessor(object):
         return df.index
 
     def subset_where(self, sample=None, label=None):
+        """return a boolean DataFrame with the location of subset."""
         df = pd.DataFrame(False, index=self._df.index, columns=self._df.columns)
         col_indexer = self._get_subset_data_indexer(sample=sample, label=label)
         df.loc[:, col_indexer] = True
         return df
+
+    def subset_loc(self, sample=None, label=None):
+        """return an indexing list col_indexer to be used with .loc[:, col_indexer] for a subset."""
+        col_indexer = self._get_subset_data_indexer(sample=sample, label=label)
+        return col_indexer
+
+    def subset_iloc(self, sample=None, label=None):
+        """return an indexing list col_indexer to be used with .iloc[:, col_indexer] for a subset."""
+        if sample is None and label is None:
+            return list(range(len(self._df.columns)))
+        self._df.columns = self._df.columns.remove_unused_levels()
+        if sample is not None:
+            if _is_string(sample):
+                samples = [sample]
+            else:
+                samples = list(sample)
+            for s in samples:
+                if s not in self.samples:
+                    raise KeyError(f"'{s}' is not a sample name")
+            indexer = []
+            list_samples = list(self.samples)
+            for i, s in enumerate(list_samples):
+                if s in samples:
+                    indexer.append(i)
+            if len(indexer) == 1:
+                indexer = indexer[0]
+            return indexer
+        elif sample is None and label is not None:
+            if _is_string(label):
+                labels = [label]
+            else:
+                labels = list(label)
+            for s in labels:
+                if s not in self.labels:
+                    raise KeyError(f"'{s}' is not a label")
+            indexer = []
+            list_labels = list(self.labels)
+            for i, lbl in enumerate(list_labels):
+                if lbl in labels:
+                    indexer.append(i)
+            if len(indexer) == 1:
+                indexer = indexer[0]
+            return indexer
+        else:
+            raise KeyError("Sample name or label not found")
+        return indexer
 
     def pipe(self, func, drop_na=True, **kwargs):
         """Thin wrapper around DataFrame.pipe() with automatic dropna and housekeeping."""
@@ -449,9 +498,9 @@ class UMSAccessor(object):
             df.columns = df.columns.remove_unused_levels()
         return df
 
-    # def add_labels(self, labels=None, level_name="label"):
-    #     newcols = create_multiindex_with_labels(
-    #         self._df, labels=labels, level_name=level_name
-    #     )
-    #     self._df.columns = newcols
-    #     return self._df.copy()
+    def add_labels(self, labels=None, level_name="label"):
+        newcols = create_multiindex_with_labels(
+            self._df, labels=labels, level_name=level_name
+        )
+        self._df.columns = newcols
+        return self._df.copy()
