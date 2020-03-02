@@ -91,7 +91,9 @@ def normalize_ref_feature(df, feature, remove=True):
        """
 
     # find position of feature
-    pos = df.index.get_loc(feature, method='pad')
+    new_index, indexer = df.index.sort_values(return_indexer=True)
+    pos = new_index.get_loc(feature, method='pad')
+    pos = indexer[pos]
     feature_row = df.iloc[pos, :]
     df = df / feature_row
     if remove:
@@ -116,34 +118,34 @@ def glog(df, lamb=None):
     y = np.log2((y + (y**2 + lamb**2)**0.5)/2)
     return pd.DataFrame(y, index=df.index, columns=df.columns)
 
-# Function to do Pareto Scaling, it accomodates Missing Values.
 
-# def ParetoScal(Spectra):
-#     """Performs Pareto Scaling on an AlignedSpectra object.
+def pareto_scale(df):
+    """Performs Pareto Scaling on a DataFrame."""
 
-#        Spectra: Aligned Spectra object (from metabolinks). It can include missing values.
+    means = df.mean(axis=1)
+    stds = df.std(axis=1) ** 0.5
+    df2 = df.sub(means, axis=0).div(stds, axis=0)
+    return df2
 
-#        Returns: Aligned Spectra object (from metabolinks); Pareto Scaled Spectra."""
+    # scaled_aligned = df.data.copy()
+    # for j in range(0, len(scaled_aligned)):
+    #     std = df.data.iloc[j, ].std()
+    #     sqstd = std**(0.5)
+    #     values = df.data.iloc[j, ]
+    #     # Apply Pareto Scaling to each value
+    #     values = (values - values.mean())/sqstd
+    #     # Replace not null values by the scaled values
+    #     if len(values) == df.sample_count:
+    #         scaled_aligned.iloc[j, :] = values
+    #     else:
+    #         a = 0
+    #         for i in range(0, len(df.sample_count)):
+    #             if scaled_aligned.notnull().iloc[j, i]:
+    #                 scaled_aligned.iloc[j, i] = values.iloc[a, 0]
+    #                 a = a + 1
 
-#     scaled_aligned = Spectra.data.copy()
-#     for j in range(0, len(scaled_aligned)):
-#         std = Spectra.data.iloc[j, ].std()
-#         sqstd = std**(0.5)
-#         values = Spectra.data.iloc[j, ]
-#         # Apply Pareto Scaling to each value
-#         values = (values - values.mean())/sqstd
-#         # Replace not null values by the scaled values
-#         if len(values) == Spectra.sample_count:
-#             scaled_aligned.iloc[j, :] = values
-#         else:
-#             a = 0
-#             for i in range(0, len(Spectra.sample_count)):
-#                 if scaled_aligned.notnull().iloc[j, i]:
-#                     scaled_aligned.iloc[j, i] = values.iloc[a, 0]
-#                     a = a + 1
-
-#     # Return scaled spectra
-#     return AlignedSpectra(scaled_aligned, sample_names=Spectra.sample_names, labels=Spectra.labels)
+    # # Return scaled spectra
+    # return AlignedSpectra(scaled_aligned, sample_names=Spectra.sample_names, labels=Spectra.labels)
 
 # def spectra_proc(Spectra, minsample=0, Feat_mass=False, remove=True, lamb= 'False', Pareto = True):
 #     """Performs any combination of Missing Value Imputation, Normalization by a reference feature, Generalized Logarithmic 
@@ -280,4 +282,13 @@ if __name__ == "__main__":
     print(dataset)
     print('------after normalizing by 97.59001 -----------------')
     new_data = normalize_ref_feature(data, 97.59001)
+    print(new_data)
+
+    # read sample data set
+    print('\npareto scaling ------------\n')
+    print('---- original -------------------')
+    data = dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
+    print(dataset)
+    print('------after Pareto scaling -----------------')
+    new_data = pareto_scale(data)
     print(new_data)
