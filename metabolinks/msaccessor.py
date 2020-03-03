@@ -193,7 +193,7 @@ class MSAccessor(object):
 
     def samples_of(self, label):
         """Get a list of sample names from label"""
-        snames = [lbl for s, lbl in self._get_zip_labels_samples() if lbl == label]
+        snames = [s for lbl, s in self._get_zip_labels_samples() if lbl == label]
         return snames
 
     def _get_subset_data_indexer(self, sample=None, label=None, no_drop_na=False):

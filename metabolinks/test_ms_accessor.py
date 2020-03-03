@@ -33,7 +33,12 @@ print('-- info --------------')
 print(dataset.ms.info())
 print('-- global info---------')
 print(dataset.ms.info(all_data=True))
+print('-- label of s39 --------------')
+print(dataset.ms.label_of('s39'))
+print('-- samples of l2 --------------')
+print(dataset.ms.samples_of('l2'))
 print('-----------------------')
+
 
 print('\nretrieving subsets of data ----------')
 print('--- sample s39 ----------')
