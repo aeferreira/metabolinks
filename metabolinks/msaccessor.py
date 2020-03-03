@@ -76,8 +76,9 @@ class MSAccessor(object):
         """The Pandas DataFrame holding the data, transposed to be usable as tidy"""
         res = {'X_matrix': self._df.transpose(copy=True).values,
                'target': self.labels.values.copy(),
-               'names': self.samples.values.copy(),
-               'feature_names': self.features().values}
+               'sample_names': self.samples.values.copy(),
+               'feature_names': self.features().values,
+               'unique_labels': self.unique_labels}
         return res
 
     def _get_zip_labels_samples(self):
