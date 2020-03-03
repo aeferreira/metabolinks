@@ -105,10 +105,10 @@ def normalize_ref_feature(df, feature, remove=True):
 def glog(df, lamb=None):
     """Performs Generalized Logarithmic Transformation on a Spectra (same as MetaboAnalyst's transformation).
 
-       Spectra: AlignedSpectra object (from metabolinks).
-       lamb: scalar, optional (default: True);  transformation parameter, if True lamb = minimum value in the data divided by 10.
+       df: Pandas DataFrame.
+       lamb: scalar, optional (default: minimum value in the data divided by 10); transformation parameter lambda.
 
-       Returns: AlignedSpectra object (from metabolinks); transformed spectra by a factor of log(y + (y**2 + lamb**2)**0.5).
+       Returns: DataFrame transformed as log2(y + (y**2 + lamb**2)**0.5).
        """
     # Default lambda
     if lamb is None:
@@ -126,54 +126,6 @@ def pareto_scale(df):
     stds = df.std(axis=1) ** 0.5
     df2 = df.sub(means, axis=0).div(stds, axis=0)
     return df2
-
-    # scaled_aligned = df.data.copy()
-    # for j in range(0, len(scaled_aligned)):
-    #     std = df.data.iloc[j, ].std()
-    #     sqstd = std**(0.5)
-    #     values = df.data.iloc[j, ]
-    #     # Apply Pareto Scaling to each value
-    #     values = (values - values.mean())/sqstd
-    #     # Replace not null values by the scaled values
-    #     if len(values) == df.sample_count:
-    #         scaled_aligned.iloc[j, :] = values
-    #     else:
-    #         a = 0
-    #         for i in range(0, len(df.sample_count)):
-    #             if scaled_aligned.notnull().iloc[j, i]:
-    #                 scaled_aligned.iloc[j, i] = values.iloc[a, 0]
-    #                 a = a + 1
-
-    # # Return scaled spectra
-    # return AlignedSpectra(scaled_aligned, sample_names=Spectra.sample_names, labels=Spectra.labels)
-
-# def spectra_proc(Spectra, minsample=0, Feat_mass=False, remove=True, lamb= 'False', Pareto = True):
-#     """Performs any combination of Missing Value Imputation, Normalization by a reference feature, Generalized Logarithmic 
-#     Transformation and Pareto Scaling of the dataset.
-
-#        Spectra: Aligned Spectra object (from metabolinks). It can include missing values.
-#        minsample: scalar, optional; number between 0 and 1, minsample*100 represents the minimum % of samples where the feature must 
-#     be present in order to not be removed.
-#        Feat_mass: scalar (default: False); m/z of the reference feature to normalize the sample. False - Normalization is not performed.
-#        remove: bool (deafult: True); True to remove reference feature from data after normalization.
-#        lamb: scalar (default - 'False');  transformation parameter, if 'False', glog transformation is not performed.
-#        Pareto: bool (default - True); if True performs Pareto Scaling.
-
-#        Returns: Processed Aligned Spectra object (from metabolinks).
-#     """
-#     if minsample != 100: #Missing Value Imputation
-#         Spectra = NaN_Imputation(Spectra, minsample)
-
-#     if Feat_mass != False: #Normalization by a reference feature
-#         Spectra = Norm_Feat(Spectra, Feat_mass, remove = remove)
-
-#     if lamb != 'False': #glog transformation
-#         Spectra = glog(Spectra, lamb)
-
-#     if Pareto != False: #Pareto Scaling
-#         Spectra = ParetoScal(Spectra)
-#     return Spectra
-
 
 # ----------------------------------------
 # MassTRIX related functions
