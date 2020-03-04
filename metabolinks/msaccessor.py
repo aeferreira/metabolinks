@@ -1,7 +1,8 @@
-"""Accessors to Pandas DataFrame to interpret content as MS data.
+"""Accessors to Pandas DataFrame interpreting metadata in the column index.
 
    Two versions: 'ms' assumes labeled data, 'ums' assumes unlabeled data"""
 
+from collections import namedtuple
 import numpy as np
 import pandas as pd
 
@@ -31,6 +32,7 @@ def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
     newcols = [tuple([ns] + c) for (ns, c) in zip(newstrs, tcols)]
     return pd.MultiIndex.from_tuples(newcols, names=[level_name] + metanames)
 
+DataParts = namedtuple('DataParts', 'data_matrix labels names features unique_labels')
 
 @register_dataframe_accessor("ms")
 class MSAccessor(object):
@@ -74,11 +76,11 @@ class MSAccessor(object):
     @property
     def data(self):
         """The Pandas DataFrame holding the data, transposed to be usable as tidy"""
-        res = {'X_matrix': self._df.transpose(copy=True).values,
-               'target': self.labels.values.copy(),
-               'sample_names': self.samples.values.copy(),
-               'feature_names': self.features().values,
-               'unique_labels': self.unique_labels}
+        res = DataParts(data_matrix=self._df.transpose(copy=True).values,
+                        labels=self.labels.values.copy(),
+                        names=self.samples.values.copy(),
+                        features=self.features().values,
+                        unique_labels=self.unique_labels)
         return res
 
     def _get_zip_labels_samples(self):
@@ -329,12 +331,9 @@ class MSAccessor(object):
             self._df.columns = self._df.columns.remove_unused_levels()
         return self._df.copy()
 
-def add_labels(df, labels=None, level_name="label"):
-    newcols = create_multiindex_with_labels(
-        df, labels=labels, level_name=level_name
-    )
-    df.columns = newcols
-    return df.copy()
+def add_labels(df, **kwargs):
+    return df.ums.add_labels(**kwargs)
+
 
 
 @register_dataframe_accessor("ums")
@@ -499,9 +498,10 @@ class UMSAccessor(object):
             df.columns = df.columns.remove_unused_levels()
         return df
 
-    def add_labels(self, labels=None, level_name="label"):
+    def add_labels(self, labels=None, level_name="label", from_feature=None, from_level=None):
         newcols = create_multiindex_with_labels(
             self._df, labels=labels, level_name=level_name
         )
+        # TODO: use from_feature and from_level
         self._df.columns = newcols
         return self._df.copy()

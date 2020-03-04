@@ -1,5 +1,7 @@
 """Similarity of peak lists based on peak assignments (m/z, formulae)."""
 
+from itertools import chain, combinations
+
 import numpy as np
 import pandas as pd
 
@@ -101,6 +103,107 @@ class SimilarityMeasures(object):
             res.append(str(self.label_similarity_jaccard))
         return "\n".join(res)
 
+def common(objects):
+    """Given a list `objects` of data objects, compute common features (intersection).
+    
+       Accepts a sequence of Index, Series or DataFrame.
+       Returns an Index with common features"""
+    
+    # ensure a list of Indexes
+    if not objects:
+        return pd.Index([])
+    if hasattr(objects[0], 'index'):
+        objects = [s.index for s in objects]
+    # Calculate intersection
+    index = objects[0]
+    for right in objects[1:]:
+        index = index.intersection(right)
+    return index
+
+def exclusive(objects):
+    """Given a list `objects` of data objects, compute exclusive features for each object.
+    
+       Accepts a sequence of Index, Series or DataFrame.
+       Returns a list of Indexes with exclusive features for each object."""
+    
+    # ensure a list of Indexes
+    if not objects:
+        return pd.Index([])
+    if hasattr(objects[0], 'index'):
+        objects = [s.index for s in objects]
+
+    # concat all indexes
+    concatenation = objects[0]
+    for right in objects[1:]:
+        concatenation = concatenation.append(right)
+    
+    # find indexes that occur only once
+    reps = concatenation.value_counts()
+    exclusive_feature_counts = reps[reps == 1]
+    
+    # keep only those in each sample
+
+    exclusive = [s[s.isin(exclusive_feature_counts.index)] for s in objects]
+    return exclusive
+
+def compute_Venn_features(objects, names, max_intersections=None):
+    """Computes a dict {tuple: index} suitable to fill Venn diagrams of common features.
+
+       Names of objects are used in the tuples (dict keys). A single name means exclusive features
+       more than two names means features for the given slot in the Venn diagram.
+       dict values are Indexes, representing features: their len() will provide counts,
+       but they can be used to index DataFrames to obtain data.
+       
+       Since the returned dict results from a 'power set' enumeration, (size 2**n -1), argument
+       `max_intersections` can be used to restrict the size of the result.
+       For example, if `max_intersections` == 2, then only exclusive or pair
+       intersections are computed."""
+       
+    if max_intersections is None:
+        max_intersections = len(objects)
+    
+    # ensure a list of Indexes
+    if not objects:
+        return {}
+    if hasattr(objects[0], 'index'):
+        objects = [obj.index for obj in objects]
+
+    # concat all indexes
+    concatenation = objects[0]
+    for right in objects[1:]:
+        concatenation = concatenation.append(right)
+    
+    # find ocorrence counts of features
+    reps = concatenation.value_counts()
+    
+    # group features by number of ocorrences
+    count_groups = [reps[reps == (i+1)].index for i in range(max_intersections)]
+    # for i, c in enumerate(count_groups):
+    #     print('----------------')
+    #     print(i+1, '--->', list(c))
+    #     print('----------------')
+
+    # enumerate power set
+    res = {}
+
+    s = list(range(len(objects)))
+    for t in chain.from_iterable(combinations(s, r) for r in range(len(s)+1)):
+        if len(t) > max_intersections:
+            break
+        elif len(t) == 0:
+            # empty subset, skip
+            continue
+        else:
+            # common features with exactely len(t) ocorrences
+            if len(t) == 1:
+                all_feats = objects[t[0]]
+            else:
+                all_feats = common([objects[i] for i in t])
+            features = all_feats[all_feats.isin(count_groups[len(t)-1])]
+            subset_names = tuple([names[i] for i in t])
+            res[subset_names] = features
+    return res
+
 if __name__ == "__main__":
     import six
     print('Reading from string data (as io stream) with labels------------\n')
@@ -115,3 +218,52 @@ if __name__ == "__main__":
     similarities = mz_similarity(dataset, has_labels=True)
     print(similarities)
 
+    print('***** FEATURE OVERLAP (AND VENN DIAGRAM CALCULATIONS ****')
+    print('--- example data sets')
+    s1 = pd.DataFrame({'Bucket label': ['A0', 'A1', 'A2', 'A3'],
+                        'Name': ['B0', np.nan, 'B2', 'B3'],
+                        'Formula': ['C0', 'C1', 'C2', 'C3']},
+                        index=[0, 1, 2, 3]).set_index('Bucket label')
+    s2 = pd.DataFrame({'Bucket label': ['A0', 'A1', 'A2', 'A4'],
+                        'Name': ['B0', np.nan, 'B2', 'B4'],
+                        'Formula': ['C0', 'C1', 'C2', 'C4']},
+                        index=[0, 1, 2, 3]).set_index('Bucket label')
+
+    s3 = pd.DataFrame({'Bucket label': ['A0', 'A1', 'A4', 'A7'],
+                        'Name': ['B0', np.nan, 'B4', 'B7'],
+                        'Formula': ['C0', 'C1', 'C4', 'C7']},
+                        index=[0, 1, 2, 3]).set_index('Bucket label')
+    print(s1, end='\n------------------------\n')
+    print(s2, end='\n------------------------\n')
+    print(s3)
+
+    samples = [s1, s2, s3]
+
+    print('\n---------- Common to all')
+    common_to_all = common(samples)
+    print(list(common_to_all))
+
+    print('\n---------- Common features for every combination of two samples')
+    pair_intersections = {}
+    n = len(samples)
+    for i in range(n-1):
+        for j in range(i+1, n):
+            pair_intersections[(i,j)] = common([samples[i], samples[j]])
+
+    for (i, j) in pair_intersections:
+        print(f'\n--- common between s{i} and s{j}')
+        print(list(pair_intersections[(i,j)]))
+
+
+    print('\n----------- Exclusive features')
+    exclusive_features = exclusive(samples)
+
+    for i, e in enumerate(exclusive_features):
+        print('\n---- Exclusive to sample', i+1)
+        print(list(e))
+
+    print('\n----------- Features for Venn diagram')
+
+    venn = compute_Venn_features(samples, 'S1 S2 S3'.split())
+    for t in venn:
+        print(f'{str(t):>20} --> {list(venn[t])}')
