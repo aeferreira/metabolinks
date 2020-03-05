@@ -326,10 +326,8 @@ class MSAccessor(object):
            CAUTION: the accessor will no longer work or misinterpret levels.
            After the application of this function use accessor ums afterwards."""
 
-        self._df.columns = self._df.columns.droplevel(level=0)
-        if len(self._df.columns.names) > 1:
-            self._df.columns = self._df.columns.remove_unused_levels()
-        return self._df.copy()
+        new_cols = self._df.columns.droplevel(level=0)
+        return pd.DataFrame(self._df.values, index=self._df.index, columns=new_cols)
 
 def add_labels(df, **kwargs):
     return df.ums.add_labels(**kwargs)
