@@ -16,19 +16,19 @@ def mz_similarity(dataset, has_labels=False):
         acc = dataset.ums
     
     similarities = SimilarityMeasures()
-    sample_names = list(acc.unique_samples)
+    sample_names = list(acc.samples)
 
     n = len(sample_names)
     mzs = [acc.features(sample=name) for name in sample_names]
-    similarities.sample_names = sample_names[:]
-    
+    # similarities.sample_names = sample_names[:]
+
     common_matrix = np.zeros((n, n), dtype=int)
     jaccard_matrix = np.zeros((n,n))
-    
+
     for i in range(n):
         common_matrix[i, i] = len(mzs[i])
         jaccard_matrix[i, i] = 1.0
-    
+
     for i1 in range(n-1):
         for i2 in range(i1+1, n):
             mz1 = mzs[i1]
@@ -76,7 +76,7 @@ def mz_similarity(dataset, has_labels=False):
                 jaccard_matrix[i1, i2] = jaccard
         similarities.label_intersection_counts = pd.DataFrame(common_matrix, columns=labels, index=labels)
         similarities.label_similarity_jaccard = pd.DataFrame(jaccard_matrix, columns=labels, index=labels)
-        similarities.unique_labels = labels
+        # similarities.unique_labels = labels
     return similarities
 
 class SimilarityMeasures(object):
@@ -87,8 +87,8 @@ class SimilarityMeasures(object):
         self.sample_similarity_jaccard = None
         self.label_intersection_counts = None
         self.label_similarity_jaccard = None
-        self.unique_labels = None
-        self.sample_names = None
+        # self.unique_labels = None
+        # self.sample_names = None
     
     def __str__(self):
         res = ['\nSample similarity, counts of common peaks']
@@ -213,12 +213,11 @@ if __name__ == "__main__":
     print(dataset.ms.info())
     print('-- global info---------')
     print(dataset.ms.info(all_data=True))
-    print('-----------------------')
-    print('***** SIMILARITY MEASURES ****')
+    print('\n***** SIMILARITY MEASURES ****')
     similarities = mz_similarity(dataset, has_labels=True)
     print(similarities)
 
-    print('***** FEATURE OVERLAP (AND VENN DIAGRAM CALCULATIONS ****')
+    print('\n\n***** FEATURE OVERLAP (AND VENN DIAGRAM CALCULATIONS ****')
     print('--- example data sets')
     s1 = pd.DataFrame({'Bucket label': ['A0', 'A1', 'A2', 'A3'],
                         'Name': ['B0', np.nan, 'B2', 'B3'],

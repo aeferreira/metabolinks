@@ -92,7 +92,7 @@ class MSAccessor(object):
     @property
     def unique_labels(self):
         """Get the different data labels (with no repetitions)."""
-        return tuple(self._df.columns.levels[0])
+        return tuple(pd.unique(self.labels))
 
     @property
     def labels(self):
@@ -114,7 +114,7 @@ class MSAccessor(object):
     @property
     def unique_samples(self):
         """Get the different sample names (with no repetitions in case the number of levels > 2)."""
-        return tuple(self._df.columns.levels[1])
+        return tuple(pd.unique(self.samples))
 
     @property
     def samples(self):
@@ -363,16 +363,11 @@ class UMSAccessor(object):
         return self._df.transpose(copy=True)
 
     @property
-    def unique_labels(self):
-        """Get the different data labels (with no repetitions)."""
-        return tuple(self._df.columns.levels[0])
-
-    @property
     def unique_samples(self):
         """Get the different sample names (with no repetitions in case the number of levels > 2)."""
         """Get the different sample names."""
         if len(self._df.columns.names) > 1:
-            return tuple(self._df.columns.levels[0])
+            return tuple(pd.unique(self.samples))
         else:
             return tuple(self._df.columns)
 
