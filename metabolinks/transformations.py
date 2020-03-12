@@ -52,9 +52,9 @@ def keep_atleast_inlabels(df, min_samples=1):
     # print('****** df *********')
     # print(df)
     # print('*******************')
-    for label in df.ms.unique_labels:
+    for label in df.cdl.unique_labels:
         # get a copy of label data
-        df_label = df.ms.subset(label=label)
+        df_label = df.cdl.subset(label=label)
         old_index = df_label.index.copy()
         # print('----- Label {} -------'.format(label))
         # print('------------------------')
@@ -68,7 +68,7 @@ def keep_atleast_inlabels(df, min_samples=1):
         df_label = df_label[counts >= min_samples].reindex(old_index, method=None)
         # print('------ after removal ---')
         # print(df_label)
-        bool_loc = df.ms.subset_where(label=label)
+        bool_loc = df.cdl.subset_where(label=label)
         df = df.mask(bool_loc, df_label)
         # print('+++++++ current df +++++++')
         # print(df)
@@ -202,9 +202,9 @@ if __name__ == "__main__":
     data = dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
     print(dataset)
     print('-- info --------------')
-    print(dataset.ms.info())
+    print(dataset.cdl.info())
     print('-- global info---------')
-    print(dataset.ms.info(all_data=True))
+    print(dataset.cdl.info(all_data=True))
     print('-----------------------')
 
     print('\n--- fillna_zero ----------')

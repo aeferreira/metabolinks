@@ -4,8 +4,8 @@ import six
 import pandas as pd
 import numpy as np
 
-from metabolinks import MSAccessor, UMSAccessor, datasets
-from metabolinks.msaccessor import create_multiindex_with_labels
+from metabolinks import datasets
+from metabolinks.cdaccessors import create_multiindex_with_labels
 from metabolinks.utils import _is_string
 
 
@@ -92,9 +92,9 @@ def read_data_from_xcel(
             for table in results:
                 size = len(table)
                 if has_labels:
-                    print(table.ms.info())
+                    print(table.cdl.info())
                 else:
-                    print(table.ums.info())
+                    print(table.cdf.info())
                 print(f'{size} features\n')
         datasets[sheetname] = results
 
@@ -157,18 +157,18 @@ if __name__ == '__main__':
     dataset = read_data_csv(six.StringIO(datasets.demo_data1()))
     printdfstructure(dataset)
     print('-- info --------------')
-    print(dataset.ums.info())
+    print(dataset.cdf.info())
     print('-- global info---------')
-    print(dataset.ums.info(all_data=True))
+    print(dataset.cdf.info(all_data=True))
     print('-----------------------')
 
     print('Reading from string data (as io stream) with labels------------\n')
     dataset = read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
     printdfstructure(dataset)
     print('-- info --------------')
-    print(dataset.ms.info())
+    print(dataset.cdl.info())
     print('-- global info---------')
-    print(dataset.ms.info(all_data=True))
+    print(dataset.cdl.info(all_data=True))
     print('-----------------------')
 
     # Reading from Excel ----------

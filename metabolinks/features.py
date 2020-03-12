@@ -1,3 +1,3 @@
 """Functions that work on features (row indexes) of Pandas DataFrames."""
 
-from metabolinks import (MSAccessor, UMSAccessor)
+import metabolinks as mtl

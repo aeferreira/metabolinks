@@ -11,9 +11,9 @@ import metabolinks.datasets as datasets
 def mz_similarity(dataset, has_labels=False):
     """Compute counts and Jaccard index by samples."""
     if has_labels:
-        acc = dataset.ms
+        acc = dataset.cdl
     else:
-        acc = dataset.ums
+        acc = dataset.cdf
     
     similarities = SimilarityMeasures()
     sample_names = list(acc.samples)
@@ -210,9 +210,9 @@ if __name__ == "__main__":
     dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
     print(dataset)
     print('-- info --------------')
-    print(dataset.ms.info())
+    print(dataset.cdl.info())
     print('-- global info---------')
-    print(dataset.ms.info(all_data=True))
+    print(dataset.cdl.info(all_data=True))
     print('\n***** SIMILARITY MEASURES ****')
     similarities = mz_similarity(dataset, has_labels=True)
     print(similarities)

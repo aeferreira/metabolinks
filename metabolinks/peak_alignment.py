@@ -7,8 +7,6 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from metabolinks.msaccessor import MSAccessor, UMSAccessor
-
 from metabolinks.utils import s2HMS
 
 def are_near(d1, d2, reltol):
@@ -593,7 +591,7 @@ if __name__ == '__main__':
                                               verbose=True)
         aligned = add_labels(aligned, labels)
         aligned.columns.names = ['label', 'sample']
-        # aligned.ms.samples = sample_names
+        # aligned.cdl.samples = sample_names
         print('\n--- Result: --------------------')
         print(aligned)
         results_sheets[d] = aligned

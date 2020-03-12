@@ -34,9 +34,9 @@ def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
 
 DataParts = namedtuple('DataParts', 'data_matrix labels names features unique_labels')
 
-@register_dataframe_accessor("ms")
-class MSAccessor(object):
-    """An accessor to Pandas DataFrame to interpret content as MS data.
+@register_dataframe_accessor("cdl")
+class CDLAccessor(object):
+    """An accessor to Pandas DataFrame to interpret content as column organized, labeled data.
 
     This interpretation assumes that the **column** index stores the essential
     metadata, namely, sample names and group labels. This index is
@@ -329,14 +329,10 @@ class MSAccessor(object):
         new_cols = self._df.columns.droplevel(level=0)
         return pd.DataFrame(self._df.values, index=self._df.index, columns=new_cols)
 
-def add_labels(df, **kwargs):
-    return df.ums.add_labels(**kwargs)
 
-
-
-@register_dataframe_accessor("ums")
-class UMSAccessor(object):
-    """An accessor to Pandas DataFrame to interpret content as MS data.
+@register_dataframe_accessor("cdf")
+class CDFAccessor(object):
+    """An accessor to Pandas DataFrame to interpret content as column organized flat (unlabeled) data.
 
     This interpretation assumes that the **column** index stores the sample names
     on level 0. This index is optionally hierarquical. Accessor 'ms' for labeled data
@@ -498,3 +494,9 @@ class UMSAccessor(object):
         # TODO: use from_feature and from_level
         self._df.columns = newcols
         return self._df.copy()
+
+def add_labels(df, labels=None, level_name="label", from_feature=None, from_level=None):
+    return CDFAccessor(df).add_labels(labels=labels,
+                                      level_name=level_name,
+                                      from_feature=from_feature,
+                                      from_level=from_level)
