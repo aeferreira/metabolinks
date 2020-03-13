@@ -461,9 +461,7 @@ if __name__ == '__main__':
     print ('Starting annotations...')
 
     # Call the main driver function.
-    results = insert_taxonomy(cdf,
-                              #brite_blacklist='../example_data/blacklist.txt',
-                              trace=True)
+    results = insert_taxonomy(cdf, trace=True)
 
     elapsed_time = time.time() - start_time
     m, s = divmod(elapsed_time, 60)

@@ -8,6 +8,7 @@ dependencies:
   - requests
   - numpy
   - matplotlib>=2.0
-  - pandas
+  - pandas>=0.25
   - xlrd
   - xlsxwriter
+  - pandas-flavor
