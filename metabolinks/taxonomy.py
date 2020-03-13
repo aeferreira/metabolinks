@@ -5,6 +5,31 @@ import os
 import requests
 
 import pandas as pd
+# ------------- util to clean up MassTRiX columns
+
+def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
+    """Removes the 'uniqueID' and the 'isotope presence' columns."""
+    col_names = []
+    if uniqueID:
+        col_names.append("uniqueID")
+    if isotopes:
+        iso_names = (
+            "C13",
+            "O18",
+            "N15",
+            "S34",
+            "Mg25",
+            "Mg26",
+            "Fe54",
+            "Fe57",
+            "Ca44",
+            "Cl37",
+            "K41",
+        )
+        col_names.extend(iso_names)
+    if columns is not None:
+        col_names.extend(columns)
+    return df.drop(col_names, axis=1)
 
 # ------------- Local database loading ----------------------------------
 
@@ -120,7 +145,7 @@ def get_trans_id_table(fname):
         for line in f:
             if len(line) == 0:
                 continue
-            foreign, cpd, equiv = line.split('\t')
+            foreign, cpd, _ = line.split('\t')
             foreign = foreign.split(':')[1].strip()
             cpd = cpd.split(':')[1].strip()
             d[foreign] = cpd
@@ -416,27 +441,27 @@ def insert_taxonomy(df, brite_blacklist=None, trace=False):
 if __name__ == '__main__':
 
     print ('\nStarting...\n')
-    from metabolinks import read_MassTRIX
+    import six
+    from metabolinks.dataio import read_MassTRIX
+    from metabolinks import datasets
 
     start_time = time.time()
 
-    testfile_name = 'data/MassTRIX_output.tsv'
-
-    results = read_MassTRIX(testfile_name)
-    print ("File {} was read\n".format(testfile_name))
+    df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
+    print ("Data was read\n")
 
     # Clean up uniqueId and "isotope" cols
-    results = results.cleanup_cols()
+    cdf = cleanup_cols(df)
 
     # check result
-    results.info()
-    assert len(results.columns) == 12 # there are 24 - 12 = 12 columns
-    assert len(results.index) == 15 # there are still 15 peaks
+    cdf.info()
+    assert len(cdf.columns) == 12 # there are 24 - 12 = 12 columns
+    assert len(cdf.index) == 15 # there are still 15 peaks
 
     print ('Starting annotations...')
 
     # Call the main driver function.
-    results = insert_taxonomy(results,
+    results = insert_taxonomy(cdf,
                               #brite_blacklist='../example_data/blacklist.txt',
                               trace=True)
 
@@ -445,13 +470,11 @@ if __name__ == '__main__':
     print ("Finished in " + "%02dm%02ds" % (m, s))
     print('------------------------------------')
 
-    # results
     results.info()
-    # print(results.head())
     
     # Export the annotated dataframe into a MS-Excel file
     # Name it with the same name as the .tsv, replacing tail with '_raw.xlsx'
     
-    out_fname = testfile_name[:-4]+'_comptaxa.xlsx'
+    out_fname = 'results_comptaxa.xlsx'
     results.to_excel(out_fname, header=True, index=False)
-    print ("File {} written".format(out_fname))
+    print (f"File {out_fname} written")
