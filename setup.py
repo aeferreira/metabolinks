@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """`metabolinks` is on `Github`_.
 
 .. _github: https://github.com/aeferreira/metabolinks
@@ -13,8 +12,7 @@ except ImportError:
 
 def read_file(filename, encoding='utf-8'):
     with open(filename, encoding=encoding) as f:
-        content = f.read()
-    return content
+        return f.read()
 
 ###############################################################################
 
@@ -57,10 +55,10 @@ setup(
     keywords=['Metabolomics', 'Mass Spectrometry', 'Data Analysis', 'Ultra-high resolution MS'],
     description="A set of tools for high-resolution MS metabolomics data analysis",
     long_description=read_file('README.rst'),
-    packages=['metabolinks'],
+    packages=packages,
+    include_package_data=True,
     package_data={'metabolinks': ['data/sample_data.xlsx'],
                   "notebooks": ["blacklist.txt", "MassTRIX_output.tsv", '*.ipynb', '*.xlsx']},
-    include_package_data=True,
     install_requires=requires
 )
 

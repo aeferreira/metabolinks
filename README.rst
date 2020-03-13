@@ -13,7 +13,7 @@ resolution MS based metabolomics in mind.
 Features are a bit scarce right now:
 
 - peak list alignment
-- data matrix filtering, conversion and sample similarity measures
+- data matrix preprocessing, and similarity measures
 - compound taxonomy retrieval
 
 But our road map is clear and we expect to stabilize in a beta version pretty soon.
@@ -25,7 +25,7 @@ Installing
 ==========
 
 ``Metabolinks`` is distributed on PyPI_ and can be installed with pip on
-a Python 3.4+ installation::
+a Python 3.6+ installation::
 
    pip install metabolinks
 
@@ -42,9 +42,9 @@ One of these two products is highly recommended:
 
 The formal requirements are:
 
-- Python 3.4 and above (it runs on Python 2.7 too)
+- Python 3.6 and above
 - ``setuptools``, ``pip``, ``six``, ``requests`` and ``pytest``
-- ``numpy``, ``matplotlib`` and ``pandas``
+- ``numpy``, ``scipy``, ``matplotlib``, ``pandas`` and ``scikit-learn``
 
 The installation of the ``Jupyter`` platform is also recommended since
 the examples are provided as *Jupyter notebooks*.
