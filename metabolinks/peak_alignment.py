@@ -174,7 +174,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
             msg = '- {} groups were discarded (#samples < {})'.format
             print(msg(n_discarded, min_samples))
 
-        print(alignment_summary(alignment_desc))
+        print(alignment_summary(alignment_desc, ppmtol))
 
     if return_alignment_desc:
         return (result, alignment_desc)
@@ -184,7 +184,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
 # Alias
 align_spectra = align
 
-def alignment_summary(alignment_desc):
+def alignment_summary(alignment_desc, ppmtol):
         res = []
         lines=['Sample coverage of features']
         cov_items = alignment_desc['# features'].value_counts().sort_index().items()
@@ -529,9 +529,6 @@ if __name__ == '__main__':
         print(sample,'\n')
         print('------------')
 
-    ppmtol = 1.0
-    min_samples = 1
-
     aligned, desc = align_spectra(samples, return_alignment_desc=True, verbose=True)
     print('\n--- Result: --------------------')
     print(aligned)
@@ -567,8 +564,8 @@ if __name__ == '__main__':
     print('=========================')
     print('\n\nTESTING alignment with several input sets from an Excel file')
 
-    ppmtol = 1.0
-    min_samples = 1
+    # ppmtol = 1.0
+    # min_samples = 1
     labels = ['wt', 'mod', 'mod']
 
     # Reading from Excel ----------
@@ -585,10 +582,11 @@ if __name__ == '__main__':
     results_sheets = {}
     for d in data_sets:
         print('\n++++++++++++++', d)
-        aligned, desc = align_spectra(data_sets[d], min_samples=min_samples, 
-                                              ppmtol=ppmtol,
-                                              return_alignment_desc=True,
-                                              verbose=True)
+        aligned, desc = align(data_sets[d],
+                              min_samples=1, 
+                              ppmtol=1.0,
+                              return_alignment_desc=True,
+                              verbose=True)
         aligned = add_labels(aligned, labels)
         aligned.columns.names = ['label', 'sample']
         # aligned.cdl.samples = sample_names
