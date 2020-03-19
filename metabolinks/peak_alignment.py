@@ -10,11 +10,9 @@ import pandas as pd
 from metabolinks.utils import s2HMS
 
 def are_near(d1, d2, reltol):
-    """Predicate: flags if two entries should belong to the same compound"""
+    """Predicate: flags if two entries are close enough given a relative difference in ppm."""
     # two consecutive peaks from the same sample
     # should not belong to the same group
-    if d1['_sample'] == d2['_sample']:
-        return False
     m1, m2 = d1['m/z'], d2['m/z']
     if (m2 - m1) / m2 <= reltol:
         return True
@@ -33,15 +31,23 @@ def group_peaks(df, ppmtol=1.0):
 
     for i in range(len(df)):
         if i == start:
+            # new group
+            d1 = df.iloc[start]
+            samples = [d1['_sample']]
             continue
-        d1 = df.iloc[start]
+        
         d2 = df.iloc[i]
         assert isinstance(d1['m/z'], (int, float))
         assert isinstance(d2['m/z'], (int, float))
 
-        if not are_near(d1, d2, reltol):
+        sample = d2['_sample']
+
+        if (sample in samples) or (not are_near(d1, d2, reltol)):
+            # move to new group
             glabel += 1
             start = i
+        else:
+            samples.append(sample)
 
         glabels.append(glabel)
 
