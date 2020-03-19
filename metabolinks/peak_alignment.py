@@ -9,12 +9,9 @@ import pandas as pd
 
 from metabolinks.utils import s2HMS
 
-def are_near(d1, d2, reltol):
+def are_near(m1, m2, reltol):
     """Predicate: flags if two entries are close enough given a relative difference in ppm."""
-    # two consecutive peaks from the same sample
-    # should not belong to the same group
-    m1, m2 = d1['m/z'], d2['m/z']
-    if (m2 - m1) / m2 <= reltol:
+    if (m2 - m1) / m1 <= reltol:
         return True
     return False
 
@@ -26,26 +23,35 @@ def group_peaks(df, ppmtol=1.0):
     glabel = 0
     start = 0
     glabels = [0]
-    
+
     reltol = ppmtol * 1.0e-6
+
+    m1 = df.loc[0, 'm/z']
+    samples = [df.loc[0, '_sample']]
 
     for i in range(len(df)):
         if i == start:
-            # new group
-            d1 = df.iloc[start]
-            samples = [d1['_sample']]
             continue
-        
-        d2 = df.iloc[i]
-        assert isinstance(d1['m/z'], (int, float))
-        assert isinstance(d2['m/z'], (int, float))
 
-        sample = d2['_sample']
+        m2 = df.loc[i, 'm/z']
+        sample = df.loc[i, '_sample']
 
-        if (sample in samples) or (not are_near(d1, d2, reltol)):
-            # move to new group
+        # if i < 20:
+        #     print(' ********** i=', i, 'start=', start, 'samples=', samples)
+        #     print('d start = ', m1, 'sample', df.loc[start, '_sample'])
+        #     print('d i     = ', m2, 'sample', df.loc[i, '_sample'])
+
+        if (sample in samples) or (not are_near(m1, m2, reltol)):
+            # new group
+            # if i < 20:
+            #     if sample in samples:
+            #         print(sample, 'in', samples)
+            #     else:
+            #         print('d (ppm) =', 1e6 * ((m2 - m1) / m1))
             glabel += 1
             start = i
+            m1 = df.loc[start, 'm/z']
+            samples = [df.loc[start, '_sample']]
         else:
             samples.append(sample)
 
@@ -96,6 +102,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     cdf = cdf.sort_values(by='m/z')
     # insert a range index
     cdf.index = list(range(len(cdf)))
+    cdf = cdf.astype({'_sample': int, '_feature': int})
 
     if verbose:
         print('  Done, (total {} features in {} samples)'.format(cdf.shape[0], n))
@@ -570,8 +577,6 @@ if __name__ == '__main__':
     print('=========================')
     print('\n\nTESTING alignment with several input sets from an Excel file')
 
-    # ppmtol = 1.0
-    # min_samples = 1
     labels = ['wt', 'mod', 'mod']
 
     # Reading from Excel ----------
