@@ -128,18 +128,20 @@ def normalize_PQN(df, ref_sample='mean'):
        df: Pandas DataFrame.
        ref_sample: reference sample to use in PQ Normalization, types accepted: "mean" (default, reference sample will be the intensity
     mean of all samples for each feature - useful for when there are a lot of imputed missing values), "median" (reference sample will
-    be the intensity median of all samples for each feature - useful for when there aren't a lot of imputed missing values), sample name
-    (reference sample will be the sample with the given name in the dataset) or list with the intensities of all peaks that will
-    directly be the reference sample (pandas Series format not accepted - list(Series) is accepted).
+    be the intensity median of all samples for each feature - useful for when there aren't a lot of imputed missing values), column name
+    of the sample - ('label','sample') if data is labeled (reference sample will be the sample with said column name in the dataset)  -
+    or list with the intensities of all peaks that will directly be the reference sample (pandas Series not accepted - list(Series) is
+    accepted).
 
        Returns: Pandas DataFrame; normalized spectra.
     """
+    #Total Int normalization first - MetaboAnalyst doesn't do it but paper recommends it?
     #"Building" the reference sample based on the input given
     if ref_sample == 'mean': #Mean spectre of all samples
         ref_sample2 = df.T / df.mean(axis = 1)
     elif ref_sample == 'median': #Median spectre of all samples
         ref_sample2 = df.T/df.median(axis = 1)
-    elif ref_sample in df.cdl.samples: #Specified sample of the spectra
+    elif ref_sample in df.columns: #Column name of a specifiec sample of the spectra. ('Label','Sample') if data is labeled
         ref_sample2 = df.T/df.loc[:,ref_sample]
     else: #Actual sample given
         ref_sample2 = df.T/ref_sample
@@ -166,20 +168,20 @@ def normalize_quantile(df, ref_type='mean'):
     ref_spectra = df.copy()
     ranks = df.copy()
 
-    for i in range(len(norm)):
-        #Determining the ranks of each entry in the same row (same variable) in the dataset
-        ref_spectra.iloc[i] = norm.iloc[i].sort_values().values
-        ranks.iloc[i] = norm.iloc[i].rank(na_option='top')
+    for i in range(len(norm.columns)):
+        #Determining the ranks of each feature in the same column (same sample) in the dataset
+        ref_spectra.iloc[:,i] = norm.iloc[:,i].sort_values().values
+        ranks.iloc[:,i] = norm.iloc[:,i].rank(na_option='top')
 
     #Determining the reference sample for normalization based on the ref_type chosen (applied on the columns).
     if ref_type == 'mean':
-        ref_sample = ref_spectra.mean(axis=0).values
+        ref_sample = ref_spectra.mean(axis=1).values
     elif ref_type == 'median':
-        ref_sample = ref_spectra.median(axis=0).values
+        ref_sample = ref_spectra.median(axis=1).values
     else:
         raise ValueError('Type not recognized. Available ref_type: "mean", "median".')
 
-    #Replacing the values in the dataset for the reference sample values based on the rankscalculated  earlier for each entry
+    #Replacing the values in the dataset for the reference sample values based on the ranks calculated  earlier for each entry
     for i in range(len(ranks)):
         for j in range(len(ranks.columns)):
             if ranks.iloc[i,j] == round(ranks.iloc[i,j]):
