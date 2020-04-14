@@ -9,11 +9,96 @@ import pandas as pd
 
 from metabolinks.utils import s2HMS
 
-def are_near(m1, m2, reltol):
-    """Predicate: flags if two entries are close enough given a relative difference in ppm."""
-    if (m2 - m1) / m1 <= reltol:
-        return True
-    return False
+def group_peaks_hca(df, ppmtol=1.0):
+    reltol = ppmtol * 1.0e-6
+
+    # data for each cluster
+    samples = []
+    dist2next = []
+    masses = []
+    centroids = []
+
+    # fill list with original peaks
+    for i in range(len(df)):
+        samples.append(set([df.loc[i, '_sample']]))
+        masses.append([df.loc[i, 'm/z']])
+        centroids.append(df.loc[i, 'm/z'])
+
+    # compute dist2next
+    for i in range(len(samples)-1):
+        intersection = samples[i].intersection(samples[i+1])
+        reldist = (centroids[i+1] - centroids[i]) / centroids[i]
+        if len(intersection) > 0 or reldist > reltol:
+            dist2next.append(np.inf)
+        else:
+            dist2next.append(reldist)
+    
+    dist2next = np.array(dist2next)
+    nfinite = np.sum(np.isfinite(dist2next))
+
+    while nfinite > 0:
+
+        # locate minimum
+        i = int(dist2next.argmin()) # expected to be the most expensive line
+        # print(' ********** i=', i, 'nfinite = ', nfinite, '**** merging ******')
+        # print(samples[i])
+        # print(masses[i])
+        # print('----- and -------')
+        # print(samples[i+1])
+        # print(masses[i+1])
+        
+        # merge cluster imin and imin + 1
+        newsamples = samples[i].union(samples[i+1])
+        newmasses = masses[i] + masses[i+1]
+        newcentroid = np.median(newmasses)
+
+        # change arrays
+        centroids[i] = newcentroid
+        del centroids[i+1]
+        masses[i] = newmasses
+        del masses[i+1]
+        samples[i] = newsamples
+        del samples[i+1]
+
+        # recompute distances
+        if i != len(dist2next) - 1:
+            dist2next = np.delete(dist2next, i+1)
+            if i > 0:
+                intersection = samples[i-1].intersection(samples[i])
+                reldist = (centroids[i] - centroids[i-1]) / centroids[i-1]
+                if len(intersection) > 0 or reldist > reltol:
+                    dist2next[i-1] = np.inf
+                else:
+                    dist2next[i-1] = reldist
+            if i < len(samples) - 1:
+                intersection = samples[i].intersection(samples[i+1])
+                reldist = (centroids[i+1] - centroids[i]) / centroids[i]
+                if len(intersection) > 0 or reldist > reltol:
+                    dist2next[i] = np.inf
+
+                else:
+                    dist2next[i] = reldist
+        else:
+            dist2next = np.delete(dist2next, i)
+            if i > 0:
+                intersection = samples[i-1].intersection(samples[i])
+                reldist = (centroids[i] - centroids[i-1]) / centroids[i-1]
+                if len(intersection) > 0 or reldist > reltol:
+                    dist2next[i-1] = np.inf
+                else:
+                    dist2next[i-1] = reldist
+
+        nfinite = np.sum(np.isfinite(dist2next))
+
+    glabels = []
+    for glabel, group in enumerate(samples):
+        glabels.extend([glabel]*len(group))
+
+    # insert new column with group indexes and group by this column
+    result = pd.concat([df, pd.Series(glabels, index=df.index, name='_group')],
+                        axis=1)
+
+    return result.groupby('_group')
 
 
 def group_peaks(df, ppmtol=1.0):
@@ -28,6 +113,8 @@ def group_peaks(df, ppmtol=1.0):
 
     m1 = df.loc[0, 'm/z']
     samples = [df.loc[0, '_sample']]
+    masses = [m1]
+    centroid = m1
 
     for i in range(len(df)):
         if i == start:
@@ -40,8 +127,8 @@ def group_peaks(df, ppmtol=1.0):
         #     print(' ********** i=', i, 'start=', start, 'samples=', samples)
         #     print('d start = ', m1, 'sample', df.loc[start, '_sample'])
         #     print('d i     = ', m2, 'sample', df.loc[i, '_sample'])
-
-        if (sample in samples) or (not are_near(m1, m2, reltol)):
+        
+        if (sample in samples) or ((m2 - centroid) / centroid > reltol):
             # new group
             # if i < 20:
             #     if sample in samples:
@@ -52,8 +139,12 @@ def group_peaks(df, ppmtol=1.0):
             start = i
             m1 = df.loc[start, 'm/z']
             samples = [df.loc[start, '_sample']]
+            centroid = m1
+            masses=[m1]
         else:
             samples.append(sample)
+            masses.append(m2)
+            centroid = np.mean(masses)
 
         glabels.append(glabel)
 
@@ -112,7 +203,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     if verbose:
         print('- Grouping and joining...')
 
-    grouped = group_peaks(cdf, ppmtol=ppmtol)
+    grouped = group_peaks_hca(cdf, ppmtol=ppmtol)
 
     # print('*********************************')
     # for i, g in zip(range(20), grouped):
@@ -133,7 +224,8 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     for (group_label, group) in grouped:
         group_labels.append(group_label)
         group_nfeatures.append(len(group))
-        new_features.append(group['m/z'].mean())
+        new_features.append(group['m/z'].median())
+        # new_features.append(group['m/z'].mean())
         m_min, m_max = group['m/z'].min(), group['m/z'].max()
         range_ppm = 1e6 * (m_max - m_min) / m_min
         mz_range_array.append(range_ppm)
