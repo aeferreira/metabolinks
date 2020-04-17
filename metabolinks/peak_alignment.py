@@ -9,7 +9,7 @@ import pandas as pd
 
 from metabolinks.utils import s2HMS
 
-def group_peaks_hca(df, ppmtol=1.0):
+def group_peaks_hca_median(df, ppmtol=1.0):
     reltol = ppmtol * 1.0e-6
 
     # data for each cluster
@@ -101,8 +101,8 @@ def group_peaks_hca(df, ppmtol=1.0):
     return result.groupby('_group')
 
 
-def group_peaks(df, ppmtol=1.0):
-    """Compute groups of peaks, according to m/z proximity."""
+def group_peaks_naive_1pass_centroid(df, ppmtol=1.0):
+    """Compute groups of peaks, naive, one-pass, control distance to centroid ."""
     
     # compute group indexes
     glabel = 0
@@ -154,7 +154,56 @@ def group_peaks(df, ppmtol=1.0):
 
     return result.groupby('_group')
 
+def group_peaks_naive_1pass_complete_linkage(df, ppmtol=1.0):
+    """Compute groups of peaks, according to m/z proximity."""
+    
+    # compute group indexes
+    glabel = 0
+    start = 0
+    glabels = [0]
+
+    reltol = ppmtol * 1.0e-6
+
+    m1 = df.loc[0, 'm/z']
+    samples = [df.loc[0, '_sample']]
+
+    for i in range(len(df)):
+        if i == start:
+            continue
+
+        m2 = df.loc[i, 'm/z']
+        sample = df.loc[i, '_sample']
+
+        # if i < 20:
+        #     print(' ********** i=', i, 'start=', start, 'samples=', samples)
+        #     print('d start = ', m1, 'sample', df.loc[start, '_sample'])
+        #     print('d i     = ', m2, 'sample', df.loc[i, '_sample'])
+
+        if (sample in samples) or ((m2 - m1) / m1 > reltol):
+            # new group
+            # if i < 20:
+            #     if sample in samples:
+            #         print(sample, 'in', samples)
+            #     else:
+            #         print('d (ppm) =', 1e6 * ((m2 - m1) / m1))
+            glabel += 1
+            start = i
+            m1 = df.loc[start, 'm/z']
+            samples = [df.loc[start, '_sample']]
+        else:
+            samples.append(sample)
+
+        glabels.append(glabel)
+
+    # insert new column with group indexes and group by this column
+    result = pd.concat([df, pd.Series(glabels, index=df.index, name='_group')],
+                        axis=1)
+
+    return result.groupby('_group')
+
+
 def align(inputs, ppmtol=1.0, min_samples=1,
+          grouping='hc', # other are 'complete' and 'centroid'
           return_alignment_desc=False,
           verbose=True):
 
@@ -162,6 +211,16 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     
        m/z values should be contained in the (row) index of the input DataFrames.
        Returns a Pandas DataFrame by outer joining input frames on proximity groups."""
+
+    # get the grouping method as a function
+    if grouping == 'hc':
+        gfunc = group_peaks_hca_median
+    elif grouping == 'complete':
+        gfunc = group_peaks_naive_1pass_complete_linkage
+    elif grouping == 'centroid':
+        gfunc = group_peaks_naive_1pass_centroid
+    else:
+        raise ValueError(f'Unrecognizable grouping method: "{grouping}"')
 
     start_time = time.time()
 
@@ -203,7 +262,7 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     if verbose:
         print('- Grouping and joining...')
 
-    grouped = group_peaks_hca(cdf, ppmtol=ppmtol)
+    grouped = gfunc(cdf, ppmtol=ppmtol)
 
     # print('*********************************')
     # for i, g in zip(range(20), grouped):
