@@ -9,15 +9,12 @@ from metabolinks.cdaccessors import create_multiindex_with_labels
 from metabolinks.utils import _is_string
 
 
-def _ensure_data_frame(data):
+def _ensure_DataFrame(data):
     """Retrieves information from data structures building a dictionary.
 
        Accepts numpy array, pandas DataFrames or structures with a DataFrame member `data`."""
 
     # ensure data is a DataFrame, otherwise return numpy array as 'data' in info dict
-    if not isinstance(data, pd.DataFrame):
-        if hasattr(data, 'data_table') and isinstance(data.data_table, pd.DataFrame):
-            data = data.data_table
     if isinstance(data, pd.Series):
         data = data.to_frame()
     if not isinstance(data, pd.DataFrame):
@@ -28,7 +25,7 @@ def _ensure_data_frame(data):
 def gen_df(data, add_labels=None):
     """Ensure a Pandas DataFrame from data, create label level in columns if needed."""
 
-    data = _ensure_data_frame(data)
+    data = _ensure_DataFrame(data)
     if add_labels is not None:
         data.columns = create_multiindex_with_labels(data, labels=add_labels)
     return data
@@ -37,8 +34,7 @@ def gen_df(data, add_labels=None):
 def read_data_csv(filename, has_labels=False, sep='\t', **kwargs):
     if has_labels and 'header' not in kwargs:
         kwargs['header'] = [0, 1]
-    df = pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
-    return gen_df(df)
+    return pd.read_csv(filename, sep=sep, index_col=0, **kwargs)
 
 
 def read_data_from_xcel(
@@ -135,24 +131,6 @@ if __name__ == '__main__':
                 print(df.columns.names[i], ':')
                 print(tuple(df.columns.levels[i]))
 
-    print('test construction from numpy array')
-    n = 12
-    nrows = 4
-    data = np.array(range(12 * 4)).reshape(nrows, n)
-    print(f'data = \n{data}')
-    df = gen_df(data)
-    printdfstructure(df)
-    print('-------------------------')
-    print('test construction from minimal pandas dataFrame')
-    exp_data = pd.DataFrame(
-        data,
-        index=['exp1', 'exp2', 'exp3', 'exp4'],
-        columns=[f'SE{i}' for i in range(1, 13)],
-    )
-    print(f'data = \n{exp_data}')
-    df = gen_df(exp_data)
-    printdfstructure(df)
-    print('-------------------------')
     print('Reading from string data (as io stream) ------------\n')
     dataset = read_data_csv(six.StringIO(datasets.demo_data1()))
     printdfstructure(dataset)
