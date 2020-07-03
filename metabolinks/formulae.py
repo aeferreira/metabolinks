@@ -51,7 +51,7 @@ def compute_composition_series(formulae, compositions = ('CHO', 'CHOS',
                                                 'CHONSP')):
 
     # remove duplicates
-    formulae = set(formulae)
+    formulae = pd.unique(formulae)
     # Calculate element compositions
     comps = []
     for formula in formulae:
@@ -73,6 +73,28 @@ def compute_composition_series(formulae, compositions = ('CHO', 'CHOS',
     for k in labels:
         final_comps[k] = elem_comp[k]
     return final_comps
+
+def composition_series(formulae, compositions = ('CHO', 'CHOS',
+                                                'CHON', 'CHONS',
+                                                'CHOP', 'CHONP',
+                                                'CHONSP')):
+
+    # Calculate element compositions
+    comps = []
+    for formula in formulae:
+        # remove numbers and punctuation
+        exclude = "0123456789,.[]() "
+        for chr in exclude:
+            formula = formula.replace(chr,'')
+        
+        # count according to composition groups
+        for c in compositions:
+            if set(formula) == set(c):
+                comps.append(c)
+                break
+        else:
+            comps.append('other')
+    return comps
 
 if __name__ == '__main__':
     import six
@@ -127,15 +149,17 @@ if __name__ == '__main__':
 
     print('\n-------------------------------')
     print(df)
-    print('\n-------------------------------')
+    print('\n---element compositions --------------')
     compositions = ['CHO', 'CHOS', 'CHON', 'CHONS', 
                     'CHOP', 'CHONP', 'CHONSP']
     
     formulae = extract_formulae_from_MassTRIX_records(df, column='KEGG_formula')
     elem_counts = [element_composition(f) for f in formulae]
-    print('\n---element compositions --------------')
-    print(pd.DataFrame(elem_counts).fillna(0).astype(int))
-    print('\n-------------------------------')
+    elem_counts = pd.DataFrame(elem_counts, index=formulae).fillna(0).astype(int)
+    assignments = pd.Series(composition_series(formulae), index=formulae, name='series')
+    series_assignments = pd.concat([elem_counts, assignments], axis=1)
+    print(series_assignments)
+    print('\n-------')
     elem_comp = compute_composition_series(formulae, compositions=compositions)
     for c in elem_comp:
         print(c, elem_comp[c])

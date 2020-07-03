@@ -1,5 +1,12 @@
+"""Example data sets.
+
+   For now, they are used essencially to testing purposes."""
+
 import pandas as pd
 import six
+
+# def load_dataset(name, as_str=False):
+#     pass
 
 def demo_data1():
     return """m/z	s38	s39	s40	s32	s33	s34
