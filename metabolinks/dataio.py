@@ -131,17 +131,8 @@ if __name__ == '__main__':
                 print(df.columns.names[i], ':')
                 print(tuple(df.columns.levels[i]))
 
-    print('Reading from string data (as io stream) ------------\n')
-    dataset = read_data_csv(six.StringIO(datasets.demo_data1()))
-    printdfstructure(dataset)
-    print('-- info --------------')
-    print(dataset.cdf.info())
-    print('-- global info---------')
-    print(dataset.cdf.info(all_data=True))
-    print('-----------------------')
-
     print('Reading from string data (as io stream) with labels------------\n')
-    dataset = read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
+    dataset = read_data_csv(six.StringIO(datasets.demo_dataset('demo2').as_str()), has_labels=True)
     printdfstructure(dataset)
     print('-- info --------------')
     print(dataset.cdl.info())

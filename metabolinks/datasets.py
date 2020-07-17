@@ -13,7 +13,7 @@ class DataSetBase(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def as_dataframe(self):
+    def as_pandas(self):
         """ Abstract method to return the dataset as pandas DataFrame."""
         pass
 
@@ -51,7 +51,7 @@ class DataSetFactory:
 
     @classmethod
     def create_dataset(cls, name, **kwargs):
-        """ Factory command to create the data set.
+        """Factory command to create the data set.
         This method gets the appropriate DataSet class from the registry
         and creates an instance of it, while passing in the parameters
         given in ``kwargs``.
@@ -95,11 +95,11 @@ class Demo1(DataSetBase):
 98.57899		1877649	1864650	1573559		1829208
 99.28772	2038979				3476845	"""
 
-    def as_dataframe(self):
+    def as_pandas(self):
         return pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=0)
 
     def create_example_file(self, file_name):
-        df = self.as_dataframe()
+        df = self.as_pandas()
         df.to_csv(file_name)
 
 @DataSetFactory.register('demo2')
@@ -130,11 +130,11 @@ m/z
 99.28772	2038979				3476845	"""
 
 
-    def as_dataframe(self):
+    def as_pandas(self):
         return pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=0, header=[0,1])
 
     def create_example_file(self, file_name):
-        df = self.as_dataframe()
+        df = self.as_pandas()
         df.to_csv(file_name)
 
 
@@ -173,11 +173,11 @@ class TableWithFormulae(DataSetBase):
 (+)-9,10,18-trihydroxy-12Z-octadecenoic acid [Hydroxy fatty acids [FA0105]] ([M+K39]+)	C18H34O5	369.2037836
 (+)-Acutifolin A [Flavans, Flavanols and Leucoanthocyanidins [PK1202]] ([M+H]+)	C20H22O4	327.1590857"""
 
-    def as_dataframe(self):
+    def as_pandas(self):
         return pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=None).set_index('Name')
 
     def create_example_file(self, file_name):
-        df = self.as_dataframe()
+        df = self.as_pandas()
         df.to_csv(file_name)
 
 @DataSetFactory.register('masstrix_output')
@@ -201,14 +201,14 @@ class MasstrixOutput(DataSetBase):
 249.18444	0.00E+00	248.1771635	13	249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681	-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677	LMFA01030163#LMFA01030164#LMFA01030165#LMFA01030166#LMFA01030277#LMFA01030278#LMFA01030279#LMFA01030280#LMFA01030491#LMFA01030492#LMFA01030493#LMFA01030870#LMFA01140010	C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2	"16:4(4Z,7Z,10Z,13Z); 4,7,10,13-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#4,7,11,14-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#4,8,12,16-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#16:4(6Z,9Z,12Z,15Z); 6,9,12,15-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2E,6Z,8Z,12E-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2E,6Z,8Z,12Z-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2Z,6Z,8Z,12E-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2Z,6Z,8Z,12Z-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#3,9-hexadecadiynoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#7,10-hexadecadiynoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#8,10-hexadecadiynoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#16:4(6Z,9Z,12Z,15Z); 6Z,9Z,12Z,15Z-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#4-[3]-ladderane-butanoic acid [Carbocyclic fatty acids [FA0114]] ([M+H]+)"													null#null#null#null#null#null#null#null#null#null#null#null#null	null#null#null#null#null#null#null#null#null#null#null#null#null	null#null#null#null#null#null#null#null#null#null#null#null#null
 raw_mass	peak_height	corrected_mass	npossible	KEGG_mass	ppm	KEGG_cid	KEGG_formula	KEGG_name	uniqueID	C13	O18	N15	S34	Mg25	Mg26	Fe54	Fe57	Ca44	Cl37	K41	KEGG Pathways	KEGG Pathways descriptions	Compound in Organism(X)"""
 
-    def as_dataframe(self):
+    def as_pandas(self):
         df = pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=None, header=None)
         df.columns = list(df.iloc[-1])
         df = df.iloc[0:-1, :]
         return df.set_index(df.columns[0])
 
     def create_example_file(self, file_name):
-        df = self.as_dataframe()
+        df = self.as_pandas()
         df.to_csv(file_name)
 
 
@@ -217,39 +217,60 @@ def demo_dataset(name):
 
 
 def demo(name):
-    return DataSetFactory.create_dataset(name).as_dataframe()
+    return DataSetFactory.create_dataset(name).as_pandas()
 
 
 if __name__ == '__main__':
-    d1 = demo_dataset('demo1')
-    print(d1.as_str())
-    print(d1.as_dataframe())
+    from pandas.testing import assert_frame_equal
+    import tempfile
+
+    d = demo_dataset('demo1')
+    print(d.as_str())
+    print(d.as_pandas())
+    print('NaNs:', d.as_pandas().isna().sum().sum())
     print('-'*40)
-    d1 = demo('demo1')
-    print(d1)
+    print('testing demo1 roundtrip')
+    with tempfile.NamedTemporaryFile(mode='w') as tmp_file:
+        tmp_file.close()
+        d.create_example_file(tmp_file.name)
+        print(tmp_file.name)
+        d_back = pd.read_csv(tmp_file.name, index_col=0)
+    assert_frame_equal(d.as_pandas(), d_back)
+    print('round-trip ok!')
     print('-'*40)
-    d2 = demo_dataset('demo2')
-    print(d2)
-    print(d2.as_str())
-    print(d2.as_dataframe())
+    d = demo_dataset('demo2')
+
+    print(d.as_str())
+    print(d.as_pandas())
     print('-'*40)
-    d2 = demo('demo2')
-    print(d2)
-    print(d2.columns.names)
-    print(d2.index.names)
+    d = demo('demo2')
+    print(d.columns.names)
+    print(d.index.names)
     print('-'*40)
-    d2 = demo_dataset('table_with_formulae')
-    print(d2.as_str())
-    print(d2.as_dataframe())
+
+    print('testing demo2 roundtrip')
+    d = demo_dataset('demo2')
+    with tempfile.NamedTemporaryFile(mode='w') as tmp_file:
+        tmp_file.close()
+        d.create_example_file(tmp_file.name)
+        print(tmp_file.name)
+        d_back = pd.read_csv(tmp_file.name, index_col=0, header=[0,1])
+    assert_frame_equal(d.as_pandas(), d_back)
+    print('round-trip ok!')
     print('-'*40)
-    d2 = demo('table_with_formulae')
-    print(d2.columns.names)
-    print(d2.index.names)
+
+    d = demo_dataset('table_with_formulae')
+    print(d.as_str())
+    print(d.as_pandas())
     print('-'*40)
-    d2 = demo_dataset('masstrix_output')
-    print(d2.as_str())
-    print(d2.as_dataframe())
+    d = demo('table_with_formulae')
+    print(d.columns.names)
+    print(d.index.names)
     print('-'*40)
-    d2 = demo('masstrix_output')
-    print(d2.columns.names)
-    print(d2.index.names)
+    d = demo_dataset('masstrix_output')
+    print(d.as_str())
+    print(d.as_pandas())
+    print('-'*40)
+    d = demo('masstrix_output')
+    print(d.columns.names)
+    print(d.index.names)

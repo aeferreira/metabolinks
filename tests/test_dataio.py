@@ -1,12 +1,10 @@
 import pytest
 import numpy as np
 import pandas as pd
-from metabolinks.dataio import gen_df
+import six
+from metabolinks.dataio import gen_df, read_data_csv
+import metabolinks.datasets as datasets
 
-def assert_almost_equal(x, y):
-    if abs(x-y) < 0.0001:
-        return True
-    return False
 
 def test_setup_from_np_array():
     """test construction from numpy array"""
@@ -59,6 +57,21 @@ def test_setup_from_DataFrame():
     assert df.columns.names[0] is None
     assert df.values[1,2] == 14
     assert df.columns[3] == 'SE4'
+
+def test_read_csv_nolabels():
+    """test construction from demo1 data set (CSV with no labels)."""
+    d = datasets.demo_dataset('demo1').as_str()
+    df = read_data_csv(six.StringIO(d))
+
+    assert isinstance(df, pd.DataFrame)
+    assert df.shape == (19,6)
+    assert len(df.index.names) == 1
+    assert len(df.columns.names) == 1
+    assert df.index.names[0] == 'm/z'
+    assert df.columns.names[0] is None
+    assert df.values[1,2] == 582966
+    assert df.columns[3] == 's32'
+    assert df.isna().sum().sum() == 51
 
 if __name__ == '__main__':
     pytest.main()
