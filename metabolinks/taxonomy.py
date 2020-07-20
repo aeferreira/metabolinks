@@ -441,13 +441,14 @@ def insert_taxonomy(df, brite_blacklist=None, trace=False):
 if __name__ == '__main__':
 
     print ('\nStarting...\n')
-    import six
-    from metabolinks.dataio import read_MassTRIX
+    #import six
+    #from metabolinks.dataio import read_MassTRIX
     from metabolinks import datasets
 
     start_time = time.time()
 
-    df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
+    df = datasets.demo('masstrix_output')
+    #df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
     print ("Data was read\n")
 
     # Clean up uniqueId and "isotope" cols
