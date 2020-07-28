@@ -1,11 +1,11 @@
-from __future__ import print_function
+from collections import namedtuple
 import time
 import os
 
 import requests
 
 import pandas as pd
-# ------------- util to clean up MassTRiX columns
+# ------------- utility function to clean up MassTRiX columns
 
 def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
     """Removes the 'uniqueID' and the 'isotope presence' columns."""
@@ -32,86 +32,75 @@ def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
     return df.drop(col_names, axis=1)
 
 # ------------- Local database loading ----------------------------------
+LocalDBs = namedtuple('LocalDBs', ['kegg_db', 'lm_df',
+                                   'hmdb2kegg', 'lm2kegg',
+                                   'kegg2lm', 'kegg2brite',
+                                   'new_kegg_records',])
 
-class LocalDBs(object):
-    def __init__(self,
-                 kegg_db,
-                 lm_df,
-                 hmdb2kegg_dict,
-                 lipidmaps2kegg_dict,
-                 kegg2lipidmaps_dict):
-
-        self.kegg_db = kegg_db
-        self.lm_df = lm_df
-        self.hmdb2kegg_dict = hmdb2kegg_dict
-        self.lipidmaps2kegg_dict = lipidmaps2kegg_dict
-        self.kegg2lipidmaps_dict = kegg2lipidmaps_dict
-        self.new_kegg_records = []
-
-_local_dbs = None
 _DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dbs'))
-        
+
 def load_local_dbs():
     print ('\nLoading local DBs')
     
     kegg_df_fname = os.path.join(_DB_DIR, 'kegg_db.txt')
     kegg_db = load_local_kegg_db(kegg_df_fname)
-    
+
     lm_db_fname = (os.path.join(_DB_DIR, 'lm_metadata.txt'))
-    lm_df = load_local_lipidmaps_db(lm_db_fname)    
-    
+    lm_df = pd.read_csv(lm_db_fname, index_col=0, dtype={'CHEBI_ID':str}, sep='\t')
+    #lm2kegg = lm_df['KEGG_ID'].dropna() # a pandas Series
+
     trans_hmdb2kegg_fname = os.path.join(_DB_DIR, 'trans_hmdb2kegg.txt')
-    hmdb2kegg_dict = get_trans_id_table(trans_hmdb2kegg_fname)
+    table = pd.read_csv(trans_hmdb2kegg_fname, sep='\t', index_col=None)
+    table.columns = ['hmdb', 'kegg', 'equiv']
+    table = table.drop(columns='equiv')
+    table['hmdb'] = table['hmdb'].str.split(':').str.get(1)
+    table['kegg'] = table['kegg'].str.split(':').str.get(1)
+    hmdb2kegg = table.set_index('hmdb') # a pandas Series
 
-    lipidmaps2kegg_dict = lm_df['KEGG_ID'].dropna().to_dict()
+    trans_lm2kegg_fname = os.path.join(_DB_DIR, 'trans_lm2kegg.txt')
+    table = pd.read_csv(trans_lm2kegg_fname, sep='\t', index_col=None)
+    table.columns = ['lm', 'kegg', 'equiv']
+    table = table.drop(columns='equiv')
+    table['lm'] = table['lm'].str.split(':').str.get(1)
+    table['kegg'] = table['kegg'].str.split(':').str.get(1)
+    lm2kegg = table.set_index('lm') # a pandas Series
+    kegg2lm = table.set_index('kegg') # a pandas Series
 
-    kegg2lipidmaps_dict = {}
-    for k, v in lipidmaps2kegg_dict.items():
-        kegg2lipidmaps_dict[v] = k
-    
-    return LocalDBs(kegg_db, lm_df, hmdb2kegg_dict,
-                    lipidmaps2kegg_dict, kegg2lipidmaps_dict)
+    new_kegg_records = []
+
+    kegg2brite_fname = os.path.join(_DB_DIR, 'kegg2brite.csv')
+    kegg2brite = pd.read_csv(kegg2brite_fname)
+
+    return LocalDBs(kegg_db, lm_df, hmdb2kegg,
+                    lm2kegg, kegg2lm,
+                    kegg2brite,
+                    new_kegg_records,)
 
 
 def load_local_kegg_db(db_fname):
     """Load Kegg compound records from a local text DB."""
-    
+
+    with open(db_fname) as whole_file:
+        records = whole_file.read().split('---- Compound:')
     kegg = {}
-    db = open(db_fname)
-    curr_c = None
-    curr_txt = None
-    for line in db:
-        if len(line.strip()) == 0:
-            continue
-        if line.startswith('---- Compound:'):
-            if curr_c is not None:
-                whole_rec = ''.join(curr_txt)
-                kegg[curr_c] = whole_rec
-            curr_c = line.split(':')[1].strip()
-            curr_txt = []
-        elif curr_c is not None:
-            curr_txt.append(line)
-    whole_rec = ''.join(curr_txt)
-    kegg[curr_c] = whole_rec
-    db.close()
-    return kegg
+    records = [r.lstrip() for r in records]
+    records = [r for r in records if r]
+    kegg = {}
+    for block in records:
+        firstline, rest = block.split('\n', 1)
+        kegg[firstline.strip()] = rest
+    return pd.Series(kegg)
 
-
-def load_local_lipidmaps_db(db_fname):
-    """Load LIPIDMAPS records from a local text DB."""
-    df = pd.read_table(db_fname, index_col=0, dtype={'CHEBI_ID':str})
-    return df
-    
-# ------------- Code related to Kegg compound records -------------------
+# ------------- KeGG-compound record parsing -------------------
 
 def get_kegg_section(k_record, sname, whole_section=False):
-    """Get the section with name _sname_ from a kegg compound record.
-    
+    """Get the section with name `sname` from a kegg compound record.
+
        Returns a str, possibly empty."""
-    
+
     in_section = False
     section = []
-    
+
     for line in k_record.splitlines():
         if line.startswith(sname):
             in_section = True
@@ -136,21 +125,11 @@ def request_kegg_record(c_id, localdict, local_dbs):
         local_dbs.new_kegg_records.append(outrecord)
         return record
 
-# Load ID translation tables as dicts
-# IMPORTANT: Use local files, (fetched by fetch_dbs.py)
-def get_trans_id_table(fname):
-    d = {}
-    with open(fname) as f:
-        # hmdb:HMDB00002 \t cpd:C00986 \t equivalent
-        for line in f:
-            if len(line) == 0:
-                continue
-            foreign, cpd, _ = line.split('\t')
-            foreign = foreign.split(':')[1].strip()
-            cpd = cpd.split(':')[1].strip()
-            d[foreign] = cpd
-    return d
+# ------------- compound annotation -------------------
 
+Classification = namedtuple('Classification',
+                           ['Ontology', 'Category', 'MainClass', 'SubClass'],
+                           defaults=[None, None, None, None])
 
 class Progress(object):
     """A progress reporter of % done for a maximum (int) of self.total"""
@@ -164,70 +143,57 @@ class Progress(object):
         self.count = 0
 
 
-def classes_from_brite(krecord, brite_blacklist=None, trace=False):
-    """Parses classes from the BRITE section of a kegg record."""
-    classes = [[], [], [], []]
+# def classes_from_brite(krecord, brite_blacklist=None, trace=False):
+#     """Parses classes from the BRITE section of a kegg record."""
+#     classes = [[], [], [], []]
 
-    # replace word BRITE by spaces
-    krecord = ' '* 5 + krecord[5:]
+#     # replace word BRITE by spaces
+#     krecord = ' '* 5 + krecord[5:]
 
-    # split by 11 spaces (and discard ":" ), remove trailing \n
-    cstrings = [c.rstrip() for c in krecord.split('           ')[1:]]
+#     # split by 11 spaces (and discard ":" ), remove trailing \n
+#     cstrings = [c.rstrip() for c in krecord.split('           ')[1:]]
 
-    brite_id = ''
-    for x in cstrings:
-##         print('*******************************')
-##         print('|{}|'.format(x))
-##         print('*******************************')
+#     brite_id = ''
+#     for x in cstrings:
+# ##         print('*******************************')
+# ##         print('|{}|'.format(x))
+# ##         print('*******************************')
         
-        if x.startswith(' ') and not x.startswith('  '):
-            if '[BR:' in x:
-                brite_id = x.split('[BR:')[1].split(']')[0]
-            elif '[br' in x:
-                brite_id = 'br' + x.split('[br')[1].split(']')[0]
-            else:
-                brite_id = 'br?????'
+#         if x.startswith(' ') and not x.startswith('  '):
+#             if '[BR:' in x:
+#                 brite_id = x.split('[BR:')[1].split(']')[0]
+#             elif '[br' in x:
+#                 brite_id = 'br' + x.split('[br')[1].split(']')[0]
+#             else:
+#                 brite_id = 'br?????'
                 
-            classes[0].append(x[1:])
-        elif x.startswith('  ') and not x.startswith('   '):
-            classes[1].append(x[2:])
-        elif x.startswith('   ') and not x.startswith('    '):
-            classes[2].append(x[3:])
-        elif x.startswith('    ') and not x.startswith('     '):
-            classes[3].append(x[4:])
-    if brite_blacklist is not None:
-        if brite_id in brite_blacklist:
-            classes = [['null'], [brite_id], [], []]
+#             classes[0].append(x[1:])
+#         elif x.startswith('  ') and not x.startswith('   '):
+#             classes[1].append(x[2:])
+#         elif x.startswith('   ') and not x.startswith('    '):
+#             classes[2].append(x[3:])
+#         elif x.startswith('    ') and not x.startswith('     '):
+#             classes[3].append(x[4:])
+#     if brite_blacklist is not None:
+#         if brite_id in brite_blacklist:
+#             classes = [['null'], [brite_id], [], []]
 
-    classes = ['#'.join(c) for c in classes]
-    if trace:
-        print ('from BRITE (with id {}):'.format(brite_id))
-        print(tuple(classes))
-    return tuple(classes)
+#     classes = ['#'.join(c) for c in classes]
+#     if trace:
+#         print ('from BRITE (with id {}):'.format(brite_id))
+#         print(tuple(classes))
+#     return tuple(classes)
 
 
-def classes_from_lipidmaps(lm_id, lm_df, trace=False):
-    if trace:
-        print('LIPIDMAPS id: {}'.format(lm_id))
-##     f = requests.get('http://www.lipidmaps.org/rest/compound/lm_id/' + lm_id + '/all/json').text
-##     s = json.loads(f)
-##     if f == '[]':
-##         return 'null', 'null', 'null', 'null'
-##     mm = 'Lipids [LM]'
-##     cc = s['core'] if s['core'] is not None else 'null'
-##     ss = s['main_class'] if s['main_class'] is not None else 'null'
-##     tt = s['sub_class'] if s['sub_class'] is not None else 'null'
+def classes_from_lipidmaps(lm_id, lm_df):
     if lm_id not in lm_df.index:
-        cc = ['Lipids [LM]', 'null', 'null', 'null']
+        cc = Classification('Lipids')
     else:
         record = lm_df.loc[lm_id]
-        cc = ['Lipids [LM]']
+        cc = ['Lipids']
         for field in 'CATEGORY', 'MAIN_CLASS', 'SUB_CLASS':
-            cc.append(record[field] if pd.notnull(record[field]) else 'null')
-    a = tuple(cc)
-    if trace:
-        print(a)
-    return a 
+            cc.append(record[field] if pd.notnull(record[field]) else None)
+    return Classification(*cc)
 
 
 def annotate_compound(compound_id, c_counter, already_fetched, 
@@ -246,23 +212,23 @@ def annotate_compound(compound_id, c_counter, already_fetched,
     
     if compound_id.startswith('C'):
         c_id = compound_id
-        if c_id in local_dbs.kegg2lipidmaps_dict:
-            lm_id = local_dbs.kegg2lipidmaps_dict[c_id]
+        if c_id in local_dbs.kegg2lm:
+            lm_id = local_dbs.kegg2lm[c_id]
             trans_lipidmaps = lm_id
     
     elif compound_id.startswith('LM'):
         lm_id = compound_id
-        if lm_id in local_dbs.lipidmaps2kegg_dict:
-            c_id = local_dbs.lipidmaps2kegg_dict[lm_id]
+        if lm_id in local_dbs.lm2kegg:
+            c_id = local_dbs.lm2kegg[lm_id]
             trans_kegg = c_id
     
     elif compound_id.startswith('HMDB'):
         hmdb_id = compound_id
-        if hmdb_id in local_dbs.hmdb2kegg_dict:
-            c_id = local_dbs.hmdb2kegg_dict[hmdb_id]
+        if hmdb_id in local_dbs.hmdb2kegg:
+            c_id = local_dbs.hmdb2kegg[hmdb_id]
             trans_kegg = c_id
-            if c_id in local_dbs.kegg2lipidmaps_dict:
-                lm_id = local_dbs.kegg2lipidmaps_dict[c_id]
+            if c_id in local_dbs.kegg2lm:
+                lm_id = local_dbs.kegg2lm[c_id]
                 trans_lipidmaps = lm_id
 
     else:
@@ -310,7 +276,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         if classes[0] == 'null':
             if trace:
                 print('BRITE class {} in blacklist. Skipped'.format(classes[1]))
-            classes = ('', '', '', '')
+            classes = Classification()
     
     # then from LIPIDMAPS
     elif (lm_id is not None):
@@ -323,7 +289,7 @@ def annotate_compound(compound_id, c_counter, already_fetched,
         already_fetched.append(lm_id)
 
     else:
-        classes = ('', '', '', '')
+        classes = Classification()
         if trace:
             print ('No BRITE, no LIPIDMAPS')
     
@@ -396,10 +362,10 @@ def annotate_all(peak, c_counter, progress=None, trace=False,
 
     col_names = ['trans_KEGG_Ids',
                  'trans_LipidMaps_Ids',
-                 'Major Class', 
-                 'Class', 
-                 'Secondary Class', 
-                 'Tertiary Class',
+                 'Ontology', 
+                 'Category', 
+                 'MainClass', 
+                 'SubClass',
                  'KNApSAcK']
     
     
@@ -411,23 +377,25 @@ def annotate_all(peak, c_counter, progress=None, trace=False,
     return pd.Series(hash_data, index=col_names)
 
 
-def insert_taxonomy(df, brite_blacklist=None, trace=False):
+def insert_taxonomy(df, local_dbs=None, brite_blacklist=None, trace=False):
     """Apply annotate_all to kegg or LIPIDMAPS ids."""
     
+    if local_dbs is None:
+        local_dbs = load_local_dbs()
+
     progress = Progress(total=len(df['raw_mass']))
     c_counter = _count_compounds()
-    local_dbs = load_local_dbs()
-    
+
     if brite_blacklist is not None:
         with open(brite_blacklist) as f:
             brite_blacklist = f.read().splitlines()
-    
+
     df = pd.concat([df, df['KEGG_cid'].apply(annotate_all, 
                                              args=(c_counter, progress,
                                              trace,
                                              local_dbs,
                                              brite_blacklist))], axis=1)
-    
+
     frmt = '\nDone! {} ids processed. {} DB lookups'.format
     print(frmt(c_counter.get_count(), c_counter.get_looks_count()))
     print('updating local Kegg DB')
@@ -445,35 +413,42 @@ if __name__ == '__main__':
     #from metabolinks.dataio import read_MassTRIX
     from metabolinks import datasets
 
-    start_time = time.time()
+    dbs = load_local_dbs()
 
-    df = datasets.demo('masstrix_output')
-    #df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
-    print ("Data was read\n")
+    for k, v in dbs._asdict().items():
+        print(f'----- {k}')
+        print(v)
+        print('*'*30)
 
-    # Clean up uniqueId and "isotope" cols
-    cdf = cleanup_cols(df)
+    # start_time = time.time()
 
-    # check result
-    cdf.info()
-    assert len(cdf.columns) == 12 # there are 24 - 12 = 12 columns
-    assert len(cdf.index) == 15 # there are still 15 peaks
+    # df = datasets.demo('masstrix_output')
+    # #df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
+    # print ("Data was read\n")
 
-    print ('Starting annotations...')
+    # # Clean up uniqueId and "isotope" cols
+    # cdf = cleanup_cols(df)
 
-    # Call the main driver function.
-    results = insert_taxonomy(cdf, trace=True)
+    # # check result
+    # cdf.info()
+    # assert len(cdf.columns) == 12 # there are 24 - 12 = 12 columns
+    # assert len(cdf.index) == 15 # there are still 15 peaks
 
-    elapsed_time = time.time() - start_time
-    m, s = divmod(elapsed_time, 60)
-    print ("Finished in " + "%02dm%02ds" % (m, s))
-    print('------------------------------------')
+    # print ('Starting annotations...')
 
-    results.info()
+    # # Call the main driver function.
+    # results = insert_taxonomy(cdf, trace=True)
+
+    # elapsed_time = time.time() - start_time
+    # m, s = divmod(elapsed_time, 60)
+    # print ("Finished in " + "%02dm%02ds" % (m, s))
+    # print('------------------------------------')
+
+    # results.info()
     
-    # Export the annotated dataframe into a MS-Excel file
-    # Name it with the same name as the .tsv, replacing tail with '_raw.xlsx'
+    # # Export the annotated dataframe into a MS-Excel file
+    # # Name it with the same name as the .tsv, replacing tail with '_raw.xlsx'
     
-    out_fname = 'results_comptaxa.xlsx'
-    results.to_excel(out_fname, header=True, index=False)
-    print (f"File {out_fname} written")
+    # out_fname = 'results_comptaxa.xlsx'
+    # results.to_excel(out_fname, header=True, index=False)
+    # print (f"File {out_fname} written")
