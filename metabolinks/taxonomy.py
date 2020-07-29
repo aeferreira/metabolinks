@@ -5,33 +5,9 @@ import os
 import requests
 
 import pandas as pd
-# ------------- utility function to clean up MassTRiX columns
-
-def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
-    """Removes the 'uniqueID' and the 'isotope presence' columns."""
-    col_names = []
-    if uniqueID:
-        col_names.append("uniqueID")
-    if isotopes:
-        iso_names = (
-            "C13",
-            "O18",
-            "N15",
-            "S34",
-            "Mg25",
-            "Mg26",
-            "Fe54",
-            "Fe57",
-            "Ca44",
-            "Cl37",
-            "K41",
-        )
-        col_names.extend(iso_names)
-    if columns is not None:
-        col_names.extend(columns)
-    return df.drop(col_names, axis=1)
 
 # ------------- Local database loading ----------------------------------
+
 LocalDBs = namedtuple('LocalDBs', ['kegg_db', 'lm_df',
                                    'hmdb2kegg', 'lm2kegg',
                                    'kegg2lm', 'kegg2brite',
@@ -58,18 +34,17 @@ def load_local_dbs():
     hmdb2kegg = table.set_index('hmdb') # a pandas Series
 
     trans_lm2kegg_fname = os.path.join(_DB_DIR, 'trans_lm2kegg.txt')
-    table = pd.read_csv(trans_lm2kegg_fname, sep='\t', index_col=None)
-    table.columns = ['lm', 'kegg', 'equiv']
-    table = table.drop(columns='equiv')
-    table['lm'] = table['lm'].str.split(':').str.get(1)
-    table['kegg'] = table['kegg'].str.split(':').str.get(1)
-    lm2kegg = table.set_index('lm') # a pandas Series
-    kegg2lm = table.set_index('kegg') # a pandas Series
+    table = pd.read_csv(trans_lm2kegg_fname)
+
+    lm2kegg = table.set_index('lm')['kegg'] # a pandas Series
+    kegg2lm = table.set_index('kegg')['lm'] # a pandas Series
 
     new_kegg_records = []
 
     kegg2brite_fname = os.path.join(_DB_DIR, 'kegg2brite.csv')
     kegg2brite = pd.read_csv(kegg2brite_fname)
+    kegg2brite = kegg2brite.set_index('KeGG CId')
+    kegg2brite = kegg2brite.sort_index()
 
     return LocalDBs(kegg_db, lm_df, hmdb2kegg,
                     lm2kegg, kegg2lm,
@@ -127,328 +102,188 @@ def request_kegg_record(c_id, localdict, local_dbs):
 
 # ------------- compound annotation -------------------
 
-Classification = namedtuple('Classification',
-                           ['Ontology', 'Category', 'MainClass', 'SubClass'],
-                           defaults=[None, None, None, None])
-
-class Progress(object):
-    """A progress reporter of % done for a maximum (int) of self.total"""
-    def __init__(self, total=1):
-        self.reset(total)
-    def tick(self):
-        self.count +=1
-        print(str(round((1-((self.total-self.count)/self.total))*100)) + "% done")
-    def reset(self, total=1):
-        self.total = total
-        self.count = 0
-
-
-# def classes_from_brite(krecord, brite_blacklist=None, trace=False):
-#     """Parses classes from the BRITE section of a kegg record."""
-#     classes = [[], [], [], []]
-
-#     # replace word BRITE by spaces
-#     krecord = ' '* 5 + krecord[5:]
-
-#     # split by 11 spaces (and discard ":" ), remove trailing \n
-#     cstrings = [c.rstrip() for c in krecord.split('           ')[1:]]
-
-#     brite_id = ''
-#     for x in cstrings:
-# ##         print('*******************************')
-# ##         print('|{}|'.format(x))
-# ##         print('*******************************')
-        
-#         if x.startswith(' ') and not x.startswith('  '):
-#             if '[BR:' in x:
-#                 brite_id = x.split('[BR:')[1].split(']')[0]
-#             elif '[br' in x:
-#                 brite_id = 'br' + x.split('[br')[1].split(']')[0]
-#             else:
-#                 brite_id = 'br?????'
-                
-#             classes[0].append(x[1:])
-#         elif x.startswith('  ') and not x.startswith('   '):
-#             classes[1].append(x[2:])
-#         elif x.startswith('   ') and not x.startswith('    '):
-#             classes[2].append(x[3:])
-#         elif x.startswith('    ') and not x.startswith('     '):
-#             classes[3].append(x[4:])
-#     if brite_blacklist is not None:
-#         if brite_id in brite_blacklist:
-#             classes = [['null'], [brite_id], [], []]
-
-#     classes = ['#'.join(c) for c in classes]
-#     if trace:
-#         print ('from BRITE (with id {}):'.format(brite_id))
-#         print(tuple(classes))
-#     return tuple(classes)
-
-
-def classes_from_lipidmaps(lm_id, lm_df):
-    if lm_id not in lm_df.index:
-        cc = Classification('Lipids')
-    else:
-        record = lm_df.loc[lm_id]
-        cc = ['Lipids']
-        for field in 'CATEGORY', 'MAIN_CLASS', 'SUB_CLASS':
-            cc.append(record[field] if pd.notnull(record[field]) else None)
-    return Classification(*cc)
-
-
-def annotate_compound(compound_id, c_counter, already_fetched, 
-                      trace=False, local_dbs=None, brite_blacklist=None):
+def get_identifiers_from_id(compound_id, local_dbs, already_fetched, trace=False):
     c_id = None
     lm_id = None
     hmdb_id = None
     ks_id = None
-    
-    brite = ''
-    dblinks = ''
-    in_plants = ''
-    
-    trans_kegg = compound_id
-    trans_lipidmaps = compound_id
-    
+    primary_id = None
+
+    if trace:
+        print('\n------------ {}'.format(compound_id))
+
     if compound_id.startswith('C'):
         c_id = compound_id
-        if c_id in local_dbs.kegg2lm:
-            lm_id = local_dbs.kegg2lm[c_id]
-            trans_lipidmaps = lm_id
-    
+        primary_id = c_id
+        lm_id = local_dbs.kegg2lm.get(c_id)
+
     elif compound_id.startswith('LM'):
         lm_id = compound_id
-        if lm_id in local_dbs.lm2kegg:
-            c_id = local_dbs.lm2kegg[lm_id]
-            trans_kegg = c_id
-    
+        primary_id = lm_id
+        c_id = local_dbs.lm2kegg.get(lm_id)
+
     elif compound_id.startswith('HMDB'):
         hmdb_id = compound_id
-        if hmdb_id in local_dbs.hmdb2kegg:
-            c_id = local_dbs.hmdb2kegg[hmdb_id]
-            trans_kegg = c_id
-            if c_id in local_dbs.kegg2lm:
-                lm_id = local_dbs.kegg2lm[c_id]
-                trans_lipidmaps = lm_id
+        primary_id = hmdb_id
+        c_id = local_dbs.hmdb2kegg.get(hmdb_id)
+        if c_id is not None:
+            lm_id = local_dbs.kegg2lm.get(c_id)
 
     else:
-        pass # does MASSTrix use any other DBs for IDs?
-    
-    if trace:
-        print('\n---- compound: {} ({}, {})'.format(compound_id, 
-                                             trans_kegg, 
-                                             trans_lipidmaps))
-    
+        raise ValueError('Cannot resolve compound Id {}'.format(compound_id))
+
     if c_id in already_fetched or lm_id in already_fetched:
         if trace:
-            print('already looked up')
-        return (trans_kegg, trans_lipidmaps, '', '', '', '', '')
-        
+            print('{} already looked up before, skipping'.format(primary_id))
+            cformat = '---- compound: KeGG={} LM={}, HMDB={}'.format
+            print(cformat(c_id, lm_id, hmdb_id))
+        return None
+
     if c_id is not None:
         krecord = request_kegg_record(c_id, local_dbs.kegg_db, local_dbs)
         if trace:
-            print('(look up {})'.format(c_id))
-        c_counter.inc_looks()
-        already_fetched.append(c_id)
-    
-        brite = get_kegg_section(krecord, 'BRITE', whole_section=True)
+            print('(retrieving KNApSAcK from {})'.format(c_id))
+
         dblinks = get_kegg_section(krecord, 'DBLINKS')
-        
+
         if len(dblinks) > 0:
-            # find if there are LIPIMAPS or KNApSAcK Xrefs in DBLINKS section
-            if 'LIPIDMAPS:' in dblinks:
-                for line in dblinks.splitlines():
-                    if 'LIPIDMAPS:' in line:
-                        lm_id = line.split(':')[1].strip()
-                        trans_lipidmaps = lm_id
             if 'KNApSAcK' in dblinks:
                 for line in dblinks.splitlines():
                     if 'KNApSAcK:' in line:
                         ks_id = line.split(':')[1].strip()
-    
-    # get compound taxonomy
-    
-    # first from BRITE section
-    if (c_id is not None) and len(brite) > 0:
-        classes = classes_from_brite(brite, 
-                                     brite_blacklist=brite_blacklist,
-                                     trace=trace)
-        if classes[0] == 'null':
-            if trace:
-                print('BRITE class {} in blacklist. Skipped'.format(classes[1]))
-            classes = Classification()
-    
-    # then from LIPIDMAPS
-    elif (lm_id is not None):
-        if trace:
-            print('(look up {})'.format(lm_id))
-        classes = classes_from_lipidmaps(lm_id,
-                                         local_dbs.lm_df,
-                                         trace=trace)
-        c_counter.inc_looks()
-        already_fetched.append(lm_id)
 
-    else:
-        classes = Classification()
-        if trace:
-            print ('No BRITE, no LIPIDMAPS')
-    
-    # find if present in plants
-    in_plants = ''
-    if ks_id is not None:
-        r = requests.post('http://kanaya.naist.jp/knapsack_jsp/information.jsp?sname=C_ID&word=' + ks_id)
-        c_counter.inc_looks()
-        if 'Plantae' in r.text:
-            in_plants = 'Plantae'
-            if trace:
-                print(in_plants)
-    
-    result = [trans_kegg, trans_lipidmaps]
-    result.extend(list(classes))
-    result.append(in_plants)
-    return tuple(result)
-
-class _count_compounds(object):
-    def __init__(self):
-        self.reset()
-    def reset(self):
-        self.count = 0
-        self.looks_count = 0
-    def inc(self, n=1):
-        self.count += n
-    def inc_looks(self, n=1):
-        self.looks_count += n
-    def get_count(self):
-        return self.count
-    def get_looks_count(self):
-        return self.looks_count
-
-
-def annotate_all(peak, c_counter, progress=None, trace=False,
-                 local_dbs=None, brite_blacklist=None):
-    """Create Pandas Series with compound class annotations."""
-    
-    data = [[], [], [], [], [], [], []]
-    
     if trace:
-        print('\n++++++++ PEAK +++++++++++++')
-    
+        print('Primary identifier: {}'.format(primary_id))
+        cformat = '---- compound: KeGG={} LM={}, HMDB={}, KNApSAcK={}'.format
+        print(cformat(c_id, lm_id, hmdb_id, ks_id))
+
+    returndict = {'kegg_id': c_id, 
+                  'lm_id': lm_id,
+                  'hmdb_id': hmdb_id,
+                  'primary': primary_id,
+                  'KNApSAcK':ks_id}
+    already_fetched.append(primary_id)
+    return returndict
+
+
+def get_identifiers(compound_ids, local_dbs, trace=False):
     already_fetched = []
-    
-    for compound_id in peak.split('#'):
-        c_counter.inc()
+    result = []
+    for compound_id in compound_ids:
+        rd = get_identifiers_from_id(compound_id, local_dbs, already_fetched, trace=trace)
+        if rd is not None:
+            result.append(rd)
+    return pd.DataFrame(result).set_index('primary')
+
+
+def get_LM_taxonomy(lm_id, local_dbs):
+    row = local_dbs.lm_df.loc[lm_id][['CATEGORY', 'MAIN_CLASS', 'SUB_CLASS', 'NAME']]
+    row = pd.Series(['Lipids'] + list(row.values),
+                     index=['Ontology', 'Category', 'Main class', 'Subclass', 'Names'])
+    return row
+
+
+def get_taxonomy_from_identifiers(identifier_table, local_dbs, trace=False):
+    alltax = []
+
+    for primary, row in identifier_table.iterrows():
+        if trace:
+            print('---------- {}'.format(primary))
+        ontologies = pd.DataFrame()
         
-        d_compound = annotate_compound(compound_id, 
-                                       c_counter, 
-                                       already_fetched, 
-                                       trace, local_dbs,
-                                       brite_blacklist)
-        
-        for d, i in zip(data, d_compound):
-            if len(i) > 0: # don't include empty strings
-                d.append(i)
-    
-    if progress is not None:
-        progress.tick()
-    
-    compressed_data = []
-    for i, d in enumerate(data):
-        if i < 2:
-            compressed_data.append(d)
-        else:
-            compressed_data.append(set(d))
-    
-    hash_data = ['#'.join(d) for d in compressed_data]    
+        if row.kegg_id is not None:
+            table = local_dbs.kegg2brite
+            ontologies = table.iloc[table.index.isin([row.kegg_id])]
+            ontologies = ontologies[['Ontology', 'Category', 'Main class', 'Subclass', 'Names']]
 
-    col_names = ['trans_KEGG_Ids',
-                 'trans_LipidMaps_Ids',
-                 'Ontology', 
-                 'Category', 
-                 'MainClass', 
-                 'SubClass',
-                 'KNApSAcK']
-    
-    
-    if trace:
-        print('\nDATA:')
-        for n, d in zip(col_names, hash_data):
-            print('{:25s} : {}'.format(n, d))
-    
-    return pd.Series(hash_data, index=col_names)
+        if row.lm_id is not None:
+            lmtax = get_LM_taxonomy(row.lm_id, local_dbs)
+            lmtax.name = primary
+            lmtax = lmtax.to_frame().T
+            if ontologies.empty:
+                ontologies = lmtax
+            elif 'Lipids' in ontologies['Ontology'].values:
+                ontologies.loc[ontologies['Ontology'] == 'Lipids'] = lmtax
+            else:
+                ontologies = pd.concat([ontologies, lmtax])
 
+        if not ontologies.empty:
+            if trace:
+                print(ontologies)
+            alltax.append(ontologies)
 
-def insert_taxonomy(df, local_dbs=None, brite_blacklist=None, trace=False):
-    """Apply annotate_all to kegg or LIPIDMAPS ids."""
-    
+    return pd.concat(alltax)
+
+def generate_taxonomy(identifiers, local_dbs=None, trace=False):
     if local_dbs is None:
         local_dbs = load_local_dbs()
+    
+    id_table = get_identifiers(identifiers, local_dbs, trace=trace)
+    annotations = get_taxonomy_from_identifiers(id_table, local_dbs, trace=trace)
+    
+    # print('updating local Kegg DB')
+    if len(local_dbs.new_kegg_records) > 0:
+        kegg_df_fname = os.path.join(_DB_DIR, 'kegg_db.txt')
+        with open(kegg_df_fname, 'a') as kf:
+            kf.write('\n')
+            kf.write('\n'.join(local_dbs.new_kegg_records))
 
-    progress = Progress(total=len(df['raw_mass']))
-    c_counter = _count_compounds()
+    # concat extra columns with other ids
+    return pd.concat([annotations,id_table], join='inner', axis=1)
 
-    if brite_blacklist is not None:
-        with open(brite_blacklist) as f:
-            brite_blacklist = f.read().splitlines()
 
-    df = pd.concat([df, df['KEGG_cid'].apply(annotate_all, 
-                                             args=(c_counter, progress,
-                                             trace,
-                                             local_dbs,
-                                             brite_blacklist))], axis=1)
+    # # find if present in plants
+    # in_plants = ''
+    # if ks_id is not None:
+    #     r = requests.post('http://kanaya.naist.jp/knapsack_jsp/information.jsp?sname=C_ID&word=' + ks_id)
+    #     c_counter.inc_looks()
+    #     if 'Plantae' in r.text:
+    #         in_plants = 'Plantae'
+    #         if trace:
+    #             print(in_plants)
 
-    frmt = '\nDone! {} ids processed. {} DB lookups'.format
-    print(frmt(c_counter.get_count(), c_counter.get_looks_count()))
-    print('updating local Kegg DB')
-    kegg_df_fname = os.path.join(_DB_DIR, 'kegg_db.txt')
-    with open(kegg_df_fname, 'a') as kf:
-        kf.write('\n')
-        kf.write('\n'.join(local_dbs.new_kegg_records))
-    print('\nDone')
-    return df
+
 
 if __name__ == '__main__':
 
-    print ('\nStarting...\n')
-    #import six
-    #from metabolinks.dataio import read_MassTRIX
     from metabolinks import datasets
 
     dbs = load_local_dbs()
 
-    for k, v in dbs._asdict().items():
-        print(f'----- {k}')
-        print(v)
-        print('*'*30)
+    # for k, v in dbs._asdict().items():
+    #     print(f'----- {k}')
+    #     print(v)
+    #     print('*'*30)
 
-    # start_time = time.time()
+    df = datasets.demo('masstrix_output')
+    print ("Demo data:\n")
 
-    # df = datasets.demo('masstrix_output')
-    # #df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
-    # print ("Data was read\n")
+    df.info()
+    print('************************')
+    print(df.KEGG_cid)
+    print('************************')
 
-    # # Clean up uniqueId and "isotope" cols
-    # cdf = cleanup_cols(df)
+    # get one identifier per row
+    cids = df.KEGG_cid.str.split('#').explode()
+    print('\n\n----- Identifier list')
+    print(cids)
+    print('-----------------------------------')
 
-    # # check result
-    # cdf.info()
-    # assert len(cdf.columns) == 12 # there are 24 - 12 = 12 columns
-    # assert len(cdf.index) == 15 # there are still 15 peaks
+    # build identifier translation table
+    identifiers = get_identifiers(cids, dbs, trace=False)
 
-    # print ('Starting annotations...')
+    print('\n\n----- Identifiers translation table')
+    print(identifiers)
+    print('-----------------------------------')
 
-    # # Call the main driver function.
-    # results = insert_taxonomy(cdf, trace=True)
+    annotations = get_taxonomy_from_identifiers(identifiers, dbs, trace=False)
 
-    # elapsed_time = time.time() - start_time
-    # m, s = divmod(elapsed_time, 60)
-    # print ("Finished in " + "%02dm%02ds" % (m, s))
-    # print('------------------------------------')
+    print('Annotations:\n')
+    print(annotations)
 
-    # results.info()
-    
-    # # Export the annotated dataframe into a MS-Excel file
-    # # Name it with the same name as the .tsv, replacing tail with '_raw.xlsx'
-    
-    # out_fname = 'results_comptaxa.xlsx'
-    # results.to_excel(out_fname, header=True, index=False)
-    # print (f"File {out_fname} written")
+    print('+++++++++++++++++++++++++++++++++++')
+    annotations = generate_taxonomy(cids)
+
+    print('Annotations:\n')
+    print(annotations)
+    annotations.to_csv('demo_taxonomy.csv')
