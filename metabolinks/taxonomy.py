@@ -37,7 +37,8 @@ def load_local_dbs():
     table = pd.read_csv(trans_lm2kegg_fname)
 
     lm2kegg = table.set_index('lm')['kegg'] # a pandas Series
-    kegg2lm = table.set_index('kegg')['lm'] # a pandas Series
+    #kegg2lm = table.set_index('kegg')['lm'] # a pandas Series
+    kegg2lm = table.drop_duplicates(subset='kegg', keep='first').set_index('kegg')['lm']
 
     new_kegg_records = []
 
@@ -91,9 +92,9 @@ def get_kegg_section(k_record, sname, whole_section=False):
         sectionlines = [line[12:] for line in section]
     return '\n'.join(sectionlines)
 
-def request_kegg_record(c_id, localdict, local_dbs):
-    if c_id in localdict:
-        return localdict[c_id]
+def request_kegg_record(c_id, local_dbs):
+    if c_id in local_dbs.kegg_db:
+        return local_dbs.kegg_db[c_id]
     else:
         record = requests.get('http://rest.kegg.jp/get/' + c_id).text
         outrecord = '---- Compound: {}\n'.format(c_id) + record
@@ -132,6 +133,10 @@ def get_identifiers_from_id(compound_id, local_dbs, already_fetched, trace=False
     else:
         raise ValueError('Cannot resolve compound Id {}'.format(compound_id))
 
+    # if type(c_id) == pd.Series:
+    #     print('Series c_id', c_id)
+    # if type(lm_id) == pd.Series:
+    #     print('Series lm_id', lm_id)
     if c_id in already_fetched or lm_id in already_fetched:
         if trace:
             print('{} already looked up before, skipping'.format(primary_id))
@@ -139,30 +144,41 @@ def get_identifiers_from_id(compound_id, local_dbs, already_fetched, trace=False
             print(cformat(c_id, lm_id, hmdb_id))
         return None
 
-    if c_id is not None:
-        krecord = request_kegg_record(c_id, local_dbs.kegg_db, local_dbs)
-        if trace:
-            print('(retrieving KNApSAcK from {})'.format(c_id))
+    # if c_id is not None:
+    #     krecord = request_kegg_record(c_id, local_dbs)
+    #     if trace:
+    #         print('(retrieving KNApSAcK from {})'.format(c_id))
 
-        dblinks = get_kegg_section(krecord, 'DBLINKS')
+    #     dblinks = get_kegg_section(krecord, 'DBLINKS')
 
-        if len(dblinks) > 0:
-            if 'KNApSAcK' in dblinks:
-                for line in dblinks.splitlines():
-                    if 'KNApSAcK:' in line:
-                        ks_id = line.split(':')[1].strip()
+    #     if len(dblinks) > 0:
+    #         if 'KNApSAcK' in dblinks:
+    #             for line in dblinks.splitlines():
+    #                 if 'KNApSAcK:' in line:
+    #                     ks_id = line.split(':')[1].strip()
+        
+    #     # find if present in plants
+    #     if ks_id is not None:
+    #         r = requests.post('http://kanaya.naist.jp/knapsack_jsp/information.jsp?sname=C_ID&word=' + ks_id)
+    #         if 'Plantae' in r.text:
+    #             ks_id = ks_id + ' in Plantae'
+    #             if trace:
+    #                 print(ks_id)
 
     if trace:
         print('Primary identifier: {}'.format(primary_id))
-        cformat = '---- compound: KeGG={} LM={}, HMDB={}, KNApSAcK={}'.format
-        print(cformat(c_id, lm_id, hmdb_id, ks_id))
+        # cformat = '---- compound: KeGG={} LM={}, HMDB={}, KNApSAcK={}'.format
+        cformat = '---- compound: KeGG={} LM={}, HMDB={}'.format
+        print(cformat(c_id, lm_id, hmdb_id))
+
+    for db_id in (c_id, lm_id, hmdb_id):
+        if db_id is not None:
+            already_fetched.append(db_id)
 
     returndict = {'kegg_id': c_id, 
                   'lm_id': lm_id,
                   'hmdb_id': hmdb_id,
-                  'primary': primary_id,
-                  'KNApSAcK':ks_id}
-    already_fetched.append(primary_id)
+                  'primary': primary_id,}
     return returndict
 
 
@@ -177,26 +193,39 @@ def get_identifiers(compound_ids, local_dbs, trace=False):
 
 
 def get_LM_taxonomy(lm_id, local_dbs):
-    row = local_dbs.lm_df.loc[lm_id][['CATEGORY', 'MAIN_CLASS', 'SUB_CLASS', 'NAME']]
-    row = pd.Series(['Lipids'] + list(row.values),
-                     index=['Ontology', 'Category', 'Main class', 'Subclass', 'Names'])
+    row = local_dbs.lm_df.loc[lm_id]
+    name = row['NAME']
+    sname = row['SYSTEMATIC_NAME']
+    abbrev = row['ABBREVIATION']
+    if pd.isnull(name):
+        name = sname
+    if pd.isnull(name):
+         name = abbrev
+    row = row[['CATEGORY', 'MAIN_CLASS', 'SUB_CLASS']]
+    row = pd.Series([name, 'Lipids'] + list(row.values),
+                     index=['Names', 'Ontology', 'Category', 'Main class', 'Subclass'])
     return row
 
 
-def get_taxonomy_from_identifiers(identifier_table, local_dbs, trace=False):
+def get_taxonomy_from_identifiers(identifier_table, local_dbs, skip_ontologies=None, trace=False):
+    if skip_ontologies is None:
+        skip_ontologies = tuple()
+    if isinstance(skip_ontologies, str):
+        skip_ontologies = [skip_ontologies]
     alltax = []
 
     for primary, row in identifier_table.iterrows():
+        
         if trace:
             print('---------- {}'.format(primary))
         ontologies = pd.DataFrame()
-        
+
         if row.kegg_id is not None:
             table = local_dbs.kegg2brite
             ontologies = table.iloc[table.index.isin([row.kegg_id])]
-            ontologies = ontologies[['Ontology', 'Category', 'Main class', 'Subclass', 'Names']]
+            ontologies = ontologies[['Names', 'Ontology', 'Category', 'Main class', 'Subclass']]
 
-        if row.lm_id is not None:
+        if (row.lm_id is not None) and (row.lm_id in local_dbs.lm_df.index):
             lmtax = get_LM_taxonomy(row.lm_id, local_dbs)
             lmtax.name = primary
             lmtax = lmtax.to_frame().T
@@ -208,19 +237,24 @@ def get_taxonomy_from_identifiers(identifier_table, local_dbs, trace=False):
                 ontologies = pd.concat([ontologies, lmtax])
 
         if not ontologies.empty:
+            ontologies = ontologies[~ontologies['Ontology'].isin(skip_ontologies)]
+
+        if not ontologies.empty:
             if trace:
                 print(ontologies)
             alltax.append(ontologies)
 
     return pd.concat(alltax)
 
-def generate_taxonomy(identifiers, local_dbs=None, trace=False):
+def generate_taxonomy(identifiers, local_dbs=None, skip_ontologies=None, trace=False):
     if local_dbs is None:
         local_dbs = load_local_dbs()
     
     id_table = get_identifiers(identifiers, local_dbs, trace=trace)
-    annotations = get_taxonomy_from_identifiers(id_table, local_dbs, trace=trace)
-    
+    annotations = get_taxonomy_from_identifiers(id_table, local_dbs,
+                                                skip_ontologies=skip_ontologies,
+                                                trace=trace)
+
     # print('updating local Kegg DB')
     if len(local_dbs.new_kegg_records) > 0:
         kegg_df_fname = os.path.join(_DB_DIR, 'kegg_db.txt')
@@ -229,19 +263,10 @@ def generate_taxonomy(identifiers, local_dbs=None, trace=False):
             kf.write('\n'.join(local_dbs.new_kegg_records))
 
     # concat extra columns with other ids
-    return pd.concat([annotations,id_table], join='inner', axis=1)
-
-
-    # # find if present in plants
-    # in_plants = ''
-    # if ks_id is not None:
-    #     r = requests.post('http://kanaya.naist.jp/knapsack_jsp/information.jsp?sname=C_ID&word=' + ks_id)
-    #     c_counter.inc_looks()
-    #     if 'Plantae' in r.text:
-    #         in_plants = 'Plantae'
-    #         if trace:
-    #             print(in_plants)
-
+    #annotations.info()
+    #id_table.info()
+    annotations = annotations.merge(id_table, how='left', left_index=True, right_index=True)
+    return annotations
 
 
 if __name__ == '__main__':
@@ -282,7 +307,7 @@ if __name__ == '__main__':
     print(annotations)
 
     print('+++++++++++++++++++++++++++++++++++')
-    annotations = generate_taxonomy(cids)
+    annotations = generate_taxonomy(cids, skip_ontologies='Carcinogens')
 
     print('Annotations:\n')
     print(annotations)
