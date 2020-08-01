@@ -206,6 +206,19 @@ def get_LM_taxonomy(lm_id, local_dbs):
                      index=['Names', 'Ontology', 'Category', 'Main class', 'Subclass'])
     return row
 
+def substitute_lipids_ontology(identifier, primary, ontologies, local_dbs):
+    if not identifier in local_dbs.lm_df.index:
+        return ontologies
+    lmtax = get_LM_taxonomy(identifier, local_dbs)
+    lmtax.name = primary
+    lmtax = lmtax.to_frame().T
+    if len(ontologies.index) == 0:
+        return lmtax
+    elif 'Lipids' in ontologies['Ontology'].values:
+        ontologies.loc[ontologies['Ontology'] == 'Lipids'] = lmtax
+    else:
+        ontologies = pd.concat([ontologies, lmtax])
+    return ontologies
 
 def get_taxonomy_from_identifiers(identifier_table, local_dbs, skip_ontologies=None, trace=False):
     if skip_ontologies is None:
@@ -215,31 +228,25 @@ def get_taxonomy_from_identifiers(identifier_table, local_dbs, skip_ontologies=N
     alltax = []
 
     for primary, row in identifier_table.iterrows():
-        
         if trace:
             print('---------- {}'.format(primary))
         ontologies = pd.DataFrame()
 
-        if row.kegg_id is not None:
-            table = local_dbs.kegg2brite
-            ontologies = table.iloc[table.index.isin([row.kegg_id])]
-            ontologies = ontologies[['Names', 'Ontology', 'Category', 'Main class', 'Subclass']]
+        if primary.startswith('LM'):
+            ontologies = substitute_lipids_ontology(primary, primary, ontologies, local_dbs)
+        else:
+            if primary.startswith('C'):
+                table = local_dbs.kegg2brite
+                ontologies = table.iloc[table.index.isin([primary])]
+                ontologies = ontologies[['Names', 'Ontology', 'Category', 'Main class', 'Subclass']]
 
-        if (row.lm_id is not None) and (row.lm_id in local_dbs.lm_df.index):
-            lmtax = get_LM_taxonomy(row.lm_id, local_dbs)
-            lmtax.name = primary
-            lmtax = lmtax.to_frame().T
-            if ontologies.empty:
-                ontologies = lmtax
-            elif 'Lipids' in ontologies['Ontology'].values:
-                ontologies.loc[ontologies['Ontology'] == 'Lipids'] = lmtax
-            else:
-                ontologies = pd.concat([ontologies, lmtax])
+                if row.lm_id is not None:
+                    ontologies = substitute_lipids_ontology(row.lm_id, primary, ontologies, local_dbs)
 
-        if not ontologies.empty:
+        if len(ontologies.index) > 0:
             ontologies = ontologies[~ontologies['Ontology'].isin(skip_ontologies)]
 
-        if not ontologies.empty:
+        if len(ontologies.index) > 0:
             if trace:
                 print(ontologies)
             alltax.append(ontologies)
