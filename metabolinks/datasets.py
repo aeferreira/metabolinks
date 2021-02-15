@@ -219,6 +219,9 @@ def demo_dataset(name):
 def demo(name):
     return DataSetFactory.create_dataset(name).as_pandas()
 
+def load_demo_dataset(name):
+    pass
+
 
 if __name__ == '__main__':
     from pandas.testing import assert_frame_equal

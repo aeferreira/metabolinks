@@ -1,14 +1,12 @@
-from six import StringIO
 import pandas as pd
 from metabolinks import add_labels
-import metabolinks.dataio as dataio
 import metabolinks.datasets as datasets
 import metabolinks.transformations as transformations
 
 
-print('\nReading sample data (as io stream) ------------\n')
-dataset = dataio.read_data_csv(StringIO(datasets.demo_data1()))
-print(dataset)
+print('\nReading unlabeled sample data ------------\n')
+dataset = datasets.demo_dataset('demo1').as_pandas()
+#print(dataset)
 print('-- info --------------')
 print(dataset.cdf.info())
 print('-- global info---------')
@@ -19,16 +17,16 @@ print('\nretrieving subset of data ----------')
 print('--- sample s39 ----------')
 asample = dataset.cdf.take(sample='s39')
 print(asample)
-print(type(asample))
-print(asample[98.34894])
+assert type(asample) == pd.Series
+assert asample[98.34894] == 2165052.0
 print('--- samples s39 s33 ----------')
 asample = dataset.cdf.take(sample=('s39', 's33'))
 print(asample)
-print(type(asample))
+assert type(asample) == pd.DataFrame
 
-print('\nReading sample data with labels (as io stream) ------------\n')
-data = dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
-print(dataset)
+print('\nReading dataset data with labels ------------\n')
+dataset = datasets.demo_dataset('demo2').as_pandas()
+#print(dataset)
 print('-- info --------------')
 print(dataset.cdl.info())
 print('-- global info---------')
@@ -44,12 +42,12 @@ print('\nretrieving subsets of data ----------')
 print('--- sample s39 ----------')
 asample = dataset.cdl.take(sample='s39')
 print(asample)
-print(type(asample))
-# print(asample[97.59185])
+assert type(asample) == pd.Series
+
 print('--- label l2 ----------')
 asample = dataset.cdl.take(label='l2')
 print(asample)
-print(type(asample))
+assert type(asample) == pd.DataFrame
 
 print('\nretrieving features')
 print('--- whole data ----------')
@@ -63,8 +61,8 @@ print(asample.values)
 
 print('\nUsing subset_iloc to double label l2 ----')
 newdataset = dataset.copy()
-print(newdataset)
-print('\n-- label l2 replaced by double -------------')
+#print(newdataset)
+print('\n-- label l2 is replaced by 2 x -------------')
 double = newdataset.cdl.subset(label='l2') * 2
 iloc = newdataset.cdl.subset_iloc(label='l2')
 print(iloc)
@@ -74,7 +72,7 @@ print(newdataset.cdl.info())
 
 print('\nUsing subset_loc to double label l2 ----')
 newdataset = dataset.copy()
-print(newdataset)
+#print(newdataset)
 # print('\n--original data with sorted column index -')
 # newdataset = newdataset.sort_index(axis='columns')
 # print(newdataset)
@@ -88,7 +86,7 @@ print(newdataset.cdl.info())
 
 print('\nUsing subset_where to double label l2 ----')
 newdataset = dataset.copy()
-print(newdataset)
+#print(newdataset)
 print('\n--original data with sorted column index -')
 newdataset = newdataset.sort_index(axis='columns')
 print(newdataset)
@@ -115,17 +113,17 @@ print(dataset.cdl.unique_labels)
 
 print('\nSetting new labels -- L1 L2 L3 --')
 dataset.cdl.labels = ['L1', 'L2', 'L3']
-print(dataset)
+#print(dataset)
 print(dataset.cdl.info())
 
 print('\nSetting new labels -- L1 --')
 dataset.cdl.labels = 'L1'
-print(dataset)
+#print(dataset)
 print(dataset.cdl.info())
 
 print('\nSetting new labels --- None -')
 dataset.cdl.labels = None
-print(dataset)
+#print(dataset)
 print(dataset.cdl.info())
 
 print('\nSetting new labels and samples ----')
@@ -133,11 +131,11 @@ print('--- labels L1 L2 L3 ----------')
 dataset.cdl.labels = ['L1', 'L2', 'L3']
 print('--- samples as default ----------')
 dataset.cdl.samples = None
-print(dataset)
+#print(dataset)
 print(dataset.cdl.info())
 
 print('\nReading again sample data with labels (as io stream) ------------\n')
-dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
+dataset = datasets.demo_dataset('demo2').as_pandas()
 print(dataset)
 print('-- info --------------')
 print(dataset.cdl.info())
@@ -147,7 +145,7 @@ print('-----------------------')
 
 print('\nTesting ms.erase_labels() ----')
 dataset_unlabeled = dataset.cdl.erase_labels()
-print(dataset_unlabeled)
+#print(dataset_unlabeled)
 print('-- info --------------')
 print(dataset_unlabeled.cdf.info())
 print('-- global info---------')
@@ -158,11 +156,13 @@ print('\nretrieving subsets of data ----------')
 print('--- sample s39 ----------')
 asample = dataset_unlabeled.cdf.take(sample='s39')
 print(asample)
-print(type(asample))
+assert type(asample) == pd.Series
+#print(type(asample))
 print('--- samples s38 s32 ----------')
 asample = dataset_unlabeled.cdf.take(sample=['s38', 's32'])
 print(asample)
-print(type(asample))
+assert type(asample) == pd.DataFrame
+#print(type(asample))
 
 print('\nretrieving features')
 print('--- whole data ----------')
@@ -175,12 +175,5 @@ print('\nadding labels again')
 print('--- adding L1, L2 ----------')
 newdataset = add_labels(dataset, labels=['L1', 'L2'])
 print(newdataset)
-
-print('\n\n-----++++++ ML data ++++++------')
-print('\nReading sample data with labels (as io stream) ------------\n')
-data = dataset = dataio.read_data_csv(StringIO(datasets.demo_data2()), has_labels=True)
-print(dataset)
-print('-- ML data --------------')
-print(dataset.cdl.data)
 
 

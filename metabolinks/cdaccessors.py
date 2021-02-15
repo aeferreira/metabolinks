@@ -32,8 +32,6 @@ def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
     newcols = [tuple([ns] + c) for (ns, c) in zip(newstrs, tcols)]
     return pd.MultiIndex.from_tuples(newcols, names=[level_name] + metanames)
 
-DataParts = namedtuple('DataParts', 'data_matrix labels names features unique_labels')
-
 @register_dataframe_accessor("cdl")
 class CDLAccessor(object):
     """An accessor to Pandas DataFrame to interpret content as column organized, labeled data.
@@ -67,21 +65,11 @@ class CDLAccessor(object):
     def _validate(df):
         """Require a pandas DataFrame with at least two levels in column MultiIndex to work."""
         if not isinstance(df, pd.DataFrame):
-            raise AttributeError("'ms' must be used with a Pandas DataFrame")
+            raise AttributeError("'cdl' must be used with a Pandas DataFrame")
         if len(df.columns.names) < 2:
             raise AttributeError(
                 "Must have at least label and sample metadata on columns"
             )
-
-    @property
-    def data(self):
-        """The Pandas DataFrame holding the data, transposed to be usable as tidy"""
-        res = DataParts(data_matrix=self._df.transpose(copy=True).values,
-                        labels=self.labels.values.copy(),
-                        names=self.samples.values.copy(),
-                        features=self.features().values,
-                        unique_labels=self.unique_labels)
-        return res
 
     def _get_zip_labels_samples(self):
         self._df.columns = self._df.columns.remove_unused_levels()
