@@ -1,20 +1,85 @@
-"""Example data sets.
+"""Demonstration data sets.
 
-   For now, they are used essencially for testing purposes."""
+   For now, they are used essencially for testing purposes.
+
+   All the datasets are scikit-learn Bunch objects and try to follow
+   the same attribute convention, with effort on creating an aditional
+   `sample_names` attribute."""
+
 from abc import ABCMeta, abstractmethod
 import pandas as pd
-import six
+from io import StringIO
+from sklearn.utils import Bunch
+from sklearn.preprocessing import LabelEncoder
+#import six
+
+def parse_data(df, samples_in_cols=False, labels_loc=None, labels_in_multindex=False, desc=''):
+    """A parse a pandas dataframe returning a sckit-learn dataset.
+
+    Returns a Bunch object with attributes following the same convention as
+    the demo datasets of sckit-learn. Aditionally, the sample_names attribute
+    is also created if possible.
+
+    `labels_loc` and `labels_in_multiindex`, indicate the location of the class labels in the df:
+
+    - if labels_in_multindex is True, the labels are read from the outer level of the sample
+      (mult)index
+    - if labels_in_multindex is False, `labels_loc` should be the name of the feature column (or row if
+      `samples_in_cols` is True) where the labels are located.
+    - if labels_in_multindex is False and `labels_loc` is None, no class labels are read
+      and target and target_names are not generated
+
+    class labels are encoded by sklearn.preprocessing.LabelEncoder() to fill attributes target
+    and target_names.
+    """
+
+    if samples_in_cols:
+        s_indx = df.columns
+        f_indx = df.index
+    else:
+        s_indx = df.index
+        f_indx = df.columns
+    bunch = Bunch()
+    # data attr
+    bunch['data'] = df.transpose() if samples_in_cols else df.copy()
+
+    # DESCR attr
+    bunch['DESCR'] = desc
+
+    #feature_names nad sample_names attrs
+    bunch['sample_names'] = list(s_indx) if s_indx.nlevels < 2 else list(s_indx.to_flat_index())
+    bunch['feature_names'] = list(f_indx) if f_indx.nlevels < 2 else list(f_indx.to_flat_index())
+
+    # target and target_names
+    classes = None
+    if labels_in_multindex:
+        outer_level = s_indx.get_level_values(0)
+        classes = list(outer_level)
+    else:
+        if labels_loc is not None:
+            if samples_in_cols:
+                classes = list(df.loc[labels_loc, :].values)
+            else:
+                classes = list(df[labels_loc].values)
+    if classes is not None:
+        le = LabelEncoder()
+        le.fit(classes)
+        bunch['target_names'] = list(le.classes_)
+        bunch['target'] = le.transform(classes)
+
+    return bunch
+
 
 class DataSetBase(metaclass=ABCMeta):
     """ Base class for an example data set"""
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """ Constructor """
         pass
 
     @abstractmethod
-    def as_pandas(self):
-        """ Abstract method to return the dataset as pandas DataFrame."""
+    def as_Bunch(self):
+        """ Abstract method to return the dataset as scikit-learn Bunch object."""
         pass
 
     @abstractmethod
@@ -62,7 +127,7 @@ class DataSetFactory:
         """
 
         if name not in cls.registry:
-            raise AttributeError('Data set {} is not registered'.format(name))
+            raise AttributeError('Data set {} is not available'.format(name))
 
 
         dataset_class = cls.registry[name]
@@ -95,11 +160,14 @@ class Demo1(DataSetBase):
 98.57899		1877649	1864650	1573559		1829208
 99.28772	2038979				3476845	"""
 
-    def as_pandas(self):
-        return pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=0)
+    def as_Bunch(self):
+        df = pd.read_csv(StringIO(self.as_str()), sep='\t', index_col=0)
+        desc = """Small data set containing MS intensity data (6 samples, 19 peaks)."""
+        return parse_data(df, samples_in_cols=True, desc=desc)
+        # no target and no target_names
 
     def create_example_file(self, file_name):
-        df = self.as_pandas()
+        df = self.as_Bunch().data.transpose()
         df.to_csv(file_name)
 
 @DataSetFactory.register('demo2')
@@ -114,7 +182,7 @@ m/z
 97.59185	460092	486631		1137139	926038	1176756
 97.72992			506345			439583
 98.34894	2232032	2165052	1966283			
-98.35078	3255288		2516386			
+98.35078	3255288	2813578	2516386			
 98.35122		2499163	2164976			
 98.36001			1270764	1463557	1390574	
 98.57354				4627491	6142759	
@@ -129,12 +197,13 @@ m/z
 98.57899		1877649	1864650	1573559		1829208
 99.28772	2038979				3476845	"""
 
-
-    def as_pandas(self):
-        return pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=0, header=[0,1])
+    def as_Bunch(self):
+        df = pd.read_csv(StringIO(self.as_str()), sep='\t', header=[0,1], index_col=0)
+        desc = """Small data set containing MS intensity data (6 samples, 19 peaks) with class labels in multindex."""
+        return parse_data(df, samples_in_cols=True, labels_in_multindex=True, desc=desc)
 
     def create_example_file(self, file_name):
-        df = self.as_pandas()
+        df = self.as_Bunch().data.transpose()
         df.to_csv(file_name)
 
 
@@ -173,12 +242,15 @@ class TableWithFormulae(DataSetBase):
 (+)-9,10,18-trihydroxy-12Z-octadecenoic acid [Hydroxy fatty acids [FA0105]] ([M+K39]+)	C18H34O5	369.2037836
 (+)-Acutifolin A [Flavans, Flavanols and Leucoanthocyanidins [PK1202]] ([M+H]+)	C20H22O4	327.1590857"""
 
-    def as_pandas(self):
-        return pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=None).set_index('Name')
+    def as_Bunch(self):
+        df = pd.read_csv(StringIO(self.as_str()), sep='\t', index_col=None).set_index('Name')
+        desc = """Small data set containing a list of compounds with names, formulae and neutral mass."""
+        return parse_data(df, desc=desc)
 
     def create_example_file(self, file_name):
-        df = self.as_pandas()
+        df = self.as_Bunch().data
         df.to_csv(file_name)
+
 
 @DataSetFactory.register('masstrix_output')
 class MasstrixOutput(DataSetBase):
@@ -201,79 +273,82 @@ class MasstrixOutput(DataSetBase):
 249.18444	0.00E+00	248.1771635	13	249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681#249.184906475681	-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677#-1.87200966885677	LMFA01030163#LMFA01030164#LMFA01030165#LMFA01030166#LMFA01030277#LMFA01030278#LMFA01030279#LMFA01030280#LMFA01030491#LMFA01030492#LMFA01030493#LMFA01030870#LMFA01140010	C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2#C16H24O2	"16:4(4Z,7Z,10Z,13Z); 4,7,10,13-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#4,7,11,14-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#4,8,12,16-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#16:4(6Z,9Z,12Z,15Z); 6,9,12,15-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2E,6Z,8Z,12E-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2E,6Z,8Z,12Z-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2Z,6Z,8Z,12E-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#2Z,6Z,8Z,12Z-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#3,9-hexadecadiynoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#7,10-hexadecadiynoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#8,10-hexadecadiynoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#16:4(6Z,9Z,12Z,15Z); 6Z,9Z,12Z,15Z-hexadecatetraenoic acid [Unsaturated fatty acids [FA0103]] ([M+H]+)#4-[3]-ladderane-butanoic acid [Carbocyclic fatty acids [FA0114]] ([M+H]+)"													null#null#null#null#null#null#null#null#null#null#null#null#null	null#null#null#null#null#null#null#null#null#null#null#null#null	null#null#null#null#null#null#null#null#null#null#null#null#null
 raw_mass	peak_height	corrected_mass	npossible	KEGG_mass	ppm	KEGG_cid	KEGG_formula	KEGG_name	uniqueID	C13	O18	N15	S34	Mg25	Mg26	Fe54	Fe57	Ca44	Cl37	K41	KEGG Pathways	KEGG Pathways descriptions	Compound in Organism(X)"""
 
-    def as_pandas(self):
-        df = pd.read_csv(six.StringIO(self.as_str()), sep='\t', index_col=None, header=None)
+    def as_Bunch(self):
+        df = pd.read_csv(StringIO(self.as_str()), sep='\t', index_col=None, header=None)
         df.columns = list(df.iloc[-1])
         df = df.iloc[0:-1, :]
-        return df.set_index(df.columns[0])
+        df = df.set_index(df.columns[0])
+        desc = """An excerpt from a MassTrix output."""
+        return parse_data(df, desc=desc)
 
     def create_example_file(self, file_name):
-        df = self.as_pandas()
+        df = self.as_Bunch().data
         df.to_csv(file_name)
 
 
 def demo_dataset(name):
+    return DataSetFactory.create_dataset(name).as_Bunch()
+
+def create_demo(name):
     return DataSetFactory.create_dataset(name)
 
-
-def demo(name):
-    return DataSetFactory.create_dataset(name).as_pandas()
-
-def load_demo_dataset(name):
-    pass
+def create_example_file(name, file_name):
+    d = DataSetFactory.create_dataset(name)
+    d.create_example_file(file_name)
 
 
 if __name__ == '__main__':
     from pandas.testing import assert_frame_equal
     import tempfile
 
-    d = demo_dataset('demo1')
-    print(d.as_str())
-    print(d.as_pandas())
-    print('NaNs:', d.as_pandas().isna().sum().sum())
+    dataset = demo_dataset('demo1')
+    print(dataset.DESCR)
+    print(dataset.data)
+    print('\nsample_names:', dataset.sample_names)
+    print('\nfeature_names:', dataset.feature_names)
+
+    print('NaNs:', dataset.data.isna().sum().sum())
     print('-'*40)
     print('testing demo1 roundtrip')
     with tempfile.NamedTemporaryFile(mode='w') as tmp_file:
         tmp_file.close()
-        d.create_example_file(tmp_file.name)
-        print(tmp_file.name)
+        create_example_file('demo1', tmp_file.name)
+        print('temp file', tmp_file.name)
         d_back = pd.read_csv(tmp_file.name, index_col=0)
-    assert_frame_equal(d.as_pandas(), d_back)
+    assert_frame_equal(dataset.data, d_back.transpose())
     print('round-trip ok!')
-    print('-'*40)
-    d = demo_dataset('demo2')
 
-    print(d.as_str())
-    print(d.as_pandas())
     print('-'*40)
-    d = demo('demo2')
-    print(d.columns.names)
-    print(d.index.names)
+    dataset = demo_dataset('demo2')
+    print(dataset.DESCR)
+    print(dataset.data)
+    print('\nsample_names:', dataset.sample_names)
+    print('\nfeature_names:', dataset.feature_names)
+    print('\ntarget_names:', dataset.target_names)
+    print('\ntarget:', dataset.target)
+
+    print('NaNs:', dataset.data.isna().sum().sum())
     print('-'*40)
 
     print('testing demo2 roundtrip')
-    d = demo_dataset('demo2')
     with tempfile.NamedTemporaryFile(mode='w') as tmp_file:
         tmp_file.close()
-        d.create_example_file(tmp_file.name)
-        print(tmp_file.name)
+        create_example_file('demo2', tmp_file.name)
+        print('temp file', tmp_file.name)
         d_back = pd.read_csv(tmp_file.name, index_col=0, header=[0,1])
-    assert_frame_equal(d.as_pandas(), d_back)
+    assert_frame_equal(dataset.data, d_back.transpose())
     print('round-trip ok!')
     print('-'*40)
 
-    d = demo_dataset('table_with_formulae')
-    print(d.as_str())
-    print(d.as_pandas())
+    dataset = demo_dataset('table_with_formulae')
+    print(dataset.DESCR)
+    dataset.data.info()
+    print('\nsample_names: from', dataset.sample_names[0], 'to', dataset.sample_names[-1])
+    print('\nfeature_names:', dataset.feature_names)
+
     print('-'*40)
-    d = demo('table_with_formulae')
-    print(d.columns.names)
-    print(d.index.names)
-    print('-'*40)
-    d = demo_dataset('masstrix_output')
-    print(d.as_str())
-    print(d.as_pandas())
-    print('-'*40)
-    d = demo('masstrix_output')
-    print(d.columns.names)
-    print(d.index.names)
+    dataset = demo_dataset('masstrix_output')
+    print(dataset.DESCR)
+    dataset.data.info()
+    print('\nfeature_names:', dataset.feature_names)
+    print('\nsample_names: from', dataset.sample_names[0], 'to', dataset.sample_names[-1])
