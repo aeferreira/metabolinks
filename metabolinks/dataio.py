@@ -1,5 +1,5 @@
 from collections import OrderedDict
-import six
+from io import StringIO
 
 import pandas as pd
 import numpy as np
@@ -41,17 +41,17 @@ def read_data_from_xcel(
     file_name, has_labels=False, drop_header_levels=None, verbose=False, **kwargs):
 
     datasets = OrderedDict()
-    wb = pd.ExcelFile(file_name).book
+    xlfile = pd.ExcelFile(file_name)
 
     if verbose:
         print(f'------ Reading MS-Excel file - {file_name}')
 
-    for sheetname in wb.sheet_names():
+    for sheetname in xlfile.sheet_names:
         if has_labels and 'header' not in kwargs:
             kwargs['header'] = [0, 1]
 
         # read data, first as a whole df. May have empty columns
-        df = pd.read_excel(file_name, sheet_name=sheetname, **kwargs)
+        df = pd.read_excel(xlfile, sheet_name=sheetname, **kwargs)
         all_columns = list(df.columns)
         d_columns = list(df.dropna(axis=1, how='all').columns)
 
@@ -130,15 +130,6 @@ if __name__ == '__main__':
             for i in range(nl):
                 print(df.columns.names[i], ':')
                 print(tuple(df.columns.levels[i]))
-
-    print('Reading from string data (as io stream) with labels------------\n')
-    dataset = read_data_csv(six.StringIO(datasets.demo_dataset('demo2').as_str()), has_labels=True)
-    printdfstructure(dataset)
-    print('-- info --------------')
-    print(dataset.cdl.info())
-    print('-- global info---------')
-    print(dataset.cdl.info(all_data=True))
-    print('-----------------------')
 
     # Reading from Excel ----------
     file_name = 'sample_data.xlsx'

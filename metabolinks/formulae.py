@@ -97,7 +97,7 @@ def composition_series(formulae, compositions = ('CHO', 'CHOS',
     return comps
 
 if __name__ == '__main__':
-    import six
+    from io import StringIO
     from metabolinks import datasets
     from metabolinks.dataio import read_MassTRIX
 
@@ -106,8 +106,7 @@ if __name__ == '__main__':
         print(test, '->', element_composition(test))
 
     print('\n------ test insert_element_counts() ------')
-    df = datasets.table_with_formulae()
-    df = df.drop(columns=df.columns[0])
+    df = datasets.demo_dataset('table_with_formulae').data
     print(df)
     print('+++++ after insertion ++++++')
     dfi = insert_element_counts(df)
@@ -119,7 +118,7 @@ if __name__ == '__main__':
     # _THIS_DIR, _ = os.path.split(os.path.abspath(__file__))
     # testfile_name = os.path.join(_THIS_DIR, "data", file_name)
 
-    df = read_MassTRIX(six.StringIO(datasets.MassTRIX_output()))
+    df = read_MassTRIX(StringIO(datasets.create_demo('masstrix_output').as_str()))
     def cleanup_cols(df, isotopes=True, uniqueID=True, columns=None):
         """Removes the 'uniqueID' and the 'isotope presence' columns."""
         col_names = []

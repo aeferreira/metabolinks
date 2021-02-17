@@ -5,8 +5,7 @@ from itertools import chain, combinations
 import numpy as np
 import pandas as pd
 
-import metabolinks.dataio as dataio
-import metabolinks.datasets as datasets
+from metabolinks import datasets
 
 def mz_similarity(dataset, has_labels=False):
     """Compute counts and Jaccard index by samples."""
@@ -14,7 +13,7 @@ def mz_similarity(dataset, has_labels=False):
         acc = dataset.cdl
     else:
         acc = dataset.cdf
-    
+
     similarities = SimilarityMeasures()
     sample_names = list(acc.samples)
 
@@ -205,9 +204,8 @@ def compute_Venn_features(objects, names, max_intersections=None):
     return res
 
 if __name__ == "__main__":
-    import six
-    print('Reading from string data (as io stream) with labels------------\n')
-    dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
+    print('Demo data with labels------------\n')
+    dataset = datasets.demo_dataset('demo2').data.transpose()
     print(dataset)
     print('-- info --------------')
     print(dataset.cdl.info())

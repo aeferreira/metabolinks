@@ -11,7 +11,33 @@ import pandas as pd
 from io import StringIO
 from sklearn.utils import Bunch
 from sklearn.preprocessing import LabelEncoder
-#import six
+
+def demo_dataset(name, as_frame=True, return_X_y=False):
+    b = DataSetFactory.create_dataset(name).as_Bunch()
+    if not as_frame:
+        # if not as_frame,  return data and target as numpy arrays
+        # and not pandas structures
+        # following scikit-learn convention
+        b['data'] = b['data'].values
+        if 'target' in b:
+            b['target'] = b['target'].values
+    if return_X_y:
+        if 'target' in 'b':
+            return(b['data'], b['target'])
+        else:
+            return (b['data'],)
+    else:
+        return b
+
+
+def create_demo(name):
+    return DataSetFactory.create_dataset(name)
+
+
+def create_example_file(name, file_name):
+    d = DataSetFactory.create_dataset(name)
+    d.create_example_file(file_name)
+
 
 def parse_data(df, samples_in_cols=False, labels_loc=None, labels_in_multindex=False, desc=''):
     """A parse a pandas dataframe returning a sckit-learn dataset.
@@ -286,22 +312,12 @@ raw_mass	peak_height	corrected_mass	npossible	KEGG_mass	ppm	KEGG_cid	KEGG_formul
         df.to_csv(file_name)
 
 
-def demo_dataset(name):
-    return DataSetFactory.create_dataset(name).as_Bunch()
-
-def create_demo(name):
-    return DataSetFactory.create_dataset(name)
-
-def create_example_file(name, file_name):
-    d = DataSetFactory.create_dataset(name)
-    d.create_example_file(file_name)
-
-
 if __name__ == '__main__':
     from pandas.testing import assert_frame_equal
     import tempfile
 
     dataset = demo_dataset('demo1')
+    print('*********** demo1')
     print(dataset.DESCR)
     print(dataset.data)
     print('\nsample_names:', dataset.sample_names)
@@ -317,8 +333,17 @@ if __name__ == '__main__':
         d_back = pd.read_csv(tmp_file.name, index_col=0)
     assert_frame_equal(dataset.data, d_back.transpose())
     print('round-trip ok!')
+    print('*********** demo1 with return_X_y')
+    (X, *rest) = demo_dataset('demo1', return_X_y=True)
+    print(X)
+    print(rest)
+    print('*********** demo1 with return_X_y and as_frame=False')
+    (X, *rest) = demo_dataset('demo1', as_frame=False, return_X_y=True)
+    print(X)
+    print(rest)
 
     print('-'*40)
+    print('*********** demo2')
     dataset = demo_dataset('demo2')
     print(dataset.DESCR)
     print(dataset.data)
@@ -340,6 +365,7 @@ if __name__ == '__main__':
     print('round-trip ok!')
     print('-'*40)
 
+    print('*********** table_with_formulae')
     dataset = demo_dataset('table_with_formulae')
     print(dataset.DESCR)
     dataset.data.info()
@@ -347,6 +373,7 @@ if __name__ == '__main__':
     print('\nfeature_names:', dataset.feature_names)
 
     print('-'*40)
+    print('*********** masstrix_output')
     dataset = demo_dataset('masstrix_output')
     print(dataset.DESCR)
     dataset.data.info()

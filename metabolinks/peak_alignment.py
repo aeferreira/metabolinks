@@ -681,7 +681,7 @@ if __name__ == '__main__':
 639.2406	683797
 """
 
-    from six import StringIO
+    from io import StringIO
     from metabolinks import add_labels, read_data_csv, read_data_from_xcel
     #from metabolinks.dataio import read_data_csv, read_data_from_xcel
 

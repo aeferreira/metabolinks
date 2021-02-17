@@ -287,7 +287,7 @@ if __name__ == '__main__':
     #     print(v)
     #     print('*'*30)
 
-    df = datasets.demo('masstrix_output')
+    df = datasets.demo_dataset('masstrix_output').data
     print ("Demo data:\n")
 
     df.info()
