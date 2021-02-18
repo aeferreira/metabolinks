@@ -1,5 +1,9 @@
 """All transformations should accept a pandas DataFrame object.
-   Most should return a new pandas DataFrame."""
+
+   Most should return a new pandas DataFrame.
+   The input data matrix should follow the convention that the
+   instances are in rows and features are in columns.
+"""
 from functools import partial
 
 import numpy as np
@@ -365,44 +369,40 @@ def unfold_MassTRIX(df):
 ###################################################################
 
 if __name__ == "__main__":
-    import six
-    from metabolinks import datasets
-    from metabolinks import dataio
-    # read sample data set
-    print('\nReading sample data with labels (as io stream) ------------\n')
-    data = dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
-    print(dataset)
+    from metabolinks.datasets import demo_dataset
+    # read sample data set demo2
+    print('\nLoad demo2: data with labels ------------\n')
+    data = demo_dataset('demo2').data.transpose()
+    print(data)
     print('-- info --------------')
-    print(dataset.cdl.info())
+    print(data.cdl.info())
     print('-- global info---------')
-    print(dataset.cdl.info(all_data=True))
+    print(data.cdl.info(all_data=True))
     print('-----------------------')
 
     print('\n--- fillna_zero ----------')
-    new_data = fillna_zero(dataset)
+    new_data = fillna_zero(data)
     print(new_data)
     print('--- fillna_value  10 ----------')
-    new_data = fillna_value(dataset, value=10)
+    new_data = fillna_value(data, value=10)
     print(new_data)
     print('--- fillna_frac_min default fraction=0.5 minimum ----------')
-    new_data = fillna_frac_min(dataset)
+    new_data = fillna_frac_min(data)
     print(new_data)
 
     print('\n--- keep_atleast min_samples=3 ----------')
-    new_data = keep_atleast(dataset, min_samples=3)
+    new_data = keep_atleast(data, min_samples=3)
     print(new_data)
     print('--- keep_atleast min_samples=5/6 ----------')
-    new_data = keep_atleast(dataset, min_samples=5/6)
+    new_data = keep_atleast(data, min_samples=5/6)
     print(new_data)
     print('\n--- keep_atleast_inlabels min_samples=2 ----------')
-    new_data = keep_atleast_inlabels(dataset, min_samples=2)
+    new_data = keep_atleast_inlabels(data, min_samples=2)
     print(new_data)
 
-    # read sample data set
     print('\nNormalization by reference feature ------------\n')
     print('---- original -------------------')
-    data = dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
-    print(dataset)
+    print(data)
     print('------after normalizing by 97.59001 -----------------')
     new_data = normalize_ref_feature(data, 97.59001)
     print(new_data)
@@ -410,8 +410,7 @@ if __name__ == "__main__":
     # read sample data set
     print('\npareto scaling ------------\n')
     print('---- original -------------------')
-    data = dataset = dataio.read_data_csv(six.StringIO(datasets.demo_data2()), has_labels=True)
-    print(dataset)
+    print(data)
     print('------after Pareto scaling -----------------')
     new_data = pareto_scale(data)
     print(new_data)
