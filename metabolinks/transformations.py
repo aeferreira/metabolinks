@@ -5,84 +5,266 @@
    instances are in rows and features are in columns.
 """
 from functools import partial
+from typing import Optional, List, Union
 
 import numpy as np
 import pandas as pd
 
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils import check_array
+from sklearn.utils.validation import check_is_fitted
+
+from feature_engine.dataframe_checks import _is_dataframe
+from feature_engine.imputation.base_imputer import BaseImputer
+from feature_engine.selection.base_selector import BaseSelector
+from feature_engine.variable_manipulation import (
+    _check_input_parameter_variables,
+    _find_or_check_numerical_variables,
+    _find_all_variables,
+)
+from feature_engine.imputation import  ArbitraryNumberImputer
+from feature_engine.wrappers import SklearnTransformerWrapper
+
 import metabolinks as mtls
 from metabolinks.utils import _is_string
+Variables = Union[None, int, str, List[Union[str, int]]]
 
 # ---------- imputation of missing values -------
 
+zero_imputer = ArbitraryNumberImputer(variables=None, arbitrary_number=0.0)
+
 def fillna_zero(df):
     """Set NaN to zero."""
-    return df.fillna(0.0)
+    return zero_imputer.fit_transform(df)
 
 def fillna_value(df, value=0.0):
     """Set NaN to value."""
-    return df.fillna(value)
+    return ArbitraryNumberImputer(arbitrary_number=value).fit_transform(df)
+    #return df.fillna(value)
 
 def fillna_frac_min(df, fraction=0.5):
     """Set NaN to a fraction of the minimum value in whole DataFrame."""
 
-    minimum = df.min().min()
-    # print(minimum)
-    minimum = minimum * fraction
-    return df.fillna(minimum)
+    # minimum = df.min().min()
+    # # print(minimum)
+    # minimum = minimum * fraction
+    return FracMinImputer(fraction=fraction).fit_transform(df)
+
+class FracMinImputer(BaseImputer):
+    """
+    The FracMinImputer() transforms features by replacing missing data by a fraction
+    of the global minimum value of a pandas DataFrame.
+
+    Parameters
+    ----------
+    fraction : float, default=0.5
+        Factor to multiply the minimum.
+    variables : list, default=None
+        The list of variables to be imputed. If None, the imputer will find and
+        select all variables of type numeric.
+    Attributes
+    ----------
+    imputer_dict_:
+        Dictionary with values equal to the constant replacement value.
+    imputation_value_:
+        The value to used to replace the NAs.
+    Methods
+    -------
+    fit:
+        Learn values to replace missing data.
+    transform:
+        Impute missing data.
+    fit_transform:
+        Fit to the data, then transform it.
+    """
+
+    def __init__(self, fraction: float = 0.5, variables: Variables = None,) -> None:
+
+        if fraction <= 0:
+            raise ValueError("fraction must be a positive number")
+
+        self.fraction = fraction
+        self.variables = _check_input_parameter_variables(variables)
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+        """
+        Learn the value of the fraction of the minimum of the data.
+        Parameters
+        ----------
+        X : pandas dataframe of shape = [n_samples, n_features]
+            The training dataset.
+        y : pandas Series, default=None
+            y is not needed in this imputation. You can pass None or y.
+        Raises
+        ------
+        TypeError
+            - If the input is not a Pandas DataFrame
+            - If any of the user provided variables are not numerical
+        ValueError
+            If there are no numerical variables in the df or the df is empty
+        Returns
+        -------
+        self
+        """
+        # check input dataframe
+        X = _is_dataframe(X)
+
+        # find or check for numerical variables
+        self.variables = _find_or_check_numerical_variables(X, self.variables)
+
+        # estimate imputation value
+        minimum = X.min().min()
+        # print(minimum)
+        minimum = minimum * self.fraction
+
+        self.imputer_dict_ = {c: minimum for c in self.variables}
+        self.imputation_value_ = minimum
+
+        self.input_shape_ = X.shape
+
+        return self
+
+    # # Ugly work around to import the docstring for Sphinx, otherwise not necessary
+    # def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    #     X = super().transform(X)
+
+    #     return X
+
+    # transform.__doc__ = BaseImputer.transform.__doc__
 
 # ---------- filters for reproducibility
 
-def keep_atleast(df, min_samples=1):
-    """Keep only features wich occur at least in min_samples.
+def keep_atleast(df, minimum=1, y=None):
+    """Keep only features which occur at least `minimum` times in samples.
 
-       If 0 < min_samples < 1, this should be interpreted as a fraction."""
+       If 0 < min_samples < 1, this should be interpreted as a fraction of the number of samples.
+       If target `y` is provided, the number of samples to compute the ocorrence is the number of
+       samples in each group.
+       """
 
-    counts = df.count(axis=1)
-    # a float in (0,1) means a fraction
-    if 0.0 < min_samples < 1.0:
-        n = len(df.columns)
-        min_samples = min_samples * float(n)
+    tf = KeepMinimumNonNA(variables=None, minimum=minimum)
+    return tf.fit_transform(df, y=y)
 
-    return df[counts >= min_samples]
+class KeepMinimumNonNA(BaseSelector):
+    """
+    Keep variables from a dataframe when the number of non-missing values exceeds
+    a minimum threshold.
+    If minimum is an int, it represents a minimum number of feature ocorrences in samples.
+    If 0 <= minimum < 1, it represents the minimum number of feature ocorrences
+    as a fraction of the number of samples.
+    The number of samples can be the global number of samples or the number of samples
+    in each groups of samples if a target `y` containing labels indicating group
+    membership is provided as an argument of `fit`.
 
-def keep_atleast_inlabels(df, min_samples=1):
-    """Keep only features wich occur at least in min_samples in each label.
+    This transformer works with both numerical and categorical variables.
+    The user can indicate a list of variables to examine.
+    Alternatively, the transformer will evaluate all the variables in the dataset.
+    The transformer will first identify and store the features with too many missing values (fit).
+    Next, the transformer will drop these variables from a dataframe (transform).
+    Parameters
+    ----------
+    minimum : float,int,  default=1
+        Threshold of non-NA ocorrences for a feature to be kept. If int,
+        it represents the minimum of samples. If 0 <= tol < 1, it represents
+        the minimum ocorrence of non-missing values as a fraction of the number of samples.
+        Number of samples is the global number of samples if a target `y=None` or
+        the number of samples in each group if a target `y`with labels indicating
+        gorup membership is provided as an argument of `fit`.
+    variables : list, default=None
+        The list of variables to evaluate. If None, the transformer will evaluate all
+        variables in the dataset.
+    Attributes
+    ----------
+    features_to_drop_:
+        List with features with too many missing values.
+    Methods
+    -------
+    fit:
+        Find features with too many missing values.
+    transform:
+        Remove features with too many missing values.
+    fit_transform:
+        Fit to the data. Then transform it.
+    """
 
-       If 0 < min_samples < 1, this should be interpreted as a fraction.
-       Features may not be removed: they are marked as NaN in each label
-       with less than min_samples, but can be kept because of their presence
-       in other labels. Nevertheless, a final removal of 'all Nan' features is performed."""
+    def __init__(self, minimum: float = 1, variables: Variables = None,):
 
-    # print('****** df *********')
-    # print(df)
-    # print('*******************')
-    for label in df.cdl.unique_labels:
-        # get a copy of label data
-        df_label = df.cdl.subset(label=label)
-        old_index = df_label.index.copy()
-        # print('----- Label {} -------'.format(label))
-        # print('------------------------')
-        # print(df_label)
+        if not isinstance(minimum, (float, int)) or minimum < 0:
+            raise ValueError("minimum must be an integer or a float between 0 and 1")
 
-        counts = df_label.count(axis=1)
-        # a float in (0,1) means a fraction
-        if 0.0 < min_samples < 1.0:
-            n = len(df_label.columns)
-            min_samples = min_samples * float(n)
-        df_label = df_label[counts >= min_samples].reindex(old_index, method=None)
-        # print('------ after removal ---')
-        # print(df_label)
-        bool_loc = df.cdl.subset_where(label=label)
-        df = df.mask(bool_loc, df_label)
-        # print('+++++++ current df +++++++')
-        # print(df)
-        # print('++++++++++++++++++++++++++')
-    # print('****** final df *********')
-    # print(df.dropna(how='all'))
-    # print('*************************')
-    return df.dropna(how='all')
+        self.minimum = minimum
+        self.variables = _check_input_parameter_variables(variables)
 
-# ---------- normalizations
+    def fit(self, X: pd.DataFrame, y: pd.Series = None):
+        """
+        Find constant and quasi-constant features.
+        Parameters
+        ----------
+        X : pandas dataframe of shape = [n_samples, n_features]
+            The input dataframe.
+        y : array-like of shape (n_samples)
+           Target describing group membership of samples. None to use global number of samples.
+        Returns
+        -------
+        self
+        """
+
+        # check input dataframe
+        X = _is_dataframe(X)
+
+        # find all variables or check those entered are present in the dataframe
+        self.variables = _find_all_variables(X, self.variables)
+
+        if y is None:
+            counts = X.count(axis=0)
+            # a float in (0,1) means a fraction
+            tol = self.minimum
+            if 0.0 < tol < 1.0:
+                n = X.shape[0]
+                tol = tol * float(n)
+            self.features_to_drop_ = list(X.columns[counts < tol])
+        else:
+            unique_labels = pd.unique(y)
+            keep_dict = {}
+            tol = self.minimum
+            for lbl in unique_labels:
+                X_lbl = X[y == lbl]
+                if 0.0 < tol < 1.0:
+                    n = X_lbl.shape[0]
+                    tol = tol * float(n)
+                counts = X_lbl.count(axis=0)
+                keep_dict[lbl] = counts >= tol
+            all_keeps = pd.DataFrame(keep_dict).transpose()
+            print('all_keeps dataframe')
+            print(all_keeps.transpose())
+            keep_vars = all_keeps.any(axis=0)
+            print('keep_vars')
+            print(keep_vars)
+            self.features_to_drop_ = list(keep_vars[keep_vars==False].index)
+            print('features_to_drop_')
+            print(self.features_to_drop_)
+
+
+        # check we are not dropping all the columns in the df
+        if len(self.features_to_drop_) == len(X.columns):
+            raise ValueError(
+                "The resulting dataframe will have no columns after dropping all "
+                "features with too many missing values. Try changing the minimum value."
+            )
+
+        self.input_shape_ = X.shape
+
+        return self
+
+    # # Ugly work around to import the docstring for Sphinx, otherwise not necessary
+    # def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    #     X = super().transform(X)
+
+    #     return X
+
+    # transform.__doc__ = BaseSelector.transform.__doc__
+
+# ---------- normalizations -----------------------------------
 
 def normalize_ref_feature(df, feature, remove=True):
     """Normalize dataset by a reference feature (an exact row label).
@@ -372,13 +554,15 @@ if __name__ == "__main__":
     from metabolinks.datasets import demo_dataset
     # read sample data set demo2
     print('\nLoad demo2: data with labels ------------\n')
-    data = demo_dataset('demo2').data.transpose()
-    print(data)
+    demo2 = demo_dataset('demo2')
+    data = demo2.data
+    y = demo2.target
     print('-- info --------------')
-    print(data.cdl.info())
+    print(data.transpose().cdl.info())
     print('-- global info---------')
-    print(data.cdl.info(all_data=True))
+    print(data.transpose().cdl.info(all_data=True))
     print('-----------------------')
+    print(data)
 
     print('\n--- fillna_zero ----------')
     new_data = fillna_zero(data)
@@ -389,15 +573,42 @@ if __name__ == "__main__":
     print('--- fillna_frac_min default fraction=0.5 minimum ----------')
     new_data = fillna_frac_min(data)
     print(new_data)
+    print('--- fillna_frac_min default fraction=0.5 minimum with FraMinImputer----------')
+    tf = FracMinImputer(fraction=0.5)
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('++'*20)
+    print(tf.imputation_value_)
 
     print('\n--- keep_atleast min_samples=3 ----------')
-    new_data = keep_atleast(data, min_samples=3)
+    new_data = keep_atleast(data, minimum=3)
     print(new_data)
+    print('\n--- keep at least min_samples=3 using KeepMinNonNA----------')
+    tf = KeepMinimumNonNA(minimum=3)
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('Dropped:', tf.features_to_drop_)
     print('--- keep_atleast min_samples=5/6 ----------')
-    new_data = keep_atleast(data, min_samples=5/6)
+    new_data = keep_atleast(data, minimum=5/6)
     print(new_data)
+    print('\n--- keep at least min_samples=5/6 using KeepMinNonNA----------')
+    tf = KeepMinimumNonNA(minimum=5/6)
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('Dropped:', tf.features_to_drop_)
+    print('\n--- keep at least min_samples=2 using KeepMinNonNA with "target"----------')
+    print('target is a label (list like) -------------------------')
+    tf = KeepMinimumNonNA(minimum=2)
+    print('target:', y)
+    print(type(y))
+    print('unique_labels:', pd.unique(y))
+    labels = np.array(demo2.target_names)[y]
+    print('labels:', labels)
+    new_data = tf.fit_transform(data, y)
+    print(new_data)
+    print('Dropped:', tf.features_to_drop_)
     print('\n--- keep_atleast_inlabels min_samples=2 ----------')
-    new_data = keep_atleast_inlabels(data, min_samples=2)
+    new_data = keep_atleast(data, minimum=2, y=y)
     print(new_data)
 
     print('\nNormalization by reference feature ------------\n')
