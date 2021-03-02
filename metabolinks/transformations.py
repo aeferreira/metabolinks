@@ -14,16 +14,21 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from feature_engine.dataframe_checks import _is_dataframe
+from feature_engine.dataframe_checks import (
+    _is_dataframe,
+    _check_input_matches_training_df,
+)
 from feature_engine.imputation.base_imputer import BaseImputer
 from feature_engine.selection.base_selector import BaseSelector
+from feature_engine.base_transformers import BaseNumericalTransformer
 from feature_engine.variable_manipulation import (
     _check_input_parameter_variables,
     _find_or_check_numerical_variables,
     _find_all_variables,
 )
-from feature_engine.imputation import  ArbitraryNumberImputer
+from feature_engine.imputation import ArbitraryNumberImputer
 from feature_engine.wrappers import SklearnTransformerWrapper
+
 
 import metabolinks as mtls
 from metabolinks.utils import _is_string
@@ -31,11 +36,9 @@ Variables = Union[None, int, str, List[Union[str, int]]]
 
 # ---------- imputation of missing values -------
 
-zero_imputer = ArbitraryNumberImputer(variables=None, arbitrary_number=0.0)
-
 def fillna_zero(df):
     """Set NaN to zero."""
-    return zero_imputer.fit_transform(df)
+    return ArbitraryNumberImputer(arbitrary_number=0.0).fit_transform(df)
 
 def fillna_value(df, value=0.0):
     """Set NaN to value."""
@@ -134,17 +137,6 @@ class FracMinImputer(BaseImputer):
 
 # ---------- filters for reproducibility
 
-def keep_atleast(df, minimum=1, y=None):
-    """Keep only features which occur at least `minimum` times in samples.
-
-       If 0 < min_samples < 1, this should be interpreted as a fraction of the number of samples.
-       If target `y` is provided, the number of samples to compute the ocorrence is the number of
-       samples in each group.
-       """
-
-    tf = KeepMinimumNonNA(variables=None, minimum=minimum)
-    return tf.fit_transform(df, y=y)
-
 class KeepMinimumNonNA(BaseSelector):
     """
     Keep variables from a dataframe when the number of non-missing values exceeds
@@ -235,17 +227,14 @@ class KeepMinimumNonNA(BaseSelector):
                 counts = X_lbl.count(axis=0)
                 keep_dict[lbl] = counts >= tol
             all_keeps = pd.DataFrame(keep_dict).transpose()
-            print('all_keeps dataframe')
-            print(all_keeps.transpose())
+            # print('all_keeps dataframe')
+            # print(all_keeps.transpose())
             keep_vars = all_keeps.any(axis=0)
-            print('keep_vars')
-            print(keep_vars)
+            # print('keep_vars')
+            # print(keep_vars)
             self.features_to_drop_ = list(keep_vars[keep_vars==False].index)
-            print('features_to_drop_')
-            print(self.features_to_drop_)
 
-
-        # check we are not dropping all the columns in the df
+        # check we are not dropping all the features
         if len(self.features_to_drop_) == len(X.columns):
             raise ValueError(
                 "The resulting dataframe will have no columns after dropping all "
@@ -264,45 +253,247 @@ class KeepMinimumNonNA(BaseSelector):
 
     # transform.__doc__ = BaseSelector.transform.__doc__
 
+def keep_atleast(df, minimum=1, y=None):
+    """Keep only features which occur at least `minimum` times in samples.
+
+       If 0 < min_samples < 1, this should be interpreted as a fraction of the number of samples.
+       If target `y` is provided, the number of samples to compute the ocorrence is the number of
+       samples in each group.
+       """
+
+    tf = KeepMinimumNonNA(variables=None, minimum=minimum)
+    return tf.fit_transform(df, y=y)
+
 # ---------- normalizations -----------------------------------
 
-def normalize_ref_feature(df, feature, remove=True):
-    """Normalize dataset by a reference feature (an exact row label).
+# A bit of nomenclature: "normalization" is used here to denote transformations that adjust
+# data to correct or compensate errors relating to overall diferences in sample concentrations
+# (for example, as resulting from different sample dilutions).
+# The assumption is that tere are factors that affect the majority of features in a systematic
+# way (as oposed to differences in features )
+# It does not necessarily produce samples with unit norms, as in the Normalizer of
+# scikit-learn
+
+# this transformer 
+
+
+class RefFeatureNormalizer(BaseEstimator, TransformerMixin):
+    """
+    The RefFeatureNormalizer() divides all numerical features of a
+    dataframe by the values of a reference column, a 'reference feature'.
+    NA values are kept as NA values.
+    A list of variables can be passed as an argument. Alternatively, the transformer
+    will automatically select and transform all variables of type numeric.
+    Parameters
+    ----------
+    feature: string, float
+        Indicates the feature to use for normalization.
+    variables : list, default=None
+        The list of numerical variables to be transformed. If None, the transformer
+        will find and select all numerical variables.
+    fold: float, default=1.0
+        After division by the reference feature values, the dataframe is then multiplied by fold.
+    Attributes
+    ----------
+    ref_features_values_:
+        pandas Series with the reference feature values.
+    Methods
+    -------
+    fit:
+        fill the ref_features_values_.
+    transform:
+        Transforms the variables by dividing from the reference feature. Then, multiply by fold.
+    fit_transform:
+        Fit to data, then transform it.
+    """
+
+    def __init__(
+        self,
+        feature: Union[str, float],
+        variables: Union[None, int, str, List[Union[str, int]]] = None,
+        fold: Union[str, float] = 1.0,
+    ) -> None:
+
+        self.feature = feature
+        self.variables = _check_input_parameter_variables(variables)
+        self.fold = fold
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+        """
+        Checks that input is a dataframe, finds numerical variables, or alternatively
+        checks that variables entered by the user are of type numerical.
+        Parameters
+        ----------
+        X : Pandas DataFrame
+        y : Pandas Series, np.array. Default = None
+            Parameter is necessary for compatibility with sklearn.pipeline.Pipeline.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+            If any of the user provided variables are not numerical
+        ValueError
+            If there are no numerical variables in the df or the df is empty
+        Returns
+        -------
+        X : Pandas DataFrame
+            The same dataframe entered as parameter
+        """
+
+        # check input dataframe
+        X = _is_dataframe(X)
+
+        # find or check for numerical variables
+        self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
+            X, self.variables
+        )
+        new_index, indexer = X.columns.sort_values(return_indexer=True)
+        pos = new_index.get_loc(self.feature, method='pad')
+        pos = indexer[pos]
+
+        self.ref_features_values_ = X.iloc[:, pos]
+
+        self.input_shape_ = X.shape
+        return self
+
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Divide dataframe by reference feature column.
+        Parameters
+        ----------
+        X : Pandas DataFrame of shape = [n_samples, n_features]
+            The data to be transformed.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+        ValueError
+            - If the dataframe not of the same size as that used in fit().
+        Returns
+        -------
+        X : pandas dataframe
+            The dataframe with the transformed variables.
+        """
+
+        # Check method fit has been called
+        check_is_fitted(self)
+
+        # check that input is a dataframe
+        X = _is_dataframe(X)
+
+        # Check if input data contains same number of columns as dataframe used to fit.
+        _check_input_matches_training_df(X, self.input_shape_[1])
+
+        # transform
+        X[self.variables] = X[self.variables].div(self.ref_features_values_, axis=0)
+        return X
+
+class DropFeatures(BaseSelector):
+    """
+    DropFeatures() drops a list of variable(s) indicated by the user from the dataframe.
+    This is just the DropFeatures transformer from feature-engine, adapted to locate
+    features as floats.
+
+    Parameters
+    ----------
+    features_to_drop : str or list, default=None
+        Variable(s) to be dropped from the dataframe
+    Methods
+    -------
+    fit:
+        This transformer does not learn any parameter.
+    transform:
+        Drops indicated features.
+    fit_transform:
+        Fit to data, then transform it.
+    """
+
+    def __init__(self, features_to_drop: List[Union[str, int]]):
+
+        if not isinstance(features_to_drop, list) or len(features_to_drop) == 0:
+            raise ValueError(
+                "features_to_drop should be a list with the name of the variables"
+                "you wish to drop from the dataframe."
+            )
+
+        self.features_to_drop = features_to_drop
+
+    def fit(self, X: pd.DataFrame, y: pd.Series = None):
+        """
+        This transformer does not learn any parameter.
+        Verifies that the input X is a pandas dataframe, and that the variables to
+        drop exist in the training dataframe.
+        Parameters
+        ----------
+        X : pandas dataframe of shape = [n_samples, n_features]
+            The input dataframe
+        y : pandas Series, default = None
+            y is not needed for this transformer. You can pass y or None.
+        Returns
+        -------
+        self
+        """
+        # check input dataframe
+        X = _is_dataframe(X)
+        self.features_to_drop_ = []
+
+        # find position of feature
+        new_index, indexer = X.columns.sort_values(return_indexer=True)
+        for feature in self.features_to_drop:
+            pos = new_index.get_loc(feature, method='pad')
+            pos = indexer[pos]
+            self.features_to_drop_.append(X.columns[pos])
+
+        # check user is not removing all columns in the dataframe
+        if len(self.features_to_drop) == len(X.columns):
+            raise ValueError(
+                "The resulting dataframe will have no columns after dropping all "
+                "existing variables"
+            )
+
+        # add input shape
+        self.input_shape_ = X.shape
+
+        return self
+
+    # # Ugly work around to import the docstring for Sphinx, otherwise not necessary
+    # def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    #     X = super().transform(X)
+
+    #     return X
+
+    # transform.__doc__ = BaseSelector.transform.__doc__
+
+def normalize_ref_feature(df, feature, remove=False):
+    """Normalize dataset by a reference feature (a column label).
 
        df: a Pandas DataFrame.
-       feature: row label.
+       feature: column label.
        remove: bool; True to remove reference feature from data after normalization.
 
        Returns: DataFrame.
        """
 
     # find position of feature
-    new_index, indexer = df.index.sort_values(return_indexer=True)
-    pos = new_index.get_loc(feature, method='pad')
-    pos = indexer[pos]
-    feature_row = df.iloc[pos, :]
-    df = df / feature_row
+    new_df = RefFeatureNormalizer(feature=feature).fit_transform(df)
     if remove:
-        df = df.drop(index=[df.index[pos]])
-    return df
+        new_df = DropFeatures(features_to_drop=[feature]).fit_transform(new_df)
+    return(df)
 
-def remove_feature(df, feature):
+
+def drop_features(df, features):
     """Remove a reference feature (an exact row label).
 
        df: a Pandas DataFrame.
-       feature: row label.
+       features: list of column names.
 
        Returns: DataFrame.
        """
 
-    # find position of feature
-    new_index, indexer = df.index.sort_values(return_indexer=True)
-    pos = new_index.get_loc(feature, method='pad')
-    pos = indexer[pos]
-    df = df.drop(index=[df.index[pos]])
-    return df
+    return DropFeatures(features_to_drop=[features]).fit_transform(df)
 
-def normalize_sum (df):
+def normalize_sum(df):
     """Normalization of a dataset by the total value per columns."""
 
     return df/df.sum(axis=0)
@@ -321,20 +512,132 @@ def normalize_PQN(df, ref_sample='mean'):
 
        Returns: Pandas DataFrame; normalized spectra.
     """
-    #Total Int normalization first - MetaboAnalyst doesn't do it but paper recommends it?
+    
     #"Building" the reference sample based on the input given
     if ref_sample == 'mean': #Mean spectre of all samples
-        ref_sample2 = df.T / df.mean(axis = 1)
+        ref_sample2 = df / df.mean()
     elif ref_sample == 'median': #Median spectre of all samples
-        ref_sample2 = df.T/df.median(axis = 1)
-    elif ref_sample in df.columns: #Column name of a specifiec sample of the spectra. ('Label','Sample') if data is labeled
-        ref_sample2 = df.T/df.loc[:,ref_sample]
-    else: #Actual sample given
-        ref_sample2 = df.T/ref_sample
+        ref_sample2 = df/df.median()
+    elif ref_sample in df.index: # Sample name to use as a reference
+        ref_sample2 = df/df.loc[ref_sample,:]
+    else: # Actual sample given (ref_sample is array like)
+        ref_sample2 = df/ref_sample
     #Normalization Factor and Normalization
-    Norm_fact = ref_sample2.median(axis=1)
-    return df / Norm_fact
+    pqr_fact = ref_sample2.median()
+    return df / pqr_fact
 
+
+class PQNormalizer(BaseNumericalTransformer):
+    """
+    The PQNormalizer() divides all numerical features of a
+    dataframe by the values of a reference column, a 'reference feature'.
+    NA values are kept as NA values.
+    A list of variables can be passed as an argument. Alternatively, the transformer
+    will automatically select and transform all variables of type numeric.
+    Parameters
+    ----------
+    feature: string, float
+        Indicates the feature to use for normalization.
+    variables : list, default=None
+        The list of numerical variables to be transformed. If None, the transformer
+        will find and select all numerical variables.
+    fold: float, default=1.0
+        After division by the reference feature values, the dataframe is then multiplied by fold.
+    Attributes
+    ----------
+    ref_features_values_:
+        pandas Series with the reference feature values.
+    Methods
+    -------
+    fit:
+        fill the ref_features_values_.
+    transform:
+        Transforms the variables by dividing from the reference feature. Then, multiply by fold.
+    fit_transform:
+        Fit to data, then transform it.
+    """
+
+    def __init__(
+        self,
+        feature: Union[str, float],
+        variables: Union[None, int, str, List[Union[str, int]]] = None,
+        fold: Union[str, float] = 1.0,
+    ) -> None:
+
+        self.feature = feature
+        self.variables = _check_input_parameter_variables(variables)
+        self.fold = fold
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+        """
+        Checks that input is a dataframe, finds numerical variables, or alternatively
+        checks that variables entered by the user are of type numerical.
+        Parameters
+        ----------
+        X : Pandas DataFrame
+        y : Pandas Series, np.array. Default = None
+            Parameter is necessary for compatibility with sklearn.pipeline.Pipeline.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+            If any of the user provided variables are not numerical
+        ValueError
+            If there are no numerical variables in the df or the df is empty
+        Returns
+        -------
+        X : Pandas DataFrame
+            The same dataframe entered as parameter
+        """
+
+        # check input dataframe
+        X = _is_dataframe(X)
+
+        # find or check for numerical variables
+        self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
+            X, self.variables
+        )
+        new_index, indexer = X.columns.sort_values(return_indexer=True)
+        pos = new_index.get_loc(self.feature, method='pad')
+        pos = indexer[pos]
+
+        self.ref_features_values_ = X.iloc[:, pos]
+
+        self.input_shape_ = X.shape
+        return self
+
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Divide dataframe by reference feature column.
+        Parameters
+        ----------
+        X : Pandas DataFrame of shape = [n_samples, n_features]
+            The data to be transformed.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+        ValueError
+            - If the dataframe not of the same size as that used in fit().
+        Returns
+        -------
+        X : pandas dataframe
+            The dataframe with the transformed variables.
+        """
+
+        # Check method fit has been called
+        check_is_fitted(self)
+
+        # check that input is a dataframe
+        X = _is_dataframe(X)
+
+        # Check if input data contains same number of columns as dataframe used to fit.
+        _check_input_matches_training_df(X, self.input_shape_[1])
+
+        # transform
+        X[self.variables] = X[self.variables].div(self.ref_features_values_, axis=0)
+        return X
 
 def normalize_quantile(df, ref_type='mean'):
     """Normalization of a dataset by the Quantile Normalization method.
@@ -367,7 +670,7 @@ def normalize_quantile(df, ref_type='mean'):
     else:
         raise ValueError('Type not recognized. Available ref_type: "mean", "median".')
 
-    #Replacing the values in the dataset for the reference sample values based on the ranks calculated  earlier for each entry
+    #Replacing the values in the dataset for the reference sample values based on the ranks calculated earlier for each entry
     for i in range(len(ranks)):
         for j in range(len(ranks.columns)):
             if ranks.iloc[i,j] == round(ranks.iloc[i,j]):
@@ -580,23 +883,18 @@ if __name__ == "__main__":
     print('++'*20)
     print(tf.imputation_value_)
 
-    print('\n--- keep_atleast min_samples=3 ----------')
-    new_data = keep_atleast(data, minimum=3)
-    print(new_data)
-    print('\n--- keep at least min_samples=3 using KeepMinNonNA----------')
+    print('\n--- keep at least minimum=3 using KeepMinNonNA----------')
     tf = KeepMinimumNonNA(minimum=3)
     new_data = tf.fit_transform(data)
     print(new_data)
     print('Dropped:', tf.features_to_drop_)
-    print('--- keep_atleast min_samples=5/6 ----------')
-    new_data = keep_atleast(data, minimum=5/6)
-    print(new_data)
-    print('\n--- keep at least min_samples=5/6 using KeepMinNonNA----------')
+    print('\n--- keep at least minimum=5/6 using KeepMinNonNA----------')
     tf = KeepMinimumNonNA(minimum=5/6)
     new_data = tf.fit_transform(data)
     print(new_data)
     print('Dropped:', tf.features_to_drop_)
-    print('\n--- keep at least min_samples=2 using KeepMinNonNA with "target"----------')
+
+    print('\n--- keep at least minimum=2 using KeepMinNonNA with "target"----------')
     print('target is a label (list like) -------------------------')
     tf = KeepMinimumNonNA(minimum=2)
     print('target:', y)
@@ -607,7 +905,13 @@ if __name__ == "__main__":
     new_data = tf.fit_transform(data, y)
     print(new_data)
     print('Dropped:', tf.features_to_drop_)
-    print('\n--- keep_atleast_inlabels min_samples=2 ----------')
+    print('\n--- keep_atleast minimum=3 ----------')
+    new_data = keep_atleast(data, minimum=3)
+    print(new_data)
+    print('--- keep_atleast minimum=5/6 ----------')
+    new_data = keep_atleast(data, minimum=5/6)
+    print(new_data)
+    print('\n--- keep_atleast minimum=2 with target ----------')
     new_data = keep_atleast(data, minimum=2, y=y)
     print(new_data)
 
@@ -615,7 +919,14 @@ if __name__ == "__main__":
     print('---- original -------------------')
     print(data)
     print('------after normalizing by 97.59001 -----------------')
-    new_data = normalize_ref_feature(data, 97.59001)
+    tf = RefFeatureNormalizer(feature=97.59001)
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
+    tf = RefFeatureNormalizer(feature=97.59001)
+    new_data = tf.fit_transform(data)
+    tf = DropFeatures(features_to_drop=[97.59001, 97.59185])
+    new_data = tf.fit_transform(new_data)
     print(new_data)
 
     # read sample data set
