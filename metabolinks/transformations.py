@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
@@ -274,46 +275,65 @@ def keep_atleast(df, minimum=1, y=None):
 # It does not necessarily produce samples with unit norms, as in the Normalizer of
 # scikit-learn
 
-# this transformer 
+# this transformer implements methods capable of using one scaler factor to divide each sample
+# for the normalization
 
-
-class RefFeatureNormalizer(BaseEstimator, TransformerMixin):
+class SampleNormalizer(BaseEstimator, TransformerMixin):
     """
-    The RefFeatureNormalizer() divides all numerical features of a
-    dataframe by the values of a reference column, a 'reference feature'.
+    The SampleNormalizer() divides all numerical features of a
+    dataframe by a vector o scaling factors, row-wise.
+    This means that each sample (instance) is divided by a corresponding value, calculated during fit()
+    Several methods are implemented to find the scaling factors (parameter `method` in the contructor):
+
+    'feature': reference column, used as a 'reference feature'.
+    'total' (or 'sum'): the sum of signals of each sample
+    'PQN': Probabilistic Quotient Normalization
+    
     NA values are kept as NA values.
     A list of variables can be passed as an argument. Alternatively, the transformer
     will automatically select and transform all variables of type numeric.
     Parameters
     ----------
+    method: string, default="total"
+        One of the above methods
     feature: string, float
-        Indicates the feature to use for normalization.
+        Indicates the feature (column name) to be used a scaling factors in case `method`='ref_feature'.
+    ref_sample: "mean", "median", string, array-like, default='mean'
+        Indicates how to compute the reference sample in case `method`='PQN'.
+        - "mean" (default), reference sample is the mean of all samples for each feature
+        - "median" reference sample is median of all samples for each feature 
+        - row name, the reference sample is the indicated sample
+        - array like, the reference sample is explicitely given
     variables : list, default=None
         The list of numerical variables to be transformed. If None, the transformer
         will find and select all numerical variables.
     fold: float, default=1.0
-        After division by the reference feature values, the dataframe is then multiplied by fold.
+        After division by the scaling factors, the dataframe is then multiplied by fold.
     Attributes
     ----------
-    ref_features_values_:
-        pandas Series with the reference feature values.
+    scaling_factors_:
+        pandas Series with the scaling factor values (index are sample names).
     Methods
     -------
     fit:
-        fill the ref_features_values_.
+        compute scaling_factors_.
     transform:
-        Transforms the variables by dividing from the reference feature. Then, multiply by fold.
+        Transforms the variables by dividing by scaling_factors_. Then, multiply by fold.
     fit_transform:
         Fit to data, then transform it.
     """
 
     def __init__(
         self,
-        feature: Union[str, float],
+        method: str = 'total',
+        feature: Union[str, float, None] = None,
+        ref_sample: Union[str, float, None] = None,
         variables: Union[None, int, str, List[Union[str, int]]] = None,
         fold: Union[str, float] = 1.0,
     ) -> None:
 
+        self.method = method
+        self.ref_sample = ref_sample
         self.feature = feature
         self.variables = _check_input_parameter_variables(variables)
         self.fold = fold
@@ -347,11 +367,28 @@ class RefFeatureNormalizer(BaseEstimator, TransformerMixin):
         self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
             X, self.variables
         )
-        new_index, indexer = X.columns.sort_values(return_indexer=True)
-        pos = new_index.get_loc(self.feature, method='pad')
-        pos = indexer[pos]
 
-        self.ref_features_values_ = X.iloc[:, pos]
+        if self.method == 'feature':
+            new_index, indexer = X.columns.sort_values(return_indexer=True)
+            pos = new_index.get_loc(self.feature, method='pad')
+            pos = indexer[pos]
+            self.scaling_factors_ = X.iloc[:, pos]
+        
+        elif self.method in ['total', 'sum']:
+            self.scaling_factors_ = X.sum(axis=1)
+        
+        elif self.method == 'PQN':
+            # "Build" the reference sample based and compute quotients
+            if self.ref_sample == 'mean': # Mean spectre of all samples
+                ref_sample2 = X / X.mean(axis=0)
+            elif self.ref_sample == 'median': # Median spectre of all samples
+                ref_sample2 = X / X.median(axis=0)
+            elif self.ref_sample in X.index: # Sample name to use as a reference
+                ref_sample2 = X / X.loc[self.ref_sample,:]
+            else: # Actual sample given (ref_sample is array like)
+                ref_sample2 = X / self.ref_sample
+            # Normalization Factors
+            self.scaling_factors_ = ref_sample2.median(axis=1)
 
         self.input_shape_ = X.shape
         return self
@@ -386,7 +423,7 @@ class RefFeatureNormalizer(BaseEstimator, TransformerMixin):
         _check_input_matches_training_df(X, self.input_shape_[1])
 
         # transform
-        X[self.variables] = X[self.variables].div(self.ref_features_values_, axis=0)
+        X[self.variables] = X[self.variables].div(self.scaling_factors_, axis=0)
         return X
 
 class DropFeatures(BaseSelector):
@@ -473,10 +510,9 @@ def normalize_ref_feature(df, feature, remove=False):
        remove: bool; True to remove reference feature from data after normalization.
 
        Returns: DataFrame.
-       """
+    """
 
-    # find position of feature
-    new_df = RefFeatureNormalizer(feature=feature).fit_transform(df)
+    new_df = SampleNormalizer(method='feature', feature=feature).fit_transform(df)
     if remove:
         new_df = DropFeatures(features_to_drop=[feature]).fit_transform(new_df)
     return(df)
@@ -489,84 +525,248 @@ def drop_features(df, features):
        features: list of column names.
 
        Returns: DataFrame.
-       """
-
+    """
     return DropFeatures(features_to_drop=[features]).fit_transform(df)
 
+
 def normalize_sum(df):
-    """Normalization of a dataset by the total value per columns."""
+    tf = SampleNormalizer(method='sum')
+    return tf.fit_transform(df)
 
-    return df/df.sum(axis=0)
 
-# Needs double-checking
 def normalize_PQN(df, ref_sample='mean'):
-    """Normalization of a dataset by the Probabilistic Quotient Normalization method.
+    tf = SampleNormalizer(method='PQN', ref_sample=ref_sample)
+    return tf.fit_transform(df)
+
+# TODO: rewrite normalize_quantile() as a Transformer and test
+def normalize_quantile(df, ref_type='mean'):
+    """Normalization of a dataset by the Quantile Normalization method.
+
+       Missing Values are temporarily replaced with 0 (and count as 0) until normalization is done. Quantile Normalization is more
+    useful with no/low number of missing values.
+
+       Spectra: AlignedSpectra object (from metabolinks).
+       ref_type: str (default: 'mean'); reference sample to use in Quantile Normalization, types accepted: 'mean' (default,
+    reference sample will be the means of the intensities of each rank), 'median' (reference sample will be the medians of the
+    intensities for each rank).
+
+       Returns: AlignedSpectra object (from metabolinks); normalized spectra.
+    """
+    # Setting up the temporary dataset with missing values
+    # replaced by zero and dataframes for the results
+    norm = df.copy().replace({np.nan:0})
+
+    # sort sample values and compute ranks of features within each sample
+    sorted_df = pd.DataFrame(np.sort(norm.values, axis=0), columns=df.columns)
+    ranks = norm.rank(axis=0, na_option='top')
+
+    # Determine the reference sample for normalization
+    if ref_type == 'mean':
+        ref_sample = sorted_df.mean(axis=1).values
+    elif ref_type == 'median':
+        ref_sample = sorted_df.median(axis=1).values
+    else:
+        raise ValueError('Type not recognized. Available ref_type: "mean", "median".')
+
+    # Replacing the values by the reference sample considering the position
+    # indicted by the rank
+
+    for i in range(len(ranks)):
+        for j in range(len(ranks.columns)):
+            if ranks.iloc[i,j] == round(ranks.iloc[i,j]):
+                # rank is an integer
+                r = int(ranks.iloc[i,j])
+                norm.iloc[i,j] = ref_sample[r-1]
+            else:
+                # in case of ties, the rank isn't an integer (ends in .5)
+                lower_rank = int(ranks.iloc[i,j]-1.5)
+                upper_rank = int(ranks.iloc[i,j]-0.5)
+                norm.iloc[i,j] = np.mean((ref_sample[lower_rank], ref_sample[upper_rank]))
+
+    #Replacing 0's by missing values
+    return norm.replace({0:np.nan})
+
+# ---------- log transformations and scalings
+
+
+def glog(df, lamb=None):
+    """Performs Generalized Logarithmic Transformation on a Spectra (same as MetaboAnalyst's transformation).
 
        df: Pandas DataFrame.
-       ref_sample: reference sample to use in PQ Normalization, types accepted: "mean" (default, reference sample will be the intensity
-    mean of all samples for each feature - useful for when there are a lot of imputed missing values), "median" (reference sample will
-    be the intensity median of all samples for each feature - useful for when there aren't a lot of imputed missing values), column name
-    of the sample - ('label','sample') if data is labeled (reference sample will be the sample with said column name in the dataset)  -
-    or list with the intensities of all peaks that will directly be the reference sample (pandas Series not accepted - list(Series) is
-    accepted).
+       lamb: scalar, optional (default: minimum value in the data divided by 10); transformation parameter lambda.
 
-       Returns: Pandas DataFrame; normalized spectra.
+       Returns: DataFrame transformed as log2(y + (y**2 + lamb**2)**0.5).
+       """
+    # Default lambda
+    if lamb is None:
+        lamb = min(df.min())/10.0
+    # Apply the transformation
+    y = df.values
+    y = np.log2((y + (y**2 + lamb**2)**0.5)/2)
+    return pd.DataFrame(y, index=df.index, columns=df.columns)
+
+class GLogTransformer(BaseNumericalTransformer):
     """
-    
-    #"Building" the reference sample based on the input given
-    if ref_sample == 'mean': #Mean spectre of all samples
-        ref_sample2 = df / df.mean()
-    elif ref_sample == 'median': #Median spectre of all samples
-        ref_sample2 = df/df.median()
-    elif ref_sample in df.index: # Sample name to use as a reference
-        ref_sample2 = df/df.loc[ref_sample,:]
-    else: # Actual sample given (ref_sample is array like)
-        ref_sample2 = df/ref_sample
-    #Normalization Factor and Normalization
-    pqr_fact = ref_sample2.median()
-    return df / pqr_fact
-
-
-class PQNormalizer(BaseNumericalTransformer):
-    """
-    The PQNormalizer() divides all numerical features of a
-    dataframe by the values of a reference column, a 'reference feature'.
-    NA values are kept as NA values.
+    The GLogTransformer() applies the Generalized Logarithmic Transformation to
+    numerical variables. This is log2(y + (y**2 + lamb**2)**0.5)
+    The Transformer only works with numerical non-negative values. If the variable
+    contains a zero or a negative value, the transformer will return an error.
     A list of variables can be passed as an argument. Alternatively, the transformer
     will automatically select and transform all variables of type numeric.
     Parameters
     ----------
-    feature: string, float
-        Indicates the feature to use for normalization.
+    lamb: float, default=None
+        Transformation parameter lambda.
     variables : list, default=None
         The list of numerical variables to be transformed. If None, the transformer
         will find and select all numerical variables.
-    fold: float, default=1.0
-        After division by the reference feature values, the dataframe is then multiplied by fold.
-    Attributes
-    ----------
-    ref_features_values_:
-        pandas Series with the reference feature values.
     Methods
     -------
     fit:
-        fill the ref_features_values_.
+        This transformer does not learn parameters.
     transform:
-        Transforms the variables by dividing from the reference feature. Then, multiply by fold.
+        Transforms the variables using glog transformation.
     fit_transform:
         Fit to data, then transform it.
     """
 
     def __init__(
         self,
-        feature: Union[str, float],
+        lamb: float = None,
         variables: Union[None, int, str, List[Union[str, int]]] = None,
-        fold: Union[str, float] = 1.0,
     ) -> None:
 
-        self.feature = feature
         self.variables = _check_input_parameter_variables(variables)
-        self.fold = fold
+        self.lamb = lamb
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+        """
+        This transformer does not learn parameters.
+        Select the numerical variables and determines whether the logarithm
+        can be applied on the selected variables (it checks if the variables
+        are all positive).
+        Parameters
+        ----------
+        X : Pandas DataFrame of shape = [n_samples, n_features].
+            The training input samples. Can be the entire dataframe, not just the
+            variables to transform.
+        y : pandas Series, default=None
+            It is not needed in this transformer. You can pass y or None.
+        Raises
+        ------
+        TypeError
+            - If the input is not a Pandas DataFrame
+            - If any of the user provided variables are not numerical
+        ValueError
+            - If there are no numerical variables in the df or the df is empty
+            - If the variable(s) contain null values
+            - If some variables contain zero or negative values
+        Returns
+        -------
+        self
+        """
+
+        # check input dataframe
+        X = super().fit(X)
+
+        # check contains zero or negative values
+        if (X[self.variables] <= 0).any().any():
+            raise ValueError(
+                "Some variables contain zero or negative values, can't apply log2"
+            )
+
+        self.input_shape_ = X.shape
+
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the variables using log transformation.
+        Parameters
+        ----------
+        X : Pandas DataFrame of shape = [n_samples, n_features]
+            The data to be transformed.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+        ValueError
+            - If the variable(s) contain null values.
+            - If the dataframe not of the same size as that used in fit().
+            - If some variables contains zero or negative values.
+        Returns
+        -------
+        X : pandas dataframe
+            The dataframe with the transformed variables.
+        """
+
+        # check input dataframe and if class was fitted
+        X = super().transform(X)
+
+        # check contains zero or negative values
+        if (X[self.variables] <= 0).any().any():
+            raise ValueError(
+                "Some variables contain zero or negative values, can't apply log2"
+            )
+
+        # transform
+        # Default lambda
+        if self.lamb is None:
+            lamb = X[self.variables].min().min()/10.0
+        else:
+            lamb = self.lamb
+        # Apply the transformation
+        y = X[self.variables].values
+        y = np.log2((y + (y**2 + lamb**2)**0.5)/2)
+        X[self.variables] = y
+        return X
+
+class FeatureScaler(BaseEstimator, TransformerMixin):
+    """
+    The FeatureScaler() scales samples using one of several types of scaling,
+    indicated by the argument `method`, which defaults to "Pareto" scaling.
+    Indicated by argument `mean_center` which defaults to True, sample data is also mean centered.
+    Several scaling types are implemented:
+
+    'standard' or 'auto': divide by std, roughly equivalent to StandardScaler of sckit-learn.
+    'pareto', the default: divide by sqrt(std)
+
+    NA values are kept as NA values. They are ignored in the computation of mean and dispertion
+    statistics.
+    A list of variables can be passed as an argument. Alternatively, the transformer
+    will automatically select and transform all variables of type numeric.
+    Parameters
+    ----------
+    method: string, default="pareto"
+        One of the above methods of scaling
+    mean_center: bool, default=True
+        Indicates wheter the dta is mean centered prior to scaling.
+    variables : list, default=None
+        The list of numerical variables to be transformed. If None, the transformer
+        will find and select all numerical variables.
+    Attributes
+    ----------
+    This transformer does not learn any attributes, besides housekeeping attributes.
+    Methods
+    -------
+    fit:
+        Does not learn any attributes. performs checks on data.
+    transform:
+        Transforms data using one of the scaling methods indicated by `method`.
+    fit_transform:
+        Fit to data, then transform it.
+    """
+
+    def __init__(
+        self,
+        method: str = 'pareto',
+        variables: Union[None, int, str, List[Union[str, int]]] = None,
+        mean_center: bool = True,
+    ) -> None:
+
+        self.method = method
+        self.mean_center = mean_center
+        self.variables = _check_input_parameter_variables(variables)
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
         """
@@ -597,11 +797,6 @@ class PQNormalizer(BaseNumericalTransformer):
         self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
             X, self.variables
         )
-        new_index, indexer = X.columns.sort_values(return_indexer=True)
-        pos = new_index.get_loc(self.feature, method='pad')
-        pos = indexer[pos]
-
-        self.ref_features_values_ = X.iloc[:, pos]
 
         self.input_shape_ = X.shape
         return self
@@ -609,7 +804,7 @@ class PQNormalizer(BaseNumericalTransformer):
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Divide dataframe by reference feature column.
+        Perform the scaling transformation indicated by `method`.
         Parameters
         ----------
         X : Pandas DataFrame of shape = [n_samples, n_features]
@@ -636,80 +831,42 @@ class PQNormalizer(BaseNumericalTransformer):
         _check_input_matches_training_df(X, self.input_shape_[1])
 
         # transform
-        X[self.variables] = X[self.variables].div(self.ref_features_values_, axis=0)
+        subX = X[self.variables]
+        means = subX.mean(axis=0)
+        stds = subX.std(axis=0)
+        maxima = subX.max(axis=0)
+        minima = subX.min(axis=0)
+        medians = subX.median(axis=0)
+        if self.mean_center:
+            subX = subX.sub(means, axis=1)
+        if self.method == 'pareto':
+            stds = stds ** 0.5
+            subX = subX.div(stds, axis=1)
+        elif self.method in ['auto', 'standard']:
+            subX = subX.div(stds, axis=1)
+        elif self.method == 'mean_center':
+            if not self.mean_center:
+                # do it, regardless of mean_center parameter
+                subX = subX.sub(means, axis=1)
+        elif self.method == 'vast':
+            subX = subX.div(stds, axis=1)
+            subX = subX.mul(means, axis=1)
+            subX = subX.div(stds, axis=1)
+        elif self.method == 'level_mean':
+            subX = subX.div(means, axis=1)
+        elif self.method == 'level_median':
+            subX = subX.div(medians, axis=1)
+        elif self.method == 'range':
+            ranges = maxima - minima
+            ranges[ranges<=0.0] = 1.0 # in case max == min
+            subX = subX.div(ranges, axis=1)
+        X[self.variables] = subX
         return X
-
-def normalize_quantile(df, ref_type='mean'):
-    """Normalization of a dataset by the Quantile Normalization method.
-
-       Missing Values are temporarily replaced with 0 (and count as 0) until normalization is done. Quantile Normalization is more
-    useful with no/low number of missing values.
-
-       Spectra: AlignedSpectra object (from metabolinks).
-       ref_type: str (default: 'mean'); reference sample to use in Quantile Normalization, types accepted: 'mean' (default,
-    reference sample will be the means of the intensities of each rank), 'median' (reference sample will be the medians of the
-    intensities for each rank).
-
-       Returns: AlignedSpectra object (from metabolinks); normalized spectra.
-    """
-    #Setting up the temporary dataset with missing values replaced by zero and dataframes for the results
-    norm = df.copy().replace({np.nan:0})
-    ref_spectra = df.copy()
-    ranks = df.copy()
-
-    for i in range(len(norm.columns)):
-        #Determining the ranks of each feature in the same column (same sample) in the dataset
-        ref_spectra.iloc[:,i] = norm.iloc[:,i].sort_values().values
-        ranks.iloc[:,i] = norm.iloc[:,i].rank(na_option='top')
-
-    #Determining the reference sample for normalization based on the ref_type chosen (applied on the columns).
-    if ref_type == 'mean':
-        ref_sample = ref_spectra.mean(axis=1).values
-    elif ref_type == 'median':
-        ref_sample = ref_spectra.median(axis=1).values
-    else:
-        raise ValueError('Type not recognized. Available ref_type: "mean", "median".')
-
-    #Replacing the values in the dataset for the reference sample values based on the ranks calculated earlier for each entry
-    for i in range(len(ranks)):
-        for j in range(len(ranks.columns)):
-            if ranks.iloc[i,j] == round(ranks.iloc[i,j]):
-                norm.iloc[i,j] = ref_sample[int(ranks.iloc[i,j])-1]
-            else: #in case the rank isn't an integer and ends in .5 (happens when a pair number of samples have the same
-                  #value in the same column - after ordering from lowest to highest values by row).
-                norm.iloc[i,j] = np.mean((ref_sample[int(ranks.iloc[i,j]-1.5)], ref_sample[int(ranks.iloc[i,j]-0.5)]))
-
-    #Replacing 0's by missing values and creating the AlignedSpectra object for the output
-    return norm.replace({0:np.nan})
-
-
-# ---------- log transformations and scalings
-
-def glog(df, lamb=None):
-    """Performs Generalized Logarithmic Transformation on a Spectra (same as MetaboAnalyst's transformation).
-
-       df: Pandas DataFrame.
-       lamb: scalar, optional (default: minimum value in the data divided by 10); transformation parameter lambda.
-
-       Returns: DataFrame transformed as log2(y + (y**2 + lamb**2)**0.5).
-       """
-    # Default lambda
-    if lamb is None:
-        lamb = min(df.min())/10.0
-    # Apply the transformation
-    y = df.values
-    y = np.log2((y + (y**2 + lamb**2)**0.5)/2)
-    return pd.DataFrame(y, index=df.index, columns=df.columns)
 
 
 def pareto_scale(df):
     """Performs Pareto Scaling on a DataFrame."""
-
-    means = df.mean(axis=1)
-    stds = df.std(axis=1) ** 0.5
-    df2 = df.sub(means, axis=0).div(stds, axis=0)
-    return df2
-
+    return FeatureScaler(method='pareto').fit_transform(df)
 
 def mean_center(df):
     """Performs Mean Centering.
@@ -717,8 +874,7 @@ def mean_center(df):
        df: Pandas DataFrame. It can include missing values.
 
        Returns: DataFrame; Mean Centered Spectra."""
-    return df.sub(df.mean(axis=1), axis=0)
-
+    return FeatureScaler(method='mean_center').fit_transform(df)
 
 def auto_scale(df):
     """Performs Autoscaling on column-organized data.
@@ -727,28 +883,13 @@ def auto_scale(df):
 
        This is x -> (x - mean(x)) / std(x) per feature"""
 
-    # TODO: verify if the name of this transformation is "Standard scaling"
-    # TODO: most likely it is known by many names (scikit-learn has a SatndardScaler transformer)
-    means = df.mean(axis=1)
-    stds = df.std(axis=1)
-    df2 = df.sub(means, axis=0).div(stds, axis=0)
-    return df2
+    return FeatureScaler(method='auto').fit_transform(df)
 
 def range_scale(df):
     """Performs Range Scaling.
 
        Returns: Pandas DataFrame."""
-
-    scaled_aligned = df.copy()
-    ranges = df.max(axis=1) - df.min(axis=1) # Defining range for every feature
-    # Applying Range scaling to each feature
-    for j in range(0, len(scaled_aligned)):
-        if ranges.iloc[j] == 0: # No difference between max and min values
-            scaled_aligned.iloc[j, :] = df.iloc[j, ]
-        else:
-            scaled_aligned.iloc[j, :] = (df.iloc[j, ] - df.iloc[j, ].mean()) / ranges.iloc[j]
-
-    return scaled_aligned
+    return FeatureScaler(method='range').fit_transform(df)
 
 
 def vast_scale(df):
@@ -756,14 +897,7 @@ def vast_scale(df):
 
        Returns: Pandas DataFrame; Vast Scaled Spectra."""
 
-    # scaled_aligned = df.copy()
-    std = df.std(axis=1)
-    mean = df.mean(axis=1)
-    # Applying Vast Scaling to each feature
-    scaled_aligned = (((df.T - mean)/std)/(mean/std)).T
-
-    # Return scaled spectra
-    return scaled_aligned
+    return FeatureScaler(method='vast').fit_transform(df)
 
 
 def level_scale(df, average=True):
@@ -774,17 +908,7 @@ def level_scale(df, average=True):
 
     Returns: Pandas DataFrame; Level Scaled Spectra."""
 
-    mean = df.mean(axis=1)
-    # Applying Level Scaling to each feature
-    if average == True:
-        scaled_aligned = ((df.T - mean)/mean).T
-    elif average == False:
-        scaled_aligned = ((df.T - mean)/df.median(axis=1)).T
-    else:
-        raise ValueError ('Average is a boolean argument. Only True or False accepted.')
-
-    # Return scaled spectra
-    return scaled_aligned
+    return FeatureScaler(method='level_median').fit_transform(df)
 
 
 # ----------------------------------------
@@ -919,20 +1043,73 @@ if __name__ == "__main__":
     print('---- original -------------------')
     print(data)
     print('------after normalizing by 97.59001 -----------------')
-    tf = RefFeatureNormalizer(feature=97.59001)
+    tf = SampleNormalizer(method='feature', feature=97.59001)
     new_data = tf.fit_transform(data)
+    print('scaling factors:\n', tf.scaling_factors_)
     print(new_data)
     print('------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
-    tf = RefFeatureNormalizer(feature=97.59001)
+    tf = SampleNormalizer(method='feature', feature=97.59001)
     new_data = tf.fit_transform(data)
     tf = DropFeatures(features_to_drop=[97.59001, 97.59185])
     new_data = tf.fit_transform(new_data)
     print(new_data)
 
-    # read sample data set
-    print('\npareto scaling ------------\n')
+    print('\nNormalization by total ------------\n')
+    print('---- original -------------------')
+    print(data)
+    print('------after normalization -----------------')
+    tf = SampleNormalizer(method='total')
+    new_data = tf.fit_transform(data)
+    print('scaling factors:\n', tf.scaling_factors_)
+    print(new_data)
+
+    print('\nPQN Normalization (ref sample is mean) ------------\n')
+    print('---- original -------------------')
+    print(data)
+    print('------after normalization -----------------')
+    tf = SampleNormalizer(method='PQN', ref_sample='mean')
+    new_data = tf.fit_transform(data)
+    print('scaling factors:\n', tf.scaling_factors_)
+    print(new_data)
+    print('\nPQN Normalization (ref sample is first) ------------\n')
+    print('---- original -------------------')
+    print(data)
+    print('------after normalization -----------------')
+    tf = SampleNormalizer(method='PQN', ref_sample=('l1', 's38'))
+    new_data = tf.fit_transform(data)
+    print('scaling factors:\n', tf.scaling_factors_)
+    print(new_data)
+
+    print('\nglog transformation (after imputing with 1/2 minimum) ------------\n')
+    print('---- original -------------------')
+    print(data)
+    print('------after normalization -----------------')
+    tf = FracMinImputer(fraction=0.5)
+    new_data = tf.fit_transform(data)
+    tf = GLogTransformer()
+    new_data = tf.fit_transform(new_data)
+    print(new_data)
+
+
+    print('\nScalings ------------\n')
     print('---- original -------------------')
     print(data)
     print('------after Pareto scaling -----------------')
-    new_data = pareto_scale(data)
+    new_data = FeatureScaler(method='pareto').fit_transform(data)
+    print(new_data)
+    print('------after auto (standard) scaling -----------------')
+    tf = FeatureScaler(method='auto')
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('------after vast scaling -----------------')
+    tf = FeatureScaler(method='vast')
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('------after level scaling -----------------')
+    tf = FeatureScaler(method='level_median')
+    new_data = tf.fit_transform(data)
+    print(new_data)
+    print('------after range scaling -----------------')
+    tf = FeatureScaler(method='range')
+    new_data = tf.fit_transform(data)
     print(new_data)
