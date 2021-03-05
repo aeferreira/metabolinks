@@ -515,7 +515,7 @@ def normalize_ref_feature(df, feature, remove=False):
     new_df = SampleNormalizer(method='feature', feature=feature).fit_transform(df)
     if remove:
         new_df = DropFeatures(features_to_drop=[feature]).fit_transform(new_df)
-    return(df)
+    return(new_df)
 
 
 def drop_features(df, features):
