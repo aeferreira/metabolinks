@@ -877,11 +877,12 @@ def mean_center(df):
     return FeatureScaler(method='mean_center').fit_transform(df)
 
 def auto_scale(df):
-    """Performs Autoscaling on column-organized data.
+    """Performs Autoscaling, AKA Standard scaling.
 
-       Returns: Pandas DataFrame; Auto Scaled Spectra.
+       Returns: Pandas DataFrame.
 
-       This is x -> (x - mean(x)) / std(x) per feature"""
+       This is x -> (x - mean(x)) / std(x) per feature.
+       Notice that std is computed with ddf=1, unlike sckit-learn."""
 
     return FeatureScaler(method='auto').fit_transform(df)
 
@@ -900,15 +901,18 @@ def vast_scale(df):
     return FeatureScaler(method='vast').fit_transform(df)
 
 
-def level_scale(df, average=True):
+def level_scale(df, average=False):
     """Performs Level Scaling on a DataFrame. (See van den Berg et al., 2006).
 
-    average: bool (Default - True); if True mean-centered data is divided by the mean spectra, if False it is divided by the median
-    spectra.
+    average: bool (Default - False); if True mean-centered data is divided by the mean spectra,
+    if False it is divided by the median spectra.
 
     Returns: Pandas DataFrame; Level Scaled Spectra."""
 
-    return FeatureScaler(method='level_median').fit_transform(df)
+    if average:
+        return FeatureScaler(method='level_mean').fit_transform(df)
+    else:
+        return FeatureScaler(method='level_median').fit_transform(df)
 
 
 # ----------------------------------------
@@ -1112,4 +1116,15 @@ if __name__ == "__main__":
     print('------after range scaling -----------------')
     tf = FeatureScaler(method='range')
     new_data = tf.fit_transform(data)
+    print(new_data)
+    print('------after range scaling with a zero range-----------------')
+    nr_data = data.copy()
+    col = np.full(nr_data.shape[0], np.nan)
+    col[0] = 1000
+    col[4] = 1000
+    nr_data.iloc[:, 2] = col
+    print(nr_data)
+    print('-'*20)
+    tf = FeatureScaler(method='range', mean_center=False)
+    new_data = tf.fit_transform(nr_data)
     print(new_data)
