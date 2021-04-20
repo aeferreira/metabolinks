@@ -4,22 +4,23 @@
    The input data matrix should follow the convention that the
    instances are in rows and features are in columns.
 """
-from functools import partial
+
 from typing import Optional, List, Union
 
 import numpy as np
 import pandas as pd
 
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from sklearn.impute import SimpleImputer
+
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
 
 from feature_engine.dataframe_checks import (
     _is_dataframe,
     _check_input_matches_training_df,
 )
-from feature_engine.imputation.base_imputer import BaseImputer
+#from feature_engine.imputation.base_imputer import BaseImputer
 from feature_engine.selection.base_selector import BaseSelector
 from feature_engine.base_transformers import BaseNumericalTransformer
 from feature_engine.variable_manipulation import (
@@ -27,7 +28,7 @@ from feature_engine.variable_manipulation import (
     _find_or_check_numerical_variables,
     _find_all_variables,
 )
-from feature_engine.imputation import ArbitraryNumberImputer
+#from feature_engine.imputation import ArbitraryNumberImputer
 from feature_engine.wrappers import SklearnTransformerWrapper
 
 
@@ -37,41 +38,30 @@ Variables = Union[None, int, str, List[Union[str, int]]]
 
 # ---------- imputation of missing values -------
 
-def fillna_zero(df):
-    """Set NaN to zero."""
-    return ArbitraryNumberImputer(arbitrary_number=0.0).fit_transform(df)
-
-def fillna_value(df, value=0.0):
-    """Set NaN to value."""
-    return ArbitraryNumberImputer(arbitrary_number=value).fit_transform(df)
-    #return df.fillna(value)
-
-def fillna_frac_min(df, fraction=0.5):
-    """Set NaN to a fraction of the minimum value in whole DataFrame."""
-
-    # minimum = df.min().min()
-    # # print(minimum)
-    # minimum = minimum * fraction
-    return FracMinImputer(fraction=fraction).fit_transform(df)
-
-class FracMinImputer(BaseImputer):
+class LODImputer(TransformerMixin, BaseEstimator):
     """
-    The FracMinImputer() transforms features by replacing missing data by a fraction
-    of the global minimum value of a pandas DataFrame.
+    The LODImputer() transforms features by replacing missing data by a value related to
+    Limit Of Detection strategies.
 
     Parameters
     ----------
-    fraction : float, default=0.5
-        Factor to multiply the minimum.
-    variables : list, default=None
-        The list of variables to be imputed. If None, the imputer will find and
-        select all variables of type numeric.
+    strategy: str, default="feature_min"
+
+        The imputation strategy.
+
+        - If "feature_min", then replace missing values by a fraction of the minimum along each column. Can only be used with numeric data.
+
+        - If "global_min", then replace missing values by a fraction of the minimum. Can only be used with numeric data.
+    
+    fraction : float, default=0.2
+        Factor to multiply the minimum defined by the LOD strategy.
+    
     Attributes
     ----------
-    imputer_dict_:
-        Dictionary with values equal to the constant replacement value.
-    imputation_value_:
-        The value to used to replace the NAs.
+    statistics_: array of shape (n_features,)
+        The imputation fill value for each feature.
+        Computing statistics can result in `np.nan` values.
+    
     Methods
     -------
     fit:
@@ -82,61 +72,111 @@ class FracMinImputer(BaseImputer):
         Fit to the data, then transform it.
     """
 
-    def __init__(self, fraction: float = 0.5, variables: Variables = None,) -> None:
-
-        if fraction <= 0:
-            raise ValueError("fraction must be a positive number")
-
+    def __init__(self, strategy:str = "feature_min", fraction: float = 0.2) -> None:
         self.fraction = fraction
-        self.variables = _check_input_parameter_variables(variables)
+        self.strategy = strategy
 
+    def _validate_parameters(self):
+        allowed_strategies = ["feature_min", "global_min"]
+        if self.strategy not in allowed_strategies:
+            raise ValueError("Can only use these strategies: {0} "
+                             " got strategy={1}".format(allowed_strategies,
+                                                        self.strategy))
+        if self.fraction <= 0:
+            raise ValueError("fraction must be a positive number")
+    
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
         """
         Learn the value of the fraction of the minimum of the data.
         Parameters
         ----------
-        X : pandas dataframe of shape = [n_samples, n_features]
-            The training dataset.
-        y : pandas Series, default=None
-            y is not needed in this imputation. You can pass None or y.
-        Raises
-        ------
-        TypeError
-            - If the input is not a Pandas DataFrame
-            - If any of the user provided variables are not numerical
-        ValueError
-            If there are no numerical variables in the df or the df is empty
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            The training input samples.
+        y : None
+            There is no need of a target in this transformer.
+
         Returns
         -------
-        self
+        self : object
+            Returns self.
+
         """
-        # check input dataframe
-        X = _is_dataframe(X)
 
-        # find or check for numerical variables
-        self.variables = _find_or_check_numerical_variables(X, self.variables)
+        # Input validation
+        self._validate_parameters()
+        X = check_array(X, force_all_finite='allow-nan')
 
-        # estimate imputation value
-        minimum = X.min().min()
-        # print(minimum)
-        minimum = minimum * self.fraction
-
-        self.imputer_dict_ = {c: minimum for c in self.variables}
-        self.imputation_value_ = minimum
-
+        self.n_features_ = X.shape[1]
         self.input_shape_ = X.shape
 
+        # estimate imputation values and keep it in statistics_ attribute
+        if self.strategy == 'feature_min':
+            mins = np.nanmin(X, axis=0)
+        elif self.strategy == 'global_min':
+            mins = np.full(self.n_features_, np.nanmin(X))
+
+        self.statistics_ = mins * self.fraction
+        
         return self
 
-    # # Ugly work around to import the docstring for Sphinx, otherwise not necessary
-    # def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-    #     X = super().transform(X)
+    def transform(self, X):
+        """Impute missing values with values calculated by a LOD strategy.
 
-    #     return X
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            The input samples.
 
-    # transform.__doc__ = BaseImputer.transform.__doc__
+        Returns
+        -------
+        X_transformed : array, shape (n_samples, n_features)
+            The array containing the missing values in ``X`` replaced by LOD calculated values.
+        """
+        
+        
+        # Check is fit had been called
+        check_is_fitted(self, 'n_features_')
 
-# ---------- filters for reproducibility
+        # Input validation
+        self._validate_parameters()
+        X = check_array(X, force_all_finite='allow-nan')
+
+        # Check that the input is of the same shape as the one passed
+        # during fit.
+        if X.shape[1] != self.n_features_:
+            raise ValueError('Shape of input is different from what was seen'
+                             'in `fit`')
+        
+        # do the imputation
+        X = X.copy()
+        # Find indices that you need to replace
+        inds = np.where(np.isnan(X))
+
+        # Place imputation values in the indices. Align the arrays using take
+        X[inds] = np.take(self.statistics_, inds[1])
+        return X
+
+def fillna_value(df, value=0.0):
+    """Set NaN to zero."""
+    res = SimpleImputer(strategy="constant", fill_value=value).fit_transform(df)
+    return pd.DataFrame(res, index=df.index, columns=df.columns)
+
+def fillna_zero(df):
+    """Set NaN to zero."""
+    return fillna_value(df, value=0.0)
+
+def fillna_frac_min(df, fraction=0.5):
+    """Set NaN to a fraction of the minimum value in whole DataFrame."""
+    res = LODImputer(strategy="global_min", fraction=fraction).fit_transform(df)
+    return pd.DataFrame(res, index=df.index, columns=df.columns)
+
+def fillna_frac_min_feature(df, fraction=0.2):
+    """Set NaN to a fraction of the minimum value in each feature."""
+    res = LODImputer(strategy="feature_min", fraction=fraction).fit_transform(df)
+    return pd.DataFrame(res, index=df.index, columns=df.columns)
+
+# ---------- variable selection
+# ---------- (using "reproducibility" criteria)
 
 class KeepMinimumNonNA(BaseSelector):
     """
@@ -1001,15 +1041,28 @@ if __name__ == "__main__":
     print('--- fillna_value  10 ----------')
     new_data = fillna_value(data, value=10)
     print(new_data)
-    print('--- fillna_frac_min default fraction=0.5 minimum ----------')
+    print('--- fillna_frac_min fraction=0.5 minimum ----------')
     new_data = fillna_frac_min(data)
     print(new_data)
-    print('--- fillna_frac_min default fraction=0.5 minimum with FraMinImputer----------')
-    tf = FracMinImputer(fraction=0.5)
+    print('--- fillna_frac_min_feature fraction=0.5 minimum per feature ----------')
+    new_data = fillna_frac_min_feature(data, fraction=0.2)
+    print(new_data)
+    print('--- fillna_frac_min default fraction=0.5 global minimum with LODImputer----------')
+    tf = LODImputer(strategy="global_min", fraction=0.5)
     new_data = tf.fit_transform(data)
+    print(type(new_data))
     print(new_data)
     print('++'*20)
-    print(tf.imputation_value_)
+    print('values to impute:')
+    print(pd.Series(tf.statistics_, index=data.columns))
+    print('--- fillna_frac_min default fraction=0.2 minimum per feature with LODImputer----------')
+    tf = LODImputer(strategy="feature_min", fraction=0.2)
+    new_data = tf.fit_transform(data)
+    print(type(new_data))
+    print(new_data)
+    print('++'*20)
+    print('values to impute:')
+    print(pd.Series(tf.statistics_, index=data.columns))
 
     print('\n--- keep at least minimum=3 using KeepMinNonNA----------')
     tf = KeepMinimumNonNA(minimum=3)
@@ -1088,8 +1141,9 @@ if __name__ == "__main__":
     print('---- original -------------------')
     print(data)
     print('------after normalization -----------------')
-    tf = FracMinImputer(fraction=0.5)
+    tf = LODImputer(strategy="global_min", fraction=0.5)
     new_data = tf.fit_transform(data)
+    new_data = pd.DataFrame(new_data, index=data.index, columns=data.columns)
     tf = GLogTransformer()
     new_data = tf.fit_transform(new_data)
     print(new_data)
