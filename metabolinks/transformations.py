@@ -1,8 +1,26 @@
-"""All transformations should accept a pandas DataFrame object.
+"""Module with several sckit-learn Transformers.
 
-   Most should return a new pandas DataFrame.
-   The input data matrix should follow the convention that the
+   Corresponding functions to be used in pandas-based
+   data processing are also included.
+
+   This sub-module is based on and follows the
+   principles of library feature-engine
+
+   https://feature-engine.readthedocs.io
+
+   Copyright (c) 2018-2021 The Feature-engine developers. All rights reserved.
+
+   Unlike scikit-learn...
+
+   Transformers accept pandas DataFrames in `.fit()` and `.transform()`
+   and `.transform()` returns a DtaFrame.
+
+   The input data matrix must follow the convention that the
    instances are in rows and features are in columns.
+
+   When instatiated, Transformers accept the parameter `variables` as
+   lists of positions or names of variables to be transformed, instead of
+   the whole DataFrame.
 """
 
 from typing import Optional, List, Union
@@ -11,6 +29,9 @@ import numpy as np
 import pandas as pd
 
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
+from sklearn.feature_extraction.text import _VectorizerMixin
+from sklearn.feature_selection._base import SelectorMixin
+from sklearn.pipeline import Pipeline
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.impute import SimpleImputer
 
@@ -20,7 +41,7 @@ from feature_engine.dataframe_checks import (
     _is_dataframe,
     _check_input_matches_training_df,
 )
-#from feature_engine.imputation.base_imputer import BaseImputer
+from feature_engine.imputation.base_imputer import BaseImputer
 from feature_engine.selection.base_selector import BaseSelector
 from feature_engine.base_transformers import BaseNumericalTransformer
 from feature_engine.variable_manipulation import (
@@ -28,13 +49,58 @@ from feature_engine.variable_manipulation import (
     _find_or_check_numerical_variables,
     _find_all_variables,
 )
-#from feature_engine.imputation import ArbitraryNumberImputer
+from feature_engine.imputation import ArbitraryNumberImputer
 from feature_engine.wrappers import SklearnTransformerWrapper
 
 
 import metabolinks as mtls
 from metabolinks.utils import _is_string
 Variables = Union[None, int, str, List[Union[str, int]]]
+
+# ---------- util functions to cast output of sklearn Transformers to pandas DataFrame
+
+# From
+# Sugestion to handle current state of affairs in sklearn
+# about the handling of feature names through Transformers and Pipelines
+# in the context of providing columns names for a DataFrame output
+
+def get_feature_out(estimator, feature_in):
+    if hasattr(estimator,'get_feature_names'):
+        if isinstance(estimator, _VectorizerMixin):
+            # handling all vectorizers
+            return [f'vec_{f}' \
+                for f in estimator.get_feature_names()]
+        else:
+            return estimator.get_feature_names(feature_in)
+    elif isinstance(estimator, SelectorMixin):
+        return np.array(feature_in)[estimator.get_support()]
+    else:
+        return feature_in
+
+
+def get_ct_feature_names(ct):
+    # handles all estimators, pipelines inside ColumnTransfomer
+    # doesn't work when remainder =='passthrough'
+    # which requires the input column names.
+    output_features = []
+
+    for name, estimator, features in ct.transformers_:
+        if name!='remainder':
+            if isinstance(estimator, Pipeline):
+                current_features = features
+                for step in estimator:
+                    current_features = get_feature_out(step, current_features)
+                features_out = current_features
+            else:
+                features_out = get_feature_out(estimator, features)
+            output_features.extend(features_out)
+        elif estimator=='passthrough':
+            output_features.extend(ct._feature_names_in[features])
+                
+    return output_features
+
+def as_df(result, like=None, new_columns=None, new_index=None):
+    return pd.DataFrame(result, index=like.index, columns=like.columns)
 
 # ---------- imputation of missing values -------
 
@@ -159,7 +225,7 @@ class LODImputer(TransformerMixin, BaseEstimator):
 def fillna_value(df, value=0.0):
     """Set NaN to zero."""
     res = SimpleImputer(strategy="constant", fill_value=value).fit_transform(df)
-    return pd.DataFrame(res, index=df.index, columns=df.columns)
+    return as_df(res, like=df)
 
 def fillna_zero(df):
     """Set NaN to zero."""
@@ -168,12 +234,12 @@ def fillna_zero(df):
 def fillna_frac_min(df, fraction=0.5):
     """Set NaN to a fraction of the minimum value in whole DataFrame."""
     res = LODImputer(strategy="global_min", fraction=fraction).fit_transform(df)
-    return pd.DataFrame(res, index=df.index, columns=df.columns)
+    return as_df(res, like=df)
 
 def fillna_frac_min_feature(df, fraction=0.2):
     """Set NaN to a fraction of the minimum value in each feature."""
     res = LODImputer(strategy="feature_min", fraction=fraction).fit_transform(df)
-    return pd.DataFrame(res, index=df.index, columns=df.columns)
+    return as_df(res, like=df)
 
 # ---------- variable selection
 # ---------- (using "reproducibility" criteria)
