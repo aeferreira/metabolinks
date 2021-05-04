@@ -4,7 +4,7 @@
    data processing are also included.
 
    This sub-module is based on and follows the
-   principles of library feature-engine
+   conventions of library feature-engine
 
    https://feature-engine.readthedocs.io
 
@@ -33,7 +33,6 @@ from sklearn.feature_extraction.text import _VectorizerMixin
 from sklearn.feature_selection._base import SelectorMixin
 from sklearn.pipeline import Pipeline
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.impute import SimpleImputer
 
 from sklearn.preprocessing import StandardScaler
 
@@ -41,7 +40,7 @@ from feature_engine.dataframe_checks import (
     _is_dataframe,
     _check_input_matches_training_df,
 )
-from feature_engine.imputation.base_imputer import BaseImputer
+
 from feature_engine.selection.base_selector import BaseSelector
 from feature_engine.base_transformers import BaseNumericalTransformer
 from feature_engine.variable_manipulation import (
@@ -52,55 +51,9 @@ from feature_engine.variable_manipulation import (
 from feature_engine.imputation import ArbitraryNumberImputer
 from feature_engine.wrappers import SklearnTransformerWrapper
 
-
-import metabolinks as mtls
 from metabolinks.utils import _is_string
 Variables = Union[None, int, str, List[Union[str, int]]]
 
-# ---------- util functions to cast output of sklearn Transformers to pandas DataFrame
-
-# From
-# Sugestion to handle current state of affairs in sklearn
-# about the handling of feature names through Transformers and Pipelines
-# in the context of providing columns names for a DataFrame output
-
-def get_feature_out(estimator, feature_in):
-    if hasattr(estimator,'get_feature_names'):
-        if isinstance(estimator, _VectorizerMixin):
-            # handling all vectorizers
-            return [f'vec_{f}' \
-                for f in estimator.get_feature_names()]
-        else:
-            return estimator.get_feature_names(feature_in)
-    elif isinstance(estimator, SelectorMixin):
-        return np.array(feature_in)[estimator.get_support()]
-    else:
-        return feature_in
-
-
-def get_ct_feature_names(ct):
-    # handles all estimators, pipelines inside ColumnTransfomer
-    # doesn't work when remainder =='passthrough'
-    # which requires the input column names.
-    output_features = []
-
-    for name, estimator, features in ct.transformers_:
-        if name!='remainder':
-            if isinstance(estimator, Pipeline):
-                current_features = features
-                for step in estimator:
-                    current_features = get_feature_out(step, current_features)
-                features_out = current_features
-            else:
-                features_out = get_feature_out(estimator, features)
-            output_features.extend(features_out)
-        elif estimator=='passthrough':
-            output_features.extend(ct._feature_names_in[features])
-                
-    return output_features
-
-def as_df(result, like=None, new_columns=None, new_index=None):
-    return pd.DataFrame(result, index=like.index, columns=like.columns)
 
 # ---------- imputation of missing values -------
 
@@ -124,9 +77,8 @@ class LODImputer(TransformerMixin, BaseEstimator):
     
     Attributes
     ----------
-    statistics_: array of shape (n_features,)
-        The imputation fill value for each feature.
-        Computing statistics can result in `np.nan` values.
+    imputer_dict_: dict
+        Dictionary with the imputation fill value for each feature.
     
     Methods
     -------
@@ -138,9 +90,12 @@ class LODImputer(TransformerMixin, BaseEstimator):
         Fit to the data, then transform it.
     """
 
-    def __init__(self, strategy:str = "feature_min", fraction: float = 0.2) -> None:
+    def __init__(self, strategy:str = "feature_min",
+                       fraction: float = 0.2,
+                       variables: Variables = None,) -> None:
         self.fraction = fraction
         self.strategy = strategy
+        self.variables = _check_input_parameter_variables(variables)
 
     def _validate_parameters(self):
         allowed_strategies = ["feature_min", "global_min"]
@@ -150,7 +105,7 @@ class LODImputer(TransformerMixin, BaseEstimator):
                                                         self.strategy))
         if self.fraction <= 0:
             raise ValueError("fraction must be a positive number")
-    
+            
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
         """
         Learn the value of the fraction of the minimum of the data.
@@ -167,65 +122,66 @@ class LODImputer(TransformerMixin, BaseEstimator):
             Returns self.
 
         """
+        # check input dataframe
+        X = _is_dataframe(X)
+
+        # find or check for numerical variables
+        self.variables = _find_or_check_numerical_variables(X, self.variables)
 
         # Input validation
         self._validate_parameters()
-        X = check_array(X, force_all_finite='allow-nan')
 
-        self.n_features_ = X.shape[1]
-        self.input_shape_ = X.shape
 
-        # estimate imputation values and keep it in statistics_ attribute
+        # estimate imputation values and keep it in imputer_dict_ attribute
         if self.strategy == 'feature_min':
-            mins = np.nanmin(X, axis=0)
+            minimum =  X[self.variables].min(axis=0) * self.fraction
+            self.imputer_dict_ = minimum.to_dict()
         elif self.strategy == 'global_min':
-            mins = np.full(self.n_features_, np.nanmin(X))
+            minimum = X.min().min() * self.fraction
+            self.imputer_dict_ = {c: minimum for c in self.variables}
 
-        self.statistics_ = mins * self.fraction
-        
+        self.input_shape_ = X.shape
+        self.n_features_ = X.shape[1]
         return self
 
-    def transform(self, X):
-        """Impute missing values with values calculated by a LOD strategy.
-
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Replace missing data with the learned values according to LOD strategy.
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
-            The input samples.
-
+        X : pandas dataframe of shape = [n_samples, n_features]
+            The data to be transformed.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+        ValueError
+            If the dataframe is not of same size as that used in fit()
         Returns
         -------
-        X_transformed : array, shape (n_samples, n_features)
-            The array containing the missing values in ``X`` replaced by LOD calculated values.
+        X : pandas dataframe of shape = [n_samples, n_features]
+            The dataframe without missing values in the selected variables.
         """
-        
-        
-        # Check is fit had been called
-        check_is_fitted(self, 'n_features_')
 
-        # Input validation
-        self._validate_parameters()
-        X = check_array(X, force_all_finite='allow-nan')
+        # Check method fit has been called
+        check_is_fitted(self)
 
-        # Check that the input is of the same shape as the one passed
-        # during fit.
-        if X.shape[1] != self.n_features_:
-            raise ValueError('Shape of input is different from what was seen'
-                             'in `fit`')
-        
-        # do the imputation
-        X = X.copy()
-        # Find indices that you need to replace
-        inds = np.where(np.isnan(X))
+        # check that input is a dataframe
+        X = _is_dataframe(X)
 
-        # Place imputation values in the indices. Align the arrays using take
-        X[inds] = np.take(self.statistics_, inds[1])
+        # Check that input df contains same number of columns as df used to fit
+        _check_input_matches_training_df(X, self.n_features_)
+
+        # replaces missing data with the learned parameters
+        for variable in self.imputer_dict_:
+            X[variable].fillna(self.imputer_dict_[variable], inplace=True)
+
         return X
+
 
 def fillna_value(df, value=0.0):
     """Set NaN to zero."""
-    res = SimpleImputer(strategy="constant", fill_value=value).fit_transform(df)
-    return as_df(res, like=df)
+    return ArbitraryNumberImputer(arbitrary_number=value).fit_transform(df)
 
 def fillna_zero(df):
     """Set NaN to zero."""
@@ -234,12 +190,12 @@ def fillna_zero(df):
 def fillna_frac_min(df, fraction=0.5):
     """Set NaN to a fraction of the minimum value in whole DataFrame."""
     res = LODImputer(strategy="global_min", fraction=fraction).fit_transform(df)
-    return as_df(res, like=df)
+    return res
 
 def fillna_frac_min_feature(df, fraction=0.2):
     """Set NaN to a fraction of the minimum value in each feature."""
     res = LODImputer(strategy="feature_min", fraction=fraction).fit_transform(df)
-    return as_df(res, like=df)
+    return res
 
 # ---------- variable selection
 # ---------- (using "reproducibility" criteria)
@@ -1120,7 +1076,7 @@ if __name__ == "__main__":
     print(new_data)
     print('++'*20)
     print('values to impute:')
-    print(pd.Series(tf.statistics_, index=data.columns))
+    print(pd.Series(tf.imputer_dict_, index=data.columns))
     print('--- fillna_frac_min default fraction=0.2 minimum per feature with LODImputer----------')
     tf = LODImputer(strategy="feature_min", fraction=0.2)
     new_data = tf.fit_transform(data)
@@ -1128,7 +1084,7 @@ if __name__ == "__main__":
     print(new_data)
     print('++'*20)
     print('values to impute:')
-    print(pd.Series(tf.statistics_, index=data.columns))
+    print(pd.Series(tf.imputer_dict_))
 
     print('\n--- keep at least minimum=3 using KeepMinNonNA----------')
     tf = KeepMinimumNonNA(minimum=3)
