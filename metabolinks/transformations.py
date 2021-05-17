@@ -785,9 +785,10 @@ class GLogTransformer(BaseNumericalTransformer):
 
 class FeatureScaler(BaseEstimator, TransformerMixin):
     """
-    The FeatureScaler() scales samples using one of several types of scaling,
+    The FeatureScaler() scales features using one of several types of scaling,
     indicated by the argument `method`, which defaults to "Pareto" scaling.
-    Indicated by argument `mean_center` which defaults to True, sample data is also mean centered.
+    If parameter `mean_center` is `True` (default) sample data is also mean centered.
+    
     Several scaling types are implemented:
 
     'standard' or 'auto': divide by std, roughly equivalent to StandardScaler of sckit-learn.
@@ -1085,6 +1086,27 @@ if __name__ == "__main__":
     print('++'*20)
     print('values to impute:')
     print(pd.Series(tf.imputer_dict_))
+    # TODO: the following does not work with float column names or lists of positions
+    # print('--- fillna_frac_min default fraction=0.2 minimum per feature with LODImputer----------')
+    # print('USE variables in Transformer')
+    # #variables = data.columns[0:4]
+    # tf = LODImputer(strategy="feature_min", fraction=0.2, variables=[0,1,2])
+    # new_data = tf.fit_transform(data)
+    # print(type(new_data))
+    # print(new_data)
+    # print('++'*20)
+    # print('values to impute:')
+    # print(pd.Series(tf.imputer_dict_))
+
+    print('\n\n-- Missing value counts ---------------------')
+    missing_counts = {}
+    missing_counts[f'global ({data.shape[0]})'] = data.isnull().sum(axis=0)
+    labels = data.transpose().cdl.unique_labels
+    for lbl in labels:
+        subdata = data.loc[lbl]
+        missing_counts[f'{lbl} ({subdata.shape[0]})'] = subdata.isnull().sum(axis=0)
+    missing_counts = pd.DataFrame(missing_counts)
+    print(missing_counts)
 
     print('\n--- keep at least minimum=3 using KeepMinNonNA----------')
     tf = KeepMinimumNonNA(minimum=3)
@@ -1170,29 +1192,9 @@ if __name__ == "__main__":
     new_data = tf.fit_transform(new_data)
     print(new_data)
 
-
     print('\nScalings ------------\n')
-    print('---- original -------------------')
+    print('---- moved to tests -------------------')
     print(data)
-    print('------after Pareto scaling -----------------')
-    new_data = FeatureScaler(method='pareto').fit_transform(data)
-    print(new_data)
-    print('------after auto (standard) scaling -----------------')
-    tf = FeatureScaler(method='auto')
-    new_data = tf.fit_transform(data)
-    print(new_data)
-    print('------after vast scaling -----------------')
-    tf = FeatureScaler(method='vast')
-    new_data = tf.fit_transform(data)
-    print(new_data)
-    print('------after level scaling -----------------')
-    tf = FeatureScaler(method='level_median')
-    new_data = tf.fit_transform(data)
-    print(new_data)
-    print('------after range scaling -----------------')
-    tf = FeatureScaler(method='range')
-    new_data = tf.fit_transform(data)
-    print(new_data)
     print('------after range scaling with a zero range-----------------')
     nr_data = data.copy()
     col = np.full(nr_data.shape[0], np.nan)
