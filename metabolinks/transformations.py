@@ -488,6 +488,24 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         X[self.variables] = X[self.variables].div(self.scaling_factors_, axis=0)
         return X
 
+def find_closest_features(data, features=None, tolerance=0.0001):
+    if features is None:
+        return {}
+    # find closest features and return them as a dictionary
+    closest_features = {}
+    new_index, indexer = data.columns.sort_values(return_indexer=True)
+    for feature in features:
+        # find position
+        try:
+            pos = new_index.get_loc(feature, method='nearest', tolerance=tolerance)
+            pos = indexer[pos]
+            closest_features[feature] = data.columns[pos]
+        except KeyError:
+            closest_features[feature] = None
+            
+    return closest_features
+
+
 class DropFeatures(BaseSelector):
     """
     DropFeatures() drops a list of variable(s) indicated by the user from the dataframe.
@@ -535,17 +553,11 @@ class DropFeatures(BaseSelector):
         """
         # check input dataframe
         X = _is_dataframe(X)
-        self.features_to_drop_ = []
-
-        # find position of feature
-        new_index, indexer = X.columns.sort_values(return_indexer=True)
-        for feature in self.features_to_drop:
-            pos = new_index.get_loc(feature, method='pad')
-            pos = indexer[pos]
-            self.features_to_drop_.append(X.columns[pos])
+        closest_features = find_closest_features(X, features=self.features_to_drop)
+        self.features_to_drop_ = [closest for feature, closest in closest_features.items()]
 
         # check user is not removing all columns in the dataframe
-        if len(self.features_to_drop) == len(X.columns):
+        if len(self.features_to_drop_) == len(X.columns):
             raise ValueError(
                 "The resulting dataframe will have no columns after dropping all "
                 "existing variables"
@@ -1149,11 +1161,15 @@ if __name__ == "__main__":
     print('scaling factors:\n', tf.scaling_factors_)
     print(new_data)
     print('------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
+    print('In data, there are the following features:')
+    print(find_closest_features(data, features=[97.59001, 97.59185]))
     tf = SampleNormalizer(method='feature', feature=97.59001)
     new_data = tf.fit_transform(data)
     tf = DropFeatures(features_to_drop=[97.59001, 97.59185])
     new_data = tf.fit_transform(new_data)
     print(new_data)
+    print('In new_data, there are the following features:')
+    print(find_closest_features(new_data, features=[97.59001, 97.59185]))
 
     print('\nNormalization by total ------------\n')
     print('---- original -------------------')

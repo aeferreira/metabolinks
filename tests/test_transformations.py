@@ -172,10 +172,18 @@ def test_norm_ref_feature_with_drop_features(data):
     # 97.59001 is feature in pos 1
     # 97.59185 is feature in pos 2
     tf = trans.SampleNormalizer(method='feature', feature=97.59001)
+    f1 = 97.59001
+    f2 = 97.59185
+    closest = trans.find_closest_features(data, features=[f1, f2])
+    assert closest[f1] is not None
+    assert closest[f2] is not None
+    
     new_data = tf.fit_transform(data)
     assert (tf.scaling_factors_ == data.iloc[:, 1]).all()
-    tf2 = trans.DropFeatures(features_to_drop=[97.59001, 97.59185])
+    
+    tf2 = trans.DropFeatures(features_to_drop=[f1, f2])
     new_data = tf2.fit_transform(new_data)
+    
     assert isinstance(new_data, pd.DataFrame)
     assert new_data.iloc[2, 0] == data.iloc[2, 0] / data.iloc[2, 1]
     kept_cols_mask = np.full(data.shape[1], True)
@@ -183,6 +191,10 @@ def test_norm_ref_feature_with_drop_features(data):
     kept_cols = data.columns[kept_cols_mask]
     assert new_data.shape[1] == data.shape[1] - 2
     assert (kept_cols == new_data.columns).all()
+    
+    closest = trans.find_closest_features(new_data, features=[f1, f2])
+    assert closest[f1] is None
+    assert closest[f2] is None
 
 def test_norm_total(data):
     tf = trans.SampleNormalizer(method='total')
