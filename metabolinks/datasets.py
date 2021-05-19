@@ -4,7 +4,7 @@
 
    All the datasets are scikit-learn Bunch objects and try to follow
    the same attribute convention, while creating aditional
-   `sample_names`, `sample_labels` and `classes`attributes
+   `sample_names`, `sample_labels` and `classes` attributes
    (`classes` and `target_names` are identical)."""
 
 from abc import ABCMeta, abstractmethod
@@ -66,21 +66,28 @@ def parse_data(df, desc='',
                samples_loc=None):
     """A parse a pandas dataframe returning a sckit-learn dataset.
 
-    Returns a Bunch object with attributes following the same convention as
-    the demo datasets of sckit-learn. Aditionally, the sample_names attribute
-    is also created if possible.
+    Returns a ``Bunch`` object with attributes following the same convention as
+    the demo datasets of sckit-learn. Aditionally, the following atributes are
+    also created if possible:
+    - `sample_names` a list of sample names.
+    - `sample_labels` a (non-encoded) list of sample labels
+    - `classes`, an alias of `target_names`, a list of unique sample labels 
 
-    `labels_loc` and `labels_in_multiindex`, indicate the location of the class labels in the df:
+    Arguments: 
+    
+    `labels_loc` indicate the location of the sample in the df:
 
-    - if labels_in_multindex is True, the labels are read from the outer level of the sample
+    - If an int, the corresponding multindex level is used as labels.
+      If a string, the multindex level with that name is used as labels. If not
+      found, then a column (or row) with that name is used as labels.
       (mult)index
-    - if labels_in_multindex is False, `labels_loc` should be the name of the feature column (or row if
-      `samples_in_cols` is True) where the labels are located.
-    - if labels_in_multindex is False and `labels_loc` is None, no class labels are read
-      and target and target_names are not generated
+    - if None, no sample labels are read and target and target_names are not generated.
 
-    class labels are encoded by sklearn.preprocessing.LabelEncoder() to fill attributes target
-    and target_names.
+    `samples_loc` has the same interpretation as `labels_loc` except that None means
+    the default "inner-most level" of the sample index. 
+
+    Sample labels are encoded by sklearn.preprocessing.LabelEncoder() to generate
+    attributes `target` and `target_names`.
     """
 
     if samples_in_cols:
@@ -92,6 +99,7 @@ def parse_data(df, desc='',
         f_indx = df.columns
         axis = 0
     bunch = Bunch()
+    
     # data attr
     bunch['data'] = df.transpose() if samples_in_cols else df.copy()
 
@@ -101,7 +109,7 @@ def parse_data(df, desc='',
     #feature_names and sample_names attrs
     bunch['feature_names'] = list(f_indx) if f_indx.nlevels < 2 else list(f_indx.to_flat_index())
     if samples_loc is None:
-        # defula is the inner level
+        # default is the inner level
         samples_loc = s_indx.nlevels - 1
     bunch['sample_names'] = _find_lbl_from_loc(samples_loc, df, axis=axis)
 
