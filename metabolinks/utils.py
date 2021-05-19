@@ -7,12 +7,12 @@
 from __future__ import print_function, absolute_import
 from six import string_types, integer_types
 
-def get_filename_using_tk():
+def get_filename_using_tk(filetypes=[("TSV","*.tsv")]):
     """Choose a filename using Tk"""
     import tkinter as tk
     root = tk.Tk()
     root.withdraw()
-    fname = tk.filedialog.askopenfilename(filetypes = [("TSV","*.tsv")])
+    fname = tk.filedialog.askopenfilename(filetypes=filetypes )
     print('Selected file {}'.format(fname))
     return fname
 
@@ -29,6 +29,9 @@ def _is_string(a):
 
 def _is_number(a):
     return isinstance(a, float) or isinstance(a, integer_types)
+
+def _is_int(a):
+    return isinstance(a, integer_types)
 
 
 def s2HMS(seconds):

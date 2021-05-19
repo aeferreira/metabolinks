@@ -3,14 +3,16 @@
    For now, they are used essencially for testing purposes.
 
    All the datasets are scikit-learn Bunch objects and try to follow
-   the same attribute convention, with effort on creating an aditional
-   `sample_names` attribute."""
+   the same attribute convention, while creating aditional
+   `sample_names`, `sample_labels` and `classes`attributes
+   (`classes` and `target_names` are identical)."""
 
 from abc import ABCMeta, abstractmethod
 import pandas as pd
 from io import StringIO
 from sklearn.utils import Bunch
 from sklearn.preprocessing import LabelEncoder
+from metabolinks import utils
 
 def demo_dataset(name, as_frame=True, return_X_y=False):
     b = DataSetFactory.create_dataset(name).as_Bunch()
@@ -38,8 +40,30 @@ def create_example_file(name, file_name):
     d = DataSetFactory.create_dataset(name)
     d.create_example_file(file_name)
 
+def _find_lbl_from_loc(loc, df, axis=0):
+    if loc is None:
+        return None
+    indx = df.index if axis == 0 else df.columns
+    if utils._is_int(loc):
+        return list(indx.get_level_values(loc))
+    if utils._is_string(loc):
+        if indx.nlevels < 2 and loc == indx.name:
+            return list(indx.get_level_values(0))
+        elif indx.nlevels >= 2 and loc in indx.names:
+            level = indx.names.index(loc)
+            return list(indx.get_level_values(level))
+        else: # try to find in column/row
+            if axis == 0:
+                return list(df[loc].values)
+            else:
+                return list(df.loc[loc, :].values)
+    raise ValueError(f'location must be int or string: {loc}')
 
-def parse_data(df, samples_in_cols=False, labels_loc=None, labels_in_multindex=False, desc=''):
+
+def parse_data(df, desc='',
+               samples_in_cols=False,
+               labels_loc=None,
+               samples_loc=None):
     """A parse a pandas dataframe returning a sckit-learn dataset.
 
     Returns a Bunch object with attributes following the same convention as
@@ -62,9 +86,11 @@ def parse_data(df, samples_in_cols=False, labels_loc=None, labels_in_multindex=F
     if samples_in_cols:
         s_indx = df.columns
         f_indx = df.index
+        axis = 1
     else:
         s_indx = df.index
         f_indx = df.columns
+        axis = 0
     bunch = Bunch()
     # data attr
     bunch['data'] = df.transpose() if samples_in_cols else df.copy()
@@ -72,26 +98,22 @@ def parse_data(df, samples_in_cols=False, labels_loc=None, labels_in_multindex=F
     # DESCR attr
     bunch['DESCR'] = desc
 
-    #feature_names nad sample_names attrs
-    bunch['sample_names'] = list(s_indx) if s_indx.nlevels < 2 else list(s_indx.to_flat_index())
+    #feature_names and sample_names attrs
     bunch['feature_names'] = list(f_indx) if f_indx.nlevels < 2 else list(f_indx.to_flat_index())
+    if samples_loc is None:
+        # defula is the inner level
+        samples_loc = s_indx.nlevels - 1
+    bunch['sample_names'] = _find_lbl_from_loc(samples_loc, df, axis=axis)
 
     # target and target_names
-    classes = None
-    if labels_in_multindex:
-        outer_level = s_indx.get_level_values(0)
-        classes = list(outer_level)
-    else:
-        if labels_loc is not None:
-            if samples_in_cols:
-                classes = list(df.loc[labels_loc, :].values)
-            else:
-                classes = list(df[labels_loc].values)
-    if classes is not None:
+    if labels_loc is not None:
+        labels = _find_lbl_from_loc(labels_loc, df, axis=axis)
+        bunch['sample_labels'] = labels
         le = LabelEncoder()
-        le.fit(classes)
+        le.fit(labels)
         bunch['target_names'] = list(le.classes_)
-        bunch['target'] = le.transform(classes)
+        bunch['classes'] = list(le.classes_)
+        bunch['target'] = le.transform(labels)
 
     return bunch
 
@@ -226,7 +248,7 @@ m/z
     def as_Bunch(self):
         df = pd.read_csv(StringIO(self.as_str()), sep='\t', header=[0,1], index_col=0)
         desc = """Small data set containing MS intensity data (6 samples, 19 peaks) with class labels in multindex."""
-        return parse_data(df, samples_in_cols=True, labels_in_multindex=True, desc=desc)
+        return parse_data(df, samples_in_cols=True, labels_loc=0, desc=desc)
 
     def create_example_file(self, file_name):
         df = self.as_Bunch().data.transpose()
@@ -315,15 +337,28 @@ raw_mass	peak_height	corrected_mass	npossible	KEGG_mass	ppm	KEGG_cid	KEGG_formul
 if __name__ == '__main__':
     from pandas.testing import assert_frame_equal
     import tempfile
+    def report_dataset(dataset):
+        print(dataset.DESCR)
+        print(dataset.data)
+        print('\nsample_names:', dataset.sample_names)
+        print('\nfeature_names:', dataset.feature_names)
+        if 'target' in dataset:
+            print('\nsample_labels:', dataset.sample_labels)
+            print('classes:', dataset.classes)
+            print('target_names:', dataset.target_names)
+            print('target:', dataset.target)
+        else:
+            print('\nsample_labels:', None)
+            print('classes:', None)
+            print('target_names:', None)
+            print('target:', None)
 
     dataset = demo_dataset('demo1')
     print('*********** demo1')
-    print(dataset.DESCR)
-    print(dataset.data)
-    print('\nsample_names:', dataset.sample_names)
-    print('\nfeature_names:', dataset.feature_names)
+    report_dataset(dataset)
 
-    print('NaNs:', dataset.data.isna().sum().sum())
+    print('\nNaNs:', dataset.data.isna().sum().sum())
+    
     print('-'*40)
     print('testing demo1 roundtrip')
     with tempfile.NamedTemporaryFile(mode='w') as tmp_file:
@@ -345,14 +380,9 @@ if __name__ == '__main__':
     print('-'*40)
     print('*********** demo2')
     dataset = demo_dataset('demo2')
-    print(dataset.DESCR)
-    print(dataset.data)
-    print('\nsample_names:', dataset.sample_names)
-    print('\nfeature_names:', dataset.feature_names)
-    print('\ntarget_names:', dataset.target_names)
-    print('\ntarget:', dataset.target)
+    report_dataset(dataset)
 
-    print('NaNs:', dataset.data.isna().sum().sum())
+    print('\nNaNs:', dataset.data.isna().sum().sum())
     print('-'*40)
 
     print('testing demo2 roundtrip')
@@ -365,7 +395,12 @@ if __name__ == '__main__':
     print('round-trip ok!')
     print('-'*40)
 
-    print('*********** table_with_formulae')
+    print('*********** demo2 using parse_data()')
+    datadf = demo_dataset('demo2').data
+    dataset = parse_data(datadf, labels_loc='label', samples_loc='sample')
+    report_dataset(dataset)
+
+    print('\n*********** table_with_formulae')
     dataset = demo_dataset('table_with_formulae')
     print(dataset.DESCR)
     dataset.data.info()
