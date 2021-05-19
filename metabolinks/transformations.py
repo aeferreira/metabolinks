@@ -493,15 +493,27 @@ def find_closest_features(data, features=None, tolerance=0.0001):
         return {}
     # find closest features and return them as a dictionary
     closest_features = {}
-    new_index, indexer = data.columns.sort_values(return_indexer=True)
-    for feature in features:
-        # find position
-        try:
-            pos = new_index.get_loc(feature, method='nearest', tolerance=tolerance)
-            pos = indexer[pos]
-            closest_features[feature] = data.columns[pos]
-        except KeyError:
-            closest_features[feature] = None
+    # eliminate duplicate features
+    new_columns = data.columns[~data.columns.duplicated()]
+    new_index, indexer = new_columns.sort_values(return_indexer=True)
+    # check if strings to find by exact match
+    all_str = all(_is_string(feature) for feature in features)
+    if all_str:
+        for feature in features:
+            try:
+                pos = new_columns.get_loc(feature)
+                closest_features[feature] = new_columns[pos]
+            except KeyError:
+                closest_features[feature] = None
+    else:  
+        for feature in features:
+            # find position
+            try:
+                pos = new_index.get_loc(feature, method='nearest', tolerance=tolerance)
+                pos = indexer[pos]
+                closest_features[feature] = new_columns[pos]
+            except KeyError:
+                closest_features[feature] = None
             
     return closest_features
 
@@ -1170,6 +1182,13 @@ if __name__ == "__main__":
     print(new_data)
     print('In new_data, there are the following features:')
     print(find_closest_features(new_data, features=[97.59001, 97.59185]))
+
+    print('------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
+    new_columns = data.columns.astype(str)
+    data_str = pd.DataFrame (data, index= data.index, columns=new_columns)
+    print(data_str)
+    print('In data with columns as str, there are the following features:')
+    print(find_closest_features(data_str, features=['97.59001', '97.59185']))
 
     print('\nNormalization by total ------------\n')
     print('---- original -------------------')
