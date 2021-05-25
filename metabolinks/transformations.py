@@ -181,7 +181,7 @@ class LODImputer(TransformerMixin, BaseEstimator):
 
 def fillna_value(df, value=0.0):
     """Set NaN to zero."""
-    return ArbitraryNumberImputer(arbitrary_number=value).fit_transform(df)
+    return df.mask(df.isnull(), value)
 
 def fillna_zero(df):
     """Set NaN to zero."""
@@ -189,13 +189,16 @@ def fillna_zero(df):
 
 def fillna_frac_min(df, fraction=0.5):
     """Set NaN to a fraction of the minimum value in whole DataFrame."""
-    res = LODImputer(strategy="global_min", fraction=fraction).fit_transform(df)
-    return res
+    minimum = df.min().min() * fraction
+    return fillna_value(df, value=minimum)
 
 def fillna_frac_min_feature(df, fraction=0.2):
     """Set NaN to a fraction of the minimum value in each feature."""
-    res = LODImputer(strategy="feature_min", fraction=fraction).fit_transform(df)
-    return res
+    minimum = df.min() * fraction
+    return df.mask(df.isnull(), minimum, axis=1)
+
+    # res = LODImputer(strategy="feature_min", fraction=fraction).fit_transform(df)
+    # return res
 
 # ---------- variable selection
 # ---------- (using "reproducibility" criteria)
