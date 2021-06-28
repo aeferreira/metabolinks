@@ -13,11 +13,12 @@
    Unlike scikit-learn...
 
    Transformers accept pandas DataFrames in `.fit()` and `.transform()`
-   and `.transform()` returns a DtaFrame.
+   and `.transform()` returns a DataFrame.
 
    The input data matrix must follow the convention that the
    instances are in rows and features are in columns.
 
+   TODO:
    When instatiated, Transformers accept the parameter `variables` as
    lists of positions or names of variables to be transformed, instead of
    the whole DataFrame.
@@ -34,25 +35,32 @@ from sklearn.feature_selection._base import SelectorMixin
 from sklearn.pipeline import Pipeline
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
-from sklearn.preprocessing import StandardScaler
-
-from feature_engine.dataframe_checks import (
-    _is_dataframe,
-    _check_input_matches_training_df,
-)
-
 from feature_engine.selection.base_selector import BaseSelector
-from feature_engine.base_transformers import BaseNumericalTransformer
 from feature_engine.variable_manipulation import (
     _check_input_parameter_variables,
     _find_or_check_numerical_variables,
     _find_all_variables,
 )
-from feature_engine.imputation import ArbitraryNumberImputer
-from feature_engine.wrappers import SklearnTransformerWrapper
 
 from metabolinks.utils import _is_string
 Variables = Union[None, int, str, List[Union[str, int]]]
+
+# ---------- util functions
+def _ensure_ncols(X: pd.DataFrame, n_cols: int) -> None:
+    if X.shape[1] != n_cols:
+        msg = f"The number of columns is wrong. It should be {n_cols}"
+        raise ValueError(msg)
+
+def _to_dataframe(X):
+    if hasattr(X, 'shape') and not isinstance(X, pd.DataFrame):
+        cols = [str(c) for c in range(X.shape[1])]
+        X = pd.DataFrame(X, columns=cols)
+    if not isinstance(X, pd.DataFrame):
+        raise TypeError(
+            f"X should be a pandas DataFrame. Found a {type(X)}."
+        )
+    # TODO: see if checks for emptiness and sparseness are necessary
+    return X.copy()
 
 
 # ---------- imputation of missing values -------
@@ -91,11 +99,9 @@ class LODImputer(TransformerMixin, BaseEstimator):
     """
 
     def __init__(self, strategy:str = "feature_min",
-                       fraction: float = 0.2,
-                       variables: Variables = None,) -> None:
+                       fraction: float = 0.2) -> None:
         self.fraction = fraction
         self.strategy = strategy
-        self.variables = _check_input_parameter_variables(variables)
 
     def _validate_parameters(self):
         allowed_strategies = ["feature_min", "global_min"]
@@ -123,10 +129,7 @@ class LODImputer(TransformerMixin, BaseEstimator):
 
         """
         # check input dataframe
-        X = _is_dataframe(X)
-
-        # find or check for numerical variables
-        self.variables = _find_or_check_numerical_variables(X, self.variables)
+        X = _to_dataframe(X)
 
         # Input validation
         self._validate_parameters()
@@ -134,11 +137,11 @@ class LODImputer(TransformerMixin, BaseEstimator):
 
         # estimate imputation values and keep it in imputer_dict_ attribute
         if self.strategy == 'feature_min':
-            minimum =  X[self.variables].min(axis=0) * self.fraction
+            minimum =  X.min(axis=0) * self.fraction
             self.imputer_dict_ = minimum.to_dict()
         elif self.strategy == 'global_min':
             minimum = X.min().min() * self.fraction
-            self.imputer_dict_ = {c: minimum for c in self.variables}
+            self.imputer_dict_ = {c: minimum for c in X.columns}
 
         self.input_shape_ = X.shape
         self.n_features_ = X.shape[1]
@@ -167,10 +170,10 @@ class LODImputer(TransformerMixin, BaseEstimator):
         check_is_fitted(self)
 
         # check that input is a dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
 
         # Check that input df contains same number of columns as df used to fit
-        _check_input_matches_training_df(X, self.n_features_)
+        _ensure_ncols(X, self.n_features_)
 
         # replaces missing data with the learned parameters
         for variable in self.imputer_dict_:
@@ -197,8 +200,6 @@ def fillna_frac_min_feature(df, fraction=0.2):
     minimum = df.min() * fraction
     return df.mask(df.isnull(), minimum, axis=1)
 
-    # res = LODImputer(strategy="feature_min", fraction=fraction).fit_transform(df)
-    # return res
 
 # ---------- variable selection
 # ---------- (using "reproducibility" criteria)
@@ -268,7 +269,7 @@ class KeepMinimumNonNA(BaseSelector):
         """
 
         # check input dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
 
         # find all variables or check those entered are present in the dataframe
         self.variables = _find_all_variables(X, self.variables)
@@ -369,9 +370,6 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         - "median" reference sample is median of all samples for each feature 
         - row name, the reference sample is the indicated sample
         - array like, the reference sample is explicitely given
-    variables : list, default=None
-        The list of numerical variables to be transformed. If None, the transformer
-        will find and select all numerical variables.
     fold: float, default=1.0
         After division by the scaling factors, the dataframe is then multiplied by fold.
     Attributes
@@ -393,14 +391,12 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         method: str = 'total',
         feature: Union[str, float, None] = None,
         ref_sample: Union[str, float, None] = None,
-        variables: Union[None, int, str, List[Union[str, int]]] = None,
         fold: Union[str, float] = 1.0,
     ) -> None:
 
         self.method = method
         self.ref_sample = ref_sample
         self.feature = feature
-        self.variables = _check_input_parameter_variables(variables)
         self.fold = fold
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
@@ -416,7 +412,6 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         ------
         TypeError
             If the input is not a Pandas DataFrame
-            If any of the user provided variables are not numerical
         ValueError
             If there are no numerical variables in the df or the df is empty
         Returns
@@ -426,12 +421,8 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         """
 
         # check input dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
 
-        # find or check for numerical variables
-        self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
-            X, self.variables
-        )
 
         if self.method == 'feature':
             new_index, indexer = X.columns.sort_values(return_indexer=True)
@@ -482,13 +473,13 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         check_is_fitted(self)
 
         # check that input is a dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
 
         # Check if input data contains same number of columns as dataframe used to fit.
-        _check_input_matches_training_df(X, self.input_shape_[1])
+        _ensure_ncols(X, self.input_shape_[1])
 
         # transform
-        X[self.variables] = X[self.variables].div(self.scaling_factors_, axis=0)
+        X = X.div(self.scaling_factors_, axis=0)
         return X
 
 def find_closest_features(data, features=None, tolerance=0.0001):
@@ -567,7 +558,7 @@ class DropFeatures(BaseSelector):
         self
         """
         # check input dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
         closest_features = find_closest_features(X, features=self.features_to_drop)
         self.features_to_drop_ = [closest for feature, closest in closest_features.items()]
 
@@ -694,7 +685,7 @@ def glog(df, lamb=None):
     y = np.log2((y + (y**2 + lamb**2)**0.5)/2)
     return pd.DataFrame(y, index=df.index, columns=df.columns)
 
-class GLogTransformer(BaseNumericalTransformer):
+class GLogTransformer(BaseEstimator, TransformerMixin):
     """
     The GLogTransformer() applies the Generalized Logarithmic Transformation to
     numerical variables. This is log2(y + (y**2 + lamb**2)**0.5)
@@ -706,9 +697,6 @@ class GLogTransformer(BaseNumericalTransformer):
     ----------
     lamb: float, default=None
         Transformation parameter lambda.
-    variables : list, default=None
-        The list of numerical variables to be transformed. If None, the transformer
-        will find and select all numerical variables.
     Methods
     -------
     fit:
@@ -719,13 +707,7 @@ class GLogTransformer(BaseNumericalTransformer):
         Fit to data, then transform it.
     """
 
-    def __init__(
-        self,
-        lamb: float = None,
-        variables: Union[None, int, str, List[Union[str, int]]] = None,
-    ) -> None:
-
-        self.variables = _check_input_parameter_variables(variables)
+    def __init__(self, lamb: float = None,) -> None:
         self.lamb = lamb
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
@@ -745,7 +727,6 @@ class GLogTransformer(BaseNumericalTransformer):
         ------
         TypeError
             - If the input is not a Pandas DataFrame
-            - If any of the user provided variables are not numerical
         ValueError
             - If there are no numerical variables in the df or the df is empty
             - If the variable(s) contain null values
@@ -756,12 +737,18 @@ class GLogTransformer(BaseNumericalTransformer):
         """
 
         # check input dataframe
-        X = super().fit(X)
+        X = _to_dataframe(X)
 
-        # check contains zero or negative values
-        if (X[self.variables] <= 0).any().any():
+        # check if input contains zero or negative values
+        if (X <= 0).any().any():
             raise ValueError(
                 "Some variables contain zero or negative values, can't apply log2"
+            )
+
+        # check if input contains infinite values
+        if np.isinf(X).values.any():
+            raise ValueError(
+                "Some of the variables contain infinite values, can't apply log2"
             )
 
         self.input_shape_ = X.shape
@@ -790,25 +777,30 @@ class GLogTransformer(BaseNumericalTransformer):
         """
 
         # check input dataframe and if class was fitted
-        X = super().transform(X)
+        X = _to_dataframe(X)
 
-        # check contains zero or negative values
-        if (X[self.variables] <= 0).any().any():
+        # check if input contains zero or negative values
+        if (X <= 0).any().any():
             raise ValueError(
                 "Some variables contain zero or negative values, can't apply log2"
+            )
+
+        # check if input contains infinite values
+        if np.isinf(X).values.any():
+            raise ValueError(
+                "Some of the variables contain infinite values, can't apply log2"
             )
 
         # transform
         # Default lambda
         if self.lamb is None:
-            lamb = X[self.variables].min().min()/10.0
+            lamb = X.min().min()/10.0
         else:
             lamb = self.lamb
         # Apply the transformation
-        y = X[self.variables].values
+        y = X.values
         y = np.log2((y + (y**2 + lamb**2)**0.5)/2)
-        X[self.variables] = y
-        return X
+        return pd.DataFrame(y, index=X.index, columns=X.columns)
 
 class FeatureScaler(BaseEstimator, TransformerMixin):
     """
@@ -881,7 +873,7 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         """
 
         # check input dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
 
         # find or check for numerical variables
         self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
@@ -915,10 +907,10 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         check_is_fitted(self)
 
         # check that input is a dataframe
-        X = _is_dataframe(X)
+        X = _to_dataframe(X)
 
         # Check if input data contains same number of columns as dataframe used to fit.
-        _check_input_matches_training_df(X, self.input_shape_[1])
+        _ensure_ncols(X, self.input_shape_[1])
 
         # transform
         subX = X[self.variables]
