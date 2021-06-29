@@ -3,23 +3,18 @@
    Corresponding functions to be used in pandas-based
    data processing are also included.
 
-   This sub-module is based on and follows the
+   This sub-module follows some of the the
    conventions of library feature-engine
 
    https://feature-engine.readthedocs.io
-
    Copyright (c) 2018-2021 The Feature-engine developers. All rights reserved.
 
-   Unlike scikit-learn...
-
-   Transformers accept pandas DataFrames in `.fit()` and `.transform()`
-   and `.transform()` returns a DataFrame.
-
-   The input data matrix must follow the convention that the
-   instances are in rows and features are in columns.
+   Transformers accept pandas DataFrames as the data argument in `.fit()` and `.transform()`
+   and `.transform()` returns a DataFrame. Compatible arguments of other typres are first converted
+   to pandas DataFrame's.
 
    TODO:
-   When instatiated, Transformers accept the parameter `variables` as
+   When instantiated, Transformers should accept the parameter `variables` as
    lists of positions or names of variables to be transformed, instead of
    the whole DataFrame.
 """
@@ -29,21 +24,11 @@ from typing import Optional, List, Union
 import numpy as np
 import pandas as pd
 
-from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
-from sklearn.feature_extraction.text import _VectorizerMixin
-from sklearn.feature_selection._base import SelectorMixin
-from sklearn.pipeline import Pipeline
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-
-from feature_engine.selection.base_selector import BaseSelector
-from feature_engine.variable_manipulation import (
-    _check_input_parameter_variables,
-    _find_or_check_numerical_variables,
-    _find_all_variables,
-)
+from sklearn.base import BaseEstimator, TransformerMixin
+#from sklearn.feature_selection._base import SelectorMixin
+from sklearn.utils.validation import check_is_fitted
 
 from metabolinks.utils import _is_string
-Variables = Union[None, int, str, List[Union[str, int]]]
 
 # ---------- util functions
 def _ensure_ncols(X: pd.DataFrame, n_cols: int) -> None:
@@ -52,12 +37,13 @@ def _ensure_ncols(X: pd.DataFrame, n_cols: int) -> None:
         raise ValueError(msg)
 
 def _to_dataframe(X):
-    if hasattr(X, 'shape') and not isinstance(X, pd.DataFrame):
-        cols = [str(c) for c in range(X.shape[1])]
-        X = pd.DataFrame(X, columns=cols)
+    if not isinstance(X, pd.DataFrame):
+        if hasattr(X, 'shape'):
+            cols = [str(c) for c in range(X.shape[1])]
+            X = pd.DataFrame(X, columns=cols)
     if not isinstance(X, pd.DataFrame):
         raise TypeError(
-            f"X should be a pandas DataFrame. Found a {type(X)}."
+            f"X should be a pandas DataFrame or a compatible data structure. Found a {type(X)}."
         )
     # TODO: see if checks for emptiness and sparseness are necessary
     return X.copy()
@@ -106,9 +92,8 @@ class LODImputer(TransformerMixin, BaseEstimator):
     def _validate_parameters(self):
         allowed_strategies = ["feature_min", "global_min"]
         if self.strategy not in allowed_strategies:
-            raise ValueError("Can only use these strategies: {0} "
-                             " got strategy={1}".format(allowed_strategies,
-                                                        self.strategy))
+            raise ValueError(f"Can only use these strategies: {allowed_strategies} "
+                             f" got strategy={self.strategy}")
         if self.fraction <= 0:
             raise ValueError("fraction must be a positive number")
             
@@ -133,7 +118,6 @@ class LODImputer(TransformerMixin, BaseEstimator):
 
         # Input validation
         self._validate_parameters()
-
 
         # estimate imputation values and keep it in imputer_dict_ attribute
         if self.strategy == 'feature_min':
@@ -163,7 +147,7 @@ class LODImputer(TransformerMixin, BaseEstimator):
         Returns
         -------
         X : pandas dataframe of shape = [n_samples, n_features]
-            The dataframe without missing values in the selected variables.
+            The dataframe resulting from NaN imputation.
         """
 
         # Check method fit has been called
@@ -204,7 +188,7 @@ def fillna_frac_min_feature(df, fraction=0.2):
 # ---------- variable selection
 # ---------- (using "reproducibility" criteria)
 
-class KeepMinimumNonNA(BaseSelector):
+class KeepMinimumNonNA(BaseEstimator, TransformerMixin):
     """
     Keep variables from a dataframe when the number of non-missing values exceeds
     a minimum threshold.
@@ -216,8 +200,7 @@ class KeepMinimumNonNA(BaseSelector):
     membership is provided as an argument of `fit`.
 
     This transformer works with both numerical and categorical variables.
-    The user can indicate a list of variables to examine.
-    Alternatively, the transformer will evaluate all the variables in the dataset.
+
     The transformer will first identify and store the features with too many missing values (fit).
     Next, the transformer will drop these variables from a dataframe (transform).
     Parameters
@@ -229,9 +212,7 @@ class KeepMinimumNonNA(BaseSelector):
         Number of samples is the global number of samples if a target `y=None` or
         the number of samples in each group if a target `y`with labels indicating
         gorup membership is provided as an argument of `fit`.
-    variables : list, default=None
-        The list of variables to evaluate. If None, the transformer will evaluate all
-        variables in the dataset.
+
     Attributes
     ----------
     features_to_drop_:
@@ -246,17 +227,16 @@ class KeepMinimumNonNA(BaseSelector):
         Fit to the data. Then transform it.
     """
 
-    def __init__(self, minimum: float = 1, variables: Variables = None,):
+    def __init__(self, minimum: float = 1):
 
         if not isinstance(minimum, (float, int)) or minimum < 0:
             raise ValueError("minimum must be an integer or a float between 0 and 1")
 
         self.minimum = minimum
-        self.variables = _check_input_parameter_variables(variables)
 
-    def fit(self, X: pd.DataFrame, y: pd.Series = None):
+    def fit(self, X: pd.DataFrame, y=None):
         """
-        Find constant and quasi-constant features.
+        Find features to drop according to minimum non-NaN ocorrence.
         Parameters
         ----------
         X : pandas dataframe of shape = [n_samples, n_features]
@@ -270,9 +250,6 @@ class KeepMinimumNonNA(BaseSelector):
 
         # check input dataframe
         X = _to_dataframe(X)
-
-        # find all variables or check those entered are present in the dataframe
-        self.variables = _find_all_variables(X, self.variables)
 
         if y is None:
             counts = X.count(axis=0)
@@ -294,11 +271,7 @@ class KeepMinimumNonNA(BaseSelector):
                 counts = X_lbl.count(axis=0)
                 keep_dict[lbl] = counts >= tol
             all_keeps = pd.DataFrame(keep_dict).transpose()
-            # print('all_keeps dataframe')
-            # print(all_keeps.transpose())
             keep_vars = all_keeps.any(axis=0)
-            # print('keep_vars')
-            # print(keep_vars)
             self.features_to_drop_ = list(keep_vars[keep_vars==False].index)
 
         # check we are not dropping all the features
@@ -312,23 +285,49 @@ class KeepMinimumNonNA(BaseSelector):
 
         return self
 
-    # # Ugly work around to import the docstring for Sphinx, otherwise not necessary
-    # def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-    #     X = super().transform(X)
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform DataFrame, removing features with non-NaN ocorrence below the minimum threshold.
+        Parameters
+        ----------
+        X : Pandas DataFrame of shape = [n_samples, n_features]
+            The data to be transformed.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+        ValueError
+            - If the dataframe not of the same size as that used in fit().
+        Returns
+        -------
+        X : pandas dataframe
+            The dataframe with the features removed.
+        """
 
-    #     return X
+        # Check method fit has been called
+        check_is_fitted(self)
 
-    # transform.__doc__ = BaseSelector.transform.__doc__
+        # check that input is a dataframe
+        X = _to_dataframe(X)
+
+        # Check if input data contains same number of columns as dataframe used to fit.
+        _ensure_ncols(X, self.input_shape_[1])
+
+        # transform
+        # return the dataframe with the selected features
+        return X.drop(columns=self.features_to_drop_)
 
 def keep_atleast(df, minimum=1, y=None):
     """Keep only features which occur at least `minimum` times in samples.
+    ``y``parameter, a sequence of labels, can be used to specify group membership.
+    If y is None, the default, ``minimum`` is relative to the total sample number.
 
-       If 0 < min_samples < 1, this should be interpreted as a fraction of the number of samples.
-       If target `y` is provided, the number of samples to compute the ocorrence is the number of
-       samples in each group.
+       If 0 < minimum < 1, this should be interpreted as a fraction of the number of samples.
+       If target `y` is provided, the minimum number of samples with non-NaN values
+       is relative to the number of samples in each group.
        """
 
-    tf = KeepMinimumNonNA(variables=None, minimum=minimum)
+    tf = KeepMinimumNonNA(minimum=minimum)
     return tf.fit_transform(df, y=y)
 
 # ---------- normalizations -----------------------------------
@@ -356,8 +355,6 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
     'PQN': Probabilistic Quotient Normalization
     
     NA values are kept as NA values.
-    A list of variables can be passed as an argument. Alternatively, the transformer
-    will automatically select and transform all variables of type numeric.
     Parameters
     ----------
     method: string, default="total"
@@ -401,8 +398,7 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
         """
-        Checks that input is a dataframe, finds numerical variables, or alternatively
-        checks that variables entered by the user are of type numerical.
+        Checks that input is a dataframe.
         Parameters
         ----------
         X : Pandas DataFrame
@@ -512,7 +508,7 @@ def find_closest_features(data, features=None, tolerance=0.0001):
     return closest_features
 
 
-class DropFeatures(BaseSelector):
+class DropFeatures(BaseEstimator, TransformerMixin):
     """
     DropFeatures() drops a list of variable(s) indicated by the user from the dataframe.
     This is just the DropFeatures transformer from feature-engine, adapted to locate
@@ -542,7 +538,7 @@ class DropFeatures(BaseSelector):
 
         self.features_to_drop = features_to_drop
 
-    def fit(self, X: pd.DataFrame, y: pd.Series = None):
+    def fit(self, X: pd.DataFrame, y=None):
         """
         This transformer does not learn any parameter.
         Verifies that the input X is a pandas dataframe, and that the variables to
@@ -551,7 +547,7 @@ class DropFeatures(BaseSelector):
         ----------
         X : pandas dataframe of shape = [n_samples, n_features]
             The input dataframe
-        y : pandas Series, default = None
+        y : sequence of labels, default = None
             y is not needed for this transformer. You can pass y or None.
         Returns
         -------
@@ -560,7 +556,7 @@ class DropFeatures(BaseSelector):
         # check input dataframe
         X = _to_dataframe(X)
         closest_features = find_closest_features(X, features=self.features_to_drop)
-        self.features_to_drop_ = [closest for feature, closest in closest_features.items()]
+        self.features_to_drop_ = [closest for _, closest in closest_features.items()]
 
         # check user is not removing all columns in the dataframe
         if len(self.features_to_drop_) == len(X.columns):
@@ -574,13 +570,38 @@ class DropFeatures(BaseSelector):
 
         return self
 
-    # # Ugly work around to import the docstring for Sphinx, otherwise not necessary
-    # def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-    #     X = super().transform(X)
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform DataFrame, removing features specified in the constructor.
+        Parameters
+        ----------
+        X : Pandas DataFrame of shape = [n_samples, n_features]
+            The data to be transformed.
+        Raises
+        ------
+        TypeError
+            If the input is not a Pandas DataFrame
+        ValueError
+            - If the dataframe not of the same size as that used in fit().
+        Returns
+        -------
+        X : pandas dataframe
+            The dataframe with the transformed variables.
+        """
 
-    #     return X
+        # Check method fit has been called
+        check_is_fitted(self)
 
-    # transform.__doc__ = BaseSelector.transform.__doc__
+        # check that input is a dataframe
+        X = _to_dataframe(X)
+
+        # Check if input data contains same number of columns as dataframe used to fit.
+        _ensure_ncols(X, self.input_shape_[1])
+
+        # transform
+        # return the dataframe with the selected features
+        return X.drop(columns=self.features_to_drop_)
+
 
 def normalize_ref_feature(df, feature, remove=False):
     """Normalize dataset by a reference feature (a column label).
@@ -691,8 +712,7 @@ class GLogTransformer(BaseEstimator, TransformerMixin):
     numerical variables. This is log2(y + (y**2 + lamb**2)**0.5)
     The Transformer only works with numerical non-negative values. If the variable
     contains a zero or a negative value, the transformer will return an error.
-    A list of variables can be passed as an argument. Alternatively, the transformer
-    will automatically select and transform all variables of type numeric.
+
     Parameters
     ----------
     lamb: float, default=None
@@ -728,9 +748,7 @@ class GLogTransformer(BaseEstimator, TransformerMixin):
         TypeError
             - If the input is not a Pandas DataFrame
         ValueError
-            - If there are no numerical variables in the df or the df is empty
-            - If the variable(s) contain null values
-            - If some variables contain zero or negative values
+            - If some variables contain zero or negative or infinity values
         Returns
         -------
         self
@@ -767,7 +785,6 @@ class GLogTransformer(BaseEstimator, TransformerMixin):
         TypeError
             If the input is not a Pandas DataFrame
         ValueError
-            - If the variable(s) contain null values.
             - If the dataframe not of the same size as that used in fit().
             - If some variables contains zero or negative values.
         Returns
@@ -815,17 +832,14 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
 
     NA values are kept as NA values. They are ignored in the computation of mean and dispertion
     statistics.
-    A list of variables can be passed as an argument. Alternatively, the transformer
-    will automatically select and transform all variables of type numeric.
+
     Parameters
     ----------
     method: string, default="pareto"
         One of the above methods of scaling
     mean_center: bool, default=True
         Indicates wheter the dta is mean centered prior to scaling.
-    variables : list, default=None
-        The list of numerical variables to be transformed. If None, the transformer
-        will find and select all numerical variables.
+
     Attributes
     ----------
     This transformer does not learn any attributes, besides housekeeping attributes.
@@ -842,18 +856,15 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         method: str = 'pareto',
-        variables: Union[None, int, str, List[Union[str, int]]] = None,
         mean_center: bool = True,
     ) -> None:
 
         self.method = method
         self.mean_center = mean_center
-        self.variables = _check_input_parameter_variables(variables)
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
         """
-        Checks that input is a dataframe, finds numerical variables, or alternatively
-        checks that variables entered by the user are of type numerical.
+        Checks that input is a dataframe, does not learn any parameters except input shape.
         Parameters
         ----------
         X : Pandas DataFrame
@@ -863,7 +874,6 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         ------
         TypeError
             If the input is not a Pandas DataFrame
-            If any of the user provided variables are not numerical
         ValueError
             If there are no numerical variables in the df or the df is empty
         Returns
@@ -874,11 +884,6 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
 
         # check input dataframe
         X = _to_dataframe(X)
-
-        # find or check for numerical variables
-        self.variables: List[Union[str, int]] = _find_or_check_numerical_variables(
-            X, self.variables
-        )
 
         self.input_shape_ = X.shape
         return self
@@ -907,13 +912,12 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         check_is_fitted(self)
 
         # check that input is a dataframe
-        X = _to_dataframe(X)
+        subX = _to_dataframe(X)
 
         # Check if input data contains same number of columns as dataframe used to fit.
-        _ensure_ncols(X, self.input_shape_[1])
+        _ensure_ncols(subX, self.input_shape_[1])
 
         # transform
-        subX = X[self.variables]
         means = subX.mean(axis=0)
         stds = subX.std(axis=0)
         maxima = subX.max(axis=0)
@@ -942,8 +946,7 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
             ranges = maxima - minima
             ranges[ranges<=0.0] = 1.0 # in case max == min
             subX = subX.div(ranges, axis=1)
-        X[self.variables] = subX
-        return X
+        return subX
 
 
 def pareto_scale(df):

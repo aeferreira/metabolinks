@@ -115,6 +115,20 @@ def test_LODImputer_global_min(data):
     col2 = new_data.columns[2]
     tf.imputer_dict_[col2] == globalmin
 
+
+def test_LODImputer_feature_min(data):
+    """test LODIMputer Transformer with minimum per feature."""
+    minima = 0.2 * data.min()
+    assert type(minima) == pd.Series
+    tf = trans.LODImputer(strategy="feature_min", fraction=0.2)
+    new_data = tf.fit_transform(data)
+    
+    assert isinstance(new_data, pd.DataFrame)
+    assert new_data.shape == (6, 19)
+    assert new_data.iloc[2, 2] == minima.iloc[2]
+    assert new_data.iloc[0, 3] == minima.iloc[3]
+
+
 def test_KeepMinimumNonNA_with_intmin(data):
     tf = trans.KeepMinimumNonNA(minimum=3)
     new_data = tf.fit_transform(data)

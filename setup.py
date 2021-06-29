@@ -35,8 +35,7 @@ CLASSIFIERS = [
 ]
 
 requires = ['requests', 'numpy', 
-            'pandas>=0.25', 'xlrd', 'xlsxwriter',
-            'feature_engine', 'pandas-flavor',
+            'pandas>=0.25', 'xlrd', 'xlsxwriter', 'pandas-flavor',
             'pytest', 'matplotlib>=2.0']
 
 packages = ['metabolinks', 'tests', 'notebooks']
