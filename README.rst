@@ -13,7 +13,7 @@ resolution MS based metabolomics in mind.
 Features are a bit scarce right now:
 
 - peak list alignment
-- data matrix preprocessing, and similarity measures
+- common metabolomics data-matrix preprocessing, based on ``pandas`` and ``scikit-learn``
 - compound taxonomy retrieval
 
 But our road map is clear and we expect to stabilize in a beta version pretty soon.
@@ -43,7 +43,10 @@ One of these two products is highly recommended:
 The formal requirements are:
 
 - Python 3.6 and above
-- ``setuptools``, ``pip``, ``six``, ``requests`` and ``pytest``
+- ``setuptools``, ``pip``, ``requests``, ``pandas-flavor`` and ``pytest``
+
+From the Python scientific ecossystem:
+
 - ``numpy``, ``scipy``, ``matplotlib``, ``pandas`` and ``scikit-learn``
 
 The installation of the ``Jupyter`` platform is also recommended since
