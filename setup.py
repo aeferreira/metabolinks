@@ -35,7 +35,7 @@ CLASSIFIERS = [
 ]
 
 requires = ['requests', 'numpy', 
-            'pandas>=0.25', 'xlrd', 'xlsxwriter', 'pandas-flavor',
+            'pandas>=0.25', 'xlrd', 'xlsxwriter', 'pandas-flavor', 'six',
             'pytest', 'matplotlib>=2.0']
 
 packages = ['metabolinks', 'tests', 'notebooks']
@@ -45,7 +45,7 @@ setup(
     license="MIT",
     url='https://github.com/aeferreira/metabolinks',
     download_url='https://github.com/aeferreira/metabolinks',
-    version='1.0.0',
+    version='0.71',
     zip_safe=False,
     author='António Ferreira',
     author_email="aeferreira@fc.ul.pt",

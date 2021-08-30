@@ -32,20 +32,20 @@ a Python 3.6+ installation::
 .. _PyPI: https://pypi.org/project/metabolinks
 
 
-However, even if ``Metabolinks`` is written in Python, it requires some of the powerful scientific
-packages that are pre-installed on "Scientific/Data Science Python" distributions.
-
+However, it is recommended to install the the scientific Python packages that are
+required by ``Metabolinks`` before using ``pip``. These are listed below, but they
+can be easily obtained by installing one of the "Scientific/Data Science Python" distributions.
 One of these two products is highly recommended:
 
-- `Anaconda <https://store.continuum.io/cshop/anaconda/>`_ (or `Miniconda <http://conda.pydata.org/miniconda.html>`_ followed by the necessary ``conda install``'s)
-- `Enthought Canopy <https://www.enthought.com/products/canopy/>`_
+- `Anaconda Individual Edition <https://www.anaconda.com/products/individual>`_ (or `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ followed by the necessary ``conda install``'s)
+- `Enthought Deployment Manager <https://assets.enthought.com/downloads/edm/>`_ (followed by the creation of suitable Python environments)
 
 The formal requirements are:
 
 - Python 3.6 and above
-- ``setuptools``, ``pip``, ``requests``, ``pandas-flavor`` and ``pytest``
+- ``setuptools``, ``pip``, ``requests``, ``six``, ``pandas-flavor`` and ``pytest``
 
-From the Python scientific ecossystem:
+and, from the Python scientific ecossystem:
 
 - ``numpy``, ``scipy``, ``matplotlib``, ``pandas`` and ``scikit-learn``
 
