@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: metabolinks
+abstract: a Python package for high-resolution-MS metabolomics data analysis.
+authors:
+- given-names: António
+  family-names: Ferreira
+  name-particle: E.N.
+  affiliation: University of Lisbon, Portugal
+  orcid: "https://orcid.org/0000-0002-9625-8115"
+- given-names: Francisco
+  family-names: Traquete
+  affiliation: University of Lisbon, Portugal
+  orcid: "https://orcid.org/0000-0002-4081-6544"
+version: 0.71
+date-released: "2021-08-30"
+identifiers:
+  - description: This is the collection of archived snapshots of all versions of Metabolinks
+    type: doi
+    value: "10.5281/zenodo.5336950"
+  - description: This is the archived snapshot of version 0.71 of Metabolinks
+    type: doi
+    value: "10.5281/zenodo.5336951"
+repository-code: "https://github.com/aeferreira/metabolinks"
+license: MIT

@@ -21,6 +21,9 @@ But our road map is clear and we expect to stabilize in a beta version pretty so
 Stay tuned, and check out the examples folder (examples are provided as
 jupyter notebooks).
 
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.5336951.svg
+   :target: https://doi.org/10.5281/zenodo.5336951
+
 Installing
 ==========
 
