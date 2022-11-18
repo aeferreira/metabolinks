@@ -421,9 +421,10 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
 
 
         if self.method == 'feature':
-            new_index, indexer = X.columns.sort_values(return_indexer=True)
-            pos = new_index.get_loc(self.feature, method='pad')
-            pos = indexer[pos]
+            new_index= X.columns.sort_values()
+            pos = new_index.get_indexer([self.feature], method='pad')[0]
+            #pos = new_index.get_loc(self.feature, method='pad')
+            #pos = indexer[pos]
             self.scaling_factors_ = X.iloc[:, pos]
         
         elif self.method in ['total', 'sum']:
@@ -479,32 +480,25 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         return X
 
 def find_closest_features(data, features=None, tolerance=0.0001):
+    # find closest features and return them as a dictionary
     if features is None:
         return {}
-    # find closest features and return them as a dictionary
-    closest_features = {}
-    # eliminate duplicate features
-    new_columns = data.columns[~data.columns.duplicated()]
-    new_index, indexer = new_columns.sort_values(return_indexer=True)
-    # check if strings to find by exact match
+    target = pd.Index(features)
+
+    # eliminate duplicate features and sort
+    new_index = data.columns[~data.columns.duplicated()].sort_values()
+    
+    # check if strings to find by exact match or use "nearest" method
     all_str = all(_is_string(feature) for feature in features)
     if all_str:
-        for feature in features:
-            try:
-                pos = new_columns.get_loc(feature)
-                closest_features[feature] = new_columns[pos]
-            except KeyError:
-                closest_features[feature] = None
-    else:  
-        for feature in features:
-            # find position
-            try:
-                pos = new_index.get_loc(feature, method='nearest', tolerance=tolerance)
-                pos = indexer[pos]
-                closest_features[feature] = new_columns[pos]
-            except KeyError:
-                closest_features[feature] = None
-            
+        locs = new_index.get_indexer(target)
+    else:
+        locs = new_index.get_indexer(target, method='nearest', tolerance=tolerance)
+    
+    # build dict of results
+    closest_features = {}
+    for i, feature in zip(locs, features):
+        closest_features[feature] = new_index[i] if i != -1 else None
     return closest_features
 
 
@@ -1170,7 +1164,7 @@ if __name__ == "__main__":
     new_data = tf.fit_transform(data)
     print('scaling factors:\n', tf.scaling_factors_)
     print(new_data)
-    print('------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
+    print('\n------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
     print('In data, there are the following features:')
     print(find_closest_features(data, features=[97.59001, 97.59185]))
     tf = SampleNormalizer(method='feature', feature=97.59001)
@@ -1178,17 +1172,27 @@ if __name__ == "__main__":
     tf = DropFeatures(features_to_drop=[97.59001, 97.59185])
     new_data = tf.fit_transform(new_data)
     print(new_data)
-    print('In new_data, there are the following features:')
+    print('\nIn new_data, there are the following features:')
     print(find_closest_features(new_data, features=[97.59001, 97.59185]))
 
-    print('------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
+    print('\n------ Now using columns as strings for exact matches ---')
+    print('---- original -------------------')
     new_columns = data.columns.astype(str)
-    data_str = pd.DataFrame (data, index= data.index, columns=new_columns)
+    data_str = pd.DataFrame (data.values, index= data.index, columns=new_columns)
     print(data_str)
-    print('In data with columns as str, there are the following features:')
+    print('\nIn data with columns as str, there are the following features:')
     print(find_closest_features(data_str, features=['97.59001', '97.59185']))
+    print('\n------after normalizing by 97.59001 and dropping that feature and also 97.59185---')
+    tf = SampleNormalizer(method='feature', feature='97.59001')
+    new_data = tf.fit_transform(data_str)
+    tf = DropFeatures(features_to_drop=['97.59001', '97.59185'])
+    new_data = tf.fit_transform(new_data)
+    print()
+    print(new_data)
+    print('\nIn new_data, there are the following features:')
+    print(find_closest_features(new_data, features=['97.59001', '97.59185']))
 
-    print('\nNormalization by total ------------\n')
+    print('\n\nNormalization by total ------------\n')
     print('---- original -------------------')
     print(data)
     print('------after normalization -----------------')
