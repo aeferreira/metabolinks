@@ -55,6 +55,7 @@ setup(
     keywords=['Metabolomics', 'Mass Spectrometry', 'Data Analysis', 'Ultra-high resolution MS'],
     description="A set of tools for high-resolution MS metabolomics data analysis",
     long_description=read_file('README.rst'),
+    long_description_content_type='text/x-rst',
     packages=packages,
     include_package_data=True,
     package_data={'metabolinks': ['data/sample_data.xlsx'],
