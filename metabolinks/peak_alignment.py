@@ -254,8 +254,12 @@ def align(inputs, ppmtol=1.0, min_samples=1,
     cdf.index = list(range(len(cdf)))
     cdf = cdf.astype({'_sample': int, '_feature': int})
 
+    # print('------------ control  cdf----------------')
+    # print(cdf.head(40))
+    # print('--------------------------------------------')
+
     if verbose:
-        print('  Done, (total {} features in {} samples)'.format(cdf.shape[0], n))
+        print(f'  Done, (total {cdf.shape[0]} features in {n} samples)')
 
     # Grouping data and building resulting table
 
@@ -298,22 +302,21 @@ def align(inputs, ppmtol=1.0, min_samples=1,
                                index = new_indexes[i],
                                columns=sample.columns)
                                for i, sample in enumerate(inputs)]
-    # print('*********************************')
-    # for i, ni in enumerate(new_inputs):
-    #     print('++++++++++++++++++++++++++++++')
-    #     print(i)
-    #     print('++++++++++++++++++++++++++++++')
-    #     print(new_indexes[i])
-    #     print('++++++++++++++++++++++++++++++')
-    #     print(inputs[i])
-    #     print('++++++++++++++++++++++++++++++')
-    #     print(ni)
-    # print('*********************************')
 
-    # perform the join of DataFrames based on indexes containing group numbers
+    # perform the join of DataFrames based on indexes
+    # the indexes contain group numbers
     result = new_inputs[0]
-    result = result.join(new_inputs[1:], how='outer')
+    for i in range(1, len(new_inputs)):
+        result = result.join(new_inputs[i], how='outer')
+        # print(f'************************ RESULT of joining {i+1} ***************')
+        # print(result.head(20))
+        # print('*****************************************************************')
+    # result = result.join(new_inputs[1:], how='outer')
     result.index = new_features
+
+    # print(f'************************ END RESULT  of join ***************')
+    # print(result.head(20))
+    # print('************************+++++++++++++***************')
 
     alignment_desc = pd.DataFrame({'# features': group_nfeatures,
                                    'mean m/z': new_features,
@@ -689,43 +692,45 @@ if __name__ == '__main__':
 
     print('Reading spectra to align ------------')
     samples = [read_data_csv(s) for s in sampledata]
-    for sample in samples:
+    for i, sample in enumerate(samples):
         print(sample,'\n')
         print('------------')
 
     aligned, desc = align_spectra(samples, return_alignment_desc=True, verbose=True)
     print('\n--- Result: --------------------')
-    print(aligned)
+    print(aligned.head(30))
+    # if saving to file is needed...
+    # aligned.to_csv('exp_aligned.csv', sep='\t')
     print('\n--- groups: --------------------')
     print(desc)
-    print('=========================')
-    print('\n\nTESTING alignment with aligned inputs')
 
-    aligned2, desc = align_spectra(samples[:2], return_alignment_desc=True, verbose=True)
-    print('\n--- Result: --------------------')
-    print(aligned2)
-    print('\n--- groups: --------------------')
-    print(desc)
+    print('\n\n===============================================')
+    print('TESTING alignment with already aligned inputs')
+
+    aligned2 = align_spectra(samples[:2], verbose=True)
+    print('\n--- Result with 2 first samples: --------------------')
+    print(aligned2.head(30))
     print('-----------------------------------------')
-    print('Now the final alignment')
+
+    print('Now the final alignment...')
 
     aligned_mix, desc = align_spectra([aligned2, samples[2]], return_alignment_desc=True, verbose=True)
-    print('\n--- Result: --------------------')
-    print(aligned_mix)
+    print('\n\n--- Result: --------------------')
+    print(aligned_mix.head(30))
     print('\n--- groups: --------------------')
     print(desc)
 
-    print('=========================')
-    print('\n\nTESTING alignment with min_samples cutoff')
+    print('\n\n======================================================')
+    print('\nTESTING alignment with min_samples cutoff')
     inputs = samples
 
     aligned, desc = align_spectra(samples, min_samples=2, return_alignment_desc=True, verbose=True)
     print('\n--- Result: --------------------')
-    print(aligned)
+    print(aligned.head(30))
     print('\n--- groups: --------------------')
     print(desc)
 
-    print('=========================')
+    print('======================================================')
     print('\n\nTESTING alignment with several input sets from an Excel file')
 
     labels = ['wt', 'mod', 'mod']
@@ -753,7 +758,7 @@ if __name__ == '__main__':
         aligned.columns.names = ['label', 'sample']
         # aligned.cdl.samples = sample_names
         print('\n--- Result: --------------------')
-        print(aligned)
+        print(aligned.head(30))
         results_sheets[d] = aligned
         results_sheets['groups {}'.format(d)] = desc
         print('+++++++++++++++++++++++++++++')
