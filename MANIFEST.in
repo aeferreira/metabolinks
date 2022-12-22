@@ -1,7 +1,0 @@
-include LICENSE README.rst AUTHORS.md CITATION.cff
-recursive-include notebooks *.ipynb
-include notebooks/MassTRIX_output.tsv
-include notebooks/sample_data.xlsx
-include notebooks/blacklist.txt
-include metabolinks/data/sample_data.xlsx
-prune notebooks/.ipynb_checkpoints
