@@ -45,7 +45,7 @@ setup(
     license="MIT",
     url='https://github.com/aeferreira/metabolinks',
     download_url='https://github.com/aeferreira/metabolinks',
-    version='0.71',
+    version='0.75',
     zip_safe=False,
     author='António Ferreira',
     author_email="aeferreira@fc.ul.pt",

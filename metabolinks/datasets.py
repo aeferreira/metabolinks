@@ -10,9 +10,17 @@
 from abc import ABCMeta, abstractmethod
 import pandas as pd
 from io import StringIO
+from pathlib import Path
 from sklearn.utils import Bunch
 from sklearn.preprocessing import LabelEncoder
 from metabolinks import utils
+
+
+def get_data_path():
+    """Return the Path of the dir containing example files."""
+    import metabolinks.data as expl_folder
+    return Path(expl_folder.__path__[0])
+
 
 def demo_dataset(name, as_frame=True, return_X_y=False):
     b = DataSetFactory.create_dataset(name).as_Bunch()
