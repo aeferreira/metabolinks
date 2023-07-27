@@ -422,8 +422,10 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
 
         if self.method == 'feature':
             new_index= X.columns.sort_values()
-            pos = new_index.get_indexer([self.feature], method='pad')[0]
-            #pos = new_index.get_loc(self.feature, method='pad')
+            if X.index.dtype in ['float64', 'int64']:
+                pos = new_index.get_indexer([self.feature], method='nearest')[0]
+            else:
+                pos = new_index.get_indexer([self.feature], method='backfill')[0]
             #pos = indexer[pos]
             self.scaling_factors_ = X.iloc[:, pos]
         
