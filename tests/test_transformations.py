@@ -2,7 +2,6 @@ import pytest
 import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal
-from io import StringIO
 #from metabolinks import parse_data
 #from metabolinks.dataio import gen_df, read_data_csv
 from metabolinks.datasets import demo_dataset
@@ -93,7 +92,7 @@ def test_fillna_frac_min(data):
 def test_fillna_frac_min_feature(data):
     """test fillna_frac_min_feature() function."""
     minima = 0.2 * data.min()
-    assert type(minima) == pd.Series
+    assert isinstance(minima, pd.Series)
     new_data = trans.fillna_frac_min_feature(data, fraction=0.2)
     
     assert isinstance(new_data, pd.DataFrame)
@@ -119,7 +118,7 @@ def test_LODImputer_global_min(data):
 def test_LODImputer_feature_min(data):
     """test LODIMputer Transformer with minimum per feature."""
     minima = 0.2 * data.min()
-    assert type(minima) == pd.Series
+    assert isinstance(minima, pd.Series)
     tf = trans.LODImputer(strategy="feature_min", fraction=0.2)
     new_data = tf.fit_transform(data)
     
@@ -225,8 +224,8 @@ def test_norm_PQN(data):
     assert isinstance(new_data, pd.DataFrame)
     mean_sample = data.mean(axis=0)
     sf_first_sample = (data.iloc[0, :] / mean_sample).median()
-    assert tf.scaling_factors_[0] == sf_first_sample
-    assert new_data.iloc[2, 0] == data.iloc[2, 0] / tf.scaling_factors_[2]
+    assert tf.scaling_factors_.iloc[0] == sf_first_sample
+    assert new_data.iloc[2, 0] == data.iloc[2, 0] / tf.scaling_factors_.iloc[2]
     
     # using first sample as ref
     tf = trans.SampleNormalizer(method='PQN', ref_sample=('l1', 's38'))
@@ -234,12 +233,23 @@ def test_norm_PQN(data):
     assert isinstance(new_data, pd.DataFrame)
     ref_sample = data.iloc[0, :]
     sf_second_sample = (data.iloc[1, :] / ref_sample).median()
-    assert tf.scaling_factors_[1] == sf_second_sample
-    assert new_data.iloc[2, 0] == data.iloc[2, 0] / tf.scaling_factors_[2]
+    assert tf.scaling_factors_.iloc[1] == sf_second_sample
+    assert new_data.iloc[2, 0] == data.iloc[2, 0] / tf.scaling_factors_.iloc[2]
+
+    # using mean of 3 samples as ref (and given as input to transformer)
+    ref = data.iloc[0:3, :].mean()
+    assert isinstance(ref, pd.Series)
+    assert len(ref) == data.shape[1]
+    tf = trans.SampleNormalizer(method='PQN', ref_sample=ref)
+    new_data = tf.fit_transform(data)
+    assert isinstance(new_data, pd.DataFrame)
+    sf_second_sample = (data.iloc[1, :] / ref).median()
+    assert tf.scaling_factors_.iloc[1] == sf_second_sample
+    assert new_data.iloc[2, 0] == data.iloc[2, 0] / tf.scaling_factors_.iloc[2]
 
 def test_glog(data):
     # this test requires missing value imputation
-    # to be done before transformation
+    # before the transformation being tested
     # global 1/2 minimum is used as imputation
     tf = trans.LODImputer(strategy="global_min", fraction=0.5)
     imputed = tf.fit_transform(data)

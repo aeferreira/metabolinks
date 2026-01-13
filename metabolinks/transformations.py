@@ -23,6 +23,7 @@ from typing import Optional, List, Union
 
 import numpy as np
 import pandas as pd
+import pandas.api.types as ptypes
 
 from sklearn.base import BaseEstimator, TransformerMixin
 #from sklearn.feature_selection._base import SelectorMixin
@@ -160,10 +161,11 @@ class LODImputer(TransformerMixin, BaseEstimator):
         _ensure_ncols(X, self.n_features_)
 
         # replaces missing data with the learned parameters
-        for variable in self.imputer_dict_:
-            X[variable].fillna(self.imputer_dict_[variable], inplace=True)
+        result = X.fillna(self.imputer_dict_)
+        # for variable in self.imputer_dict_:
+        #     X[variable].fillna(self.imputer_dict_[variable], inplace=True)
 
-        return X
+        return result
 
 
 def fillna_value(df, value=0.0):
@@ -346,9 +348,11 @@ def keep_atleast(df, minimum=1, y=None):
 class SampleNormalizer(BaseEstimator, TransformerMixin):
     """
     The SampleNormalizer() divides all numerical features of a
-    dataframe by a vector o scaling factors, row-wise.
-    This means that each sample (instance) is divided by a corresponding value, calculated during fit()
-    Several methods are implemented to find the scaling factors (parameter `method` in the contructor):
+    dataframe by a vector of scaling factors, row-wise (sample-wise).
+    This means that each sample (instance) is divided by a specific value,
+    calculated during fit().
+    Several methods are implemented to find the scaling factors
+    (parameter `method` in the contructor):
 
     'feature': reference column, used as a 'reference feature'.
     'total' (or 'sum'): the sum of signals of each sample
@@ -378,7 +382,8 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
     fit:
         compute scaling_factors_.
     transform:
-        Transforms the variables by dividing by scaling_factors_. Then, multiply by fold.
+        Transforms the variables by dividing by scaling_factors_.
+        Then, multiply by fold.
     fit_transform:
         Fit to data, then transform it.
     """
@@ -419,10 +424,9 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         # check input dataframe
         X = _to_dataframe(X)
 
-
         if self.method == 'feature':
             new_index= X.columns.sort_values()
-            if X.index.dtype in ['float64', 'int64']:
+            if ptypes.is_numeric_dtype(new_index):
                 pos = new_index.get_indexer([self.feature], method='nearest')[0]
             else:
                 pos = new_index.get_indexer([self.feature], method='backfill')[0]
@@ -433,16 +437,20 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
             self.scaling_factors_ = X.sum(axis=1)
         
         elif self.method == 'PQN':
-            # "Build" the reference sample based and compute quotients
-            if self.ref_sample == 'mean': # Mean spectre of all samples
+            # "Build" the reference sample and compute quotients
+            ref = self.ref_sample
+            if ptypes.is_hashable(ref) and ref in X.index: # Sample name to use as a reference
+                ref_sample2 = X / X.loc[ref,:]
+            # if an actual list-like ref_sample is given, use it          
+            elif ptypes.is_list_like(ref):
+                ref_sample2 = X / ref
+            elif ref == 'mean': # Mean spectre of all samples
                 ref_sample2 = X / X.mean(axis=0)
-            elif self.ref_sample == 'median': # Median spectre of all samples
+            elif ref == 'median': # Median spectre of all samples
                 ref_sample2 = X / X.median(axis=0)
-            elif self.ref_sample in X.index: # Sample name to use as a reference
-                ref_sample2 = X / X.loc[self.ref_sample,:]
-            else: # Actual sample given (ref_sample is array like)
-                ref_sample2 = X / self.ref_sample
-            # Normalization Factors
+            else:
+                pass
+            # PQN Normalization Factors (medians of ratios with reference)
             self.scaling_factors_ = ref_sample2.median(axis=1)
 
         self.input_shape_ = X.shape
