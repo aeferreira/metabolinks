@@ -1,6 +1,8 @@
 .vscode/
 depot/
 data_parser/
+dbs/
+outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

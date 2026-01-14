@@ -1,2 +1,5 @@
 [version]
 path = "metabolinks/__init__.py"
+
+[build.targets.wheel]
+packages = ["metabolinks"]

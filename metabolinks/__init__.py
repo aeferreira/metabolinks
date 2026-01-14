@@ -5,7 +5,7 @@ from .peak_alignment import align
 # this registers "column-organized" data accessors
 from .cdaccessors import (CDLAccessor, CDFAccessor, add_labels)
 
-__version__ = '0.75'
+__version__ = '0.79'
 
 __all__ = ["read_data_from_xcel",
            "read_data_csv",

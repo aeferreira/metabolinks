@@ -1,6 +1,4 @@
 import time
-import itertools
-from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
@@ -453,7 +451,7 @@ if __name__ == '__main__':
         results_sheets['groups {}'.format(d)] = desc
         print('+++++++++++++++++++++++++++++')
 
-    ofname = data_folder / out_fname
+    ofname = data_folder / "outputs" / out_fname
 
     print(f'\n------ Saving results in Excel file {ofname.name}...')
     with pd.ExcelWriter(ofname) as writer:
