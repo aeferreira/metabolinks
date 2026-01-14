@@ -51,7 +51,8 @@ def compute_composition_series(formulae, compositions = ('CHO', 'CHOS',
                                                 'CHONSP')):
 
     # remove duplicates
-    formulae = pd.unique(formulae)
+    print("type of formulae", type(formulae))
+    formulae = pd.unique(pd.Series(formulae))
     # Calculate element compositions
     comps = []
     for formula in formulae:

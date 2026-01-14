@@ -41,6 +41,7 @@ dependencies = [
     'pandas>=2.0',
     'xlrd',
     'xlsxwriter',
+    'openpyxl',
     'pandas-flavor',
     'matplotlib>=2.0',
     "scipy",

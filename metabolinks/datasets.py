@@ -32,7 +32,7 @@ def demo_dataset(name, as_frame=True, return_X_y=False):
         if 'target' in b:
             b['target'] = b['target'].values
     if return_X_y:
-        if 'target' in 'b':
+        if 'target' in b:
             return(b['data'], b['target'])
         else:
             return (b['data'],)
@@ -72,7 +72,7 @@ def parse_data(df, desc='',
                samples_in_cols=False,
                labels_loc=None,
                samples_loc=None):
-    """A parse a pandas dataframe returning a sckit-learn dataset.
+    """Parse a pandas DataFrame returning a sckit-learn dataset.
 
     Returns a ``Bunch`` object with attributes following the same convention as
     the demo datasets of sckit-learn. Aditionally, the following atributes are
@@ -346,8 +346,7 @@ raw_mass	peak_height	corrected_mass	npossible	KEGG_mass	ppm	KEGG_cid	KEGG_formul
         return parse_data(df, desc=desc)
 
     def create_example_file(self, file_name):
-        df = self.as_Bunch().data
-        df.to_csv(file_name)
+        self.as_Bunch().data.to_csv(file_name)
 
 
 if __name__ == '__main__':

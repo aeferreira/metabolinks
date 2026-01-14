@@ -1054,7 +1054,7 @@ def unfold_MassTRIX(df):
     for _, row in df.iterrows():
         n = len(row['KEGG_cid'])
     
-        for label, v in row.iteritems():
+        for label, v in row.items():
             if isinstance(v, list):
                 if len(v) < n:
                     v.extend([nan]*(n-len(v)))
