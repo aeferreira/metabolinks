@@ -14,12 +14,8 @@ Features are a bit scarce right now:
 
 - peak list alignment
 - common metabolomics data-matrix preprocessing, based on ``pandas`` and ``scikit-learn``
-- compound taxonomy retrieval
 
-But our road map is clear and we expect to stabilize in a beta version pretty soon.
-
-Stay tuned, and check out the examples folder (examples are provided as
-jupyter notebooks).
+Stay tuned, and check out the examples folder.
 
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.5336951.svg
    :target: https://doi.org/10.5281/zenodo.5336951
@@ -28,7 +24,7 @@ Installing
 ==========
 
 ``Metabolinks`` is distributed on PyPI_ and can be installed with pip on
-a Python 3.6+ installation::
+a Python 3.8+ installation::
 
    pip install metabolinks
 
@@ -45,7 +41,7 @@ One of these two products is highly recommended:
 
 The formal requirements are:
 
-- Python 3.6 and above
+- Python 3.8 or above
 - ``setuptools``, ``pip``, ``requests``, ``six``, ``pandas-flavor`` and ``pytest``
 
 and, from the Python scientific ecossystem:
