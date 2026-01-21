@@ -8,7 +8,8 @@ dynamic = ["version"]
 description = "A set of tools for high-resolution MS metabolomics data analysis"
 readme = "README.rst"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE", "AUTHORS.md", "CITATION.cff"]
 authors = [
     { name = "António Ferreira", email = "aeferreira@fc.ul.pt" },
 ]
