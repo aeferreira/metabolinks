@@ -1,36 +1,14 @@
 """Accessors to Pandas DataFrame interpreting metadata in the column index.
 
-   Two versions: 'ms' assumes labeled data, 'ums' assumes unlabeled data"""
+   Two versions: 'cdl' assumes labeled data, 'cdf' assumes unlabeled data"""
 
-from collections import namedtuple
-import numpy as np
 import pandas as pd
 
 from pandas_flavor import register_dataframe_accessor
 
 from .utils import _is_string
+from .dataio import create_multiindex_with_labels
 
-
-def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
-    cols = df.columns
-    n = len(cols)
-    metanames = cols.names
-    if not labels:
-        labels = ["no label"]
-    elif _is_string(labels):
-        labels = [labels]
-    else:
-        labels = list(labels)
-    nr = n // len(labels)
-    newstrs = []
-    for s in labels:
-        newstrs.extend([s] * nr)
-    if len(metanames) > 1:
-        tcols = [list(c) for c in cols.to_flat_index()]
-    else:
-        tcols = [[c] for c in cols]
-    newcols = [tuple([ns] + c) for (ns, c) in zip(newstrs, tcols)]
-    return pd.MultiIndex.from_tuples(newcols, names=[level_name] + metanames)
 
 @register_dataframe_accessor("cdl")
 class CDLAccessor(object):
@@ -170,9 +148,9 @@ class CDLAccessor(object):
                 labels=self.label_count,
                 features=self.feature_count,
             )
-        ls_table = [(s, l) for (l, s) in self._get_zip_labels_samples()]
+        ls_table = [(sample, label) for (label, sample) in self._get_zip_labels_samples()]
         ls_table.append((self.sample_count, self.label_count))
-        indx_strs = [str(i) for i in range(self.sample_count)] + ["global"]
+        indx_strs = [map(str, range(self.sample_count))] + ["global"]
         return pd.DataFrame(ls_table, columns=["sample", "label"], index=indx_strs)
 
     def label_of(self, sample):

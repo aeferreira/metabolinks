@@ -3,26 +3,39 @@ from collections import OrderedDict
 import pandas as pd
 import numpy as np
 
-from metabolinks.cdaccessors import create_multiindex_with_labels
+from .utils import _is_string
 
 
-def _ensure_DataFrame(data):
-    """Retrieves information from data structures building a dictionary.
-
-       Accepts numpy array, pandas DataFrames or structures with a DataFrame member `data`."""
-
-    # ensure data is a DataFrame, otherwise return numpy array as 'data' in info dict
-    if isinstance(data, pd.Series):
-        data = data.to_frame()
-    if not isinstance(data, pd.DataFrame):
-        data = pd.DataFrame(np.array(data))
-    return data
+def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
+    cols = df.columns
+    n = len(cols)
+    metanames = cols.names
+    if not labels:
+        labels = ["no label"]
+    elif _is_string(labels):
+        labels = [labels]
+    else:
+        labels = list(labels)
+    nr = n // len(labels)
+    newstrs = []
+    for s in labels:
+        newstrs.extend([s] * nr)
+    if len(metanames) > 1:
+        tcols = [list(c) for c in cols.to_flat_index()]
+    else:
+        tcols = [[c] for c in cols]
+    newcols = [tuple([ns] + c) for (ns, c) in zip(newstrs, tcols)]
+    return pd.MultiIndex.from_tuples(newcols, names=[level_name] + metanames)
 
 
 def gen_df(data, add_labels=None):
     """Ensure a Pandas DataFrame from data, create label level in columns if needed."""
 
-    data = _ensure_DataFrame(data)
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(np.array(data))
+
     if add_labels is not None:
         data.columns = create_multiindex_with_labels(data, labels=add_labels)
     return data
