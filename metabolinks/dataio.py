@@ -3,7 +3,105 @@ from collections import OrderedDict
 import pandas as pd
 import numpy as np
 
-from .utils import _is_string
+from sklearn.utils import Bunch
+from sklearn.preprocessing import LabelEncoder
+from metabolinks import utils
+# from .utils import _is_string
+
+def _find_lbl_from_loc(loc, df, axis=0):
+    if loc is None:
+        return None
+    indx = df.index if axis == 0 else df.columns
+    if utils._is_int(loc):
+        return list(indx.get_level_values(loc))
+    if utils._is_string(loc):
+        if indx.nlevels < 2 and loc == indx.name:
+            return list(indx.get_level_values(0))
+        elif indx.nlevels >= 2 and loc in indx.names:
+            level = indx.names.index(loc)
+            return list(indx.get_level_values(level))
+        else: # try to find in column/row
+            if axis == 0:
+                return list(df[loc].values)
+            else:
+                return list(df.loc[loc, :].values)
+    raise ValueError(f'location must be int or string: {loc}')
+
+
+def parse_data(df, desc='',
+               samples_in_cols=False,
+               labels_loc=None,
+               samples_loc=None,
+               copy_data=True):
+    """Parse a pandas DataFrame returning a Bunch object similar to scikit-learn datasets.
+
+    Returns a ``Bunch`` object with attributes following the same convention as
+    the demo datasets of sckit-learn. Aditionally, the following atributes are
+    also created if possible:
+    - `sample_names` a list of sample names.
+    - `sample_labels` a (non-encoded) list of sample labels
+    - `classes`, an alias of `target_names`, a list of unique sample labels
+
+    The `data` attribute is optionally left None, in case the parsing is done
+    when only data description is needed.
+
+    Arguments: 
+    
+    `labels_loc` indicate the location of the sample in the df:
+
+    - If an int, the corresponding multindex level is used as labels.
+      If a string, the multindex level with that name is used as labels. If not
+      found, then a column (or row) with that name is used as labels.
+      (mult)index
+    - if None, no sample labels are read and target and target_names are not generated.
+
+    `samples_loc` has the same interpretation as `labels_loc` except that None means
+    the default "inner-most level" of the sample index. 
+
+    `copy_data` (boolean) indicates if `data` attribute should be a copy of the DataFrame
+    or None.
+
+    Sample labels are encoded by sklearn.preprocessing.LabelEncoder() to generate
+    attributes `target` and `target_names`.
+    """
+
+    if samples_in_cols:
+        s_indx = df.columns
+        f_indx = df.index
+        axis = 1
+    else:
+        s_indx = df.index
+        f_indx = df.columns
+        axis = 0
+    bunch = Bunch()
+    
+    # data attr
+    if copy_data:
+        bunch['data'] = df.transpose() if samples_in_cols else df.copy()
+    else:
+        bunch['data'] = None
+
+    # DESCR attr
+    bunch['DESCR'] = desc
+
+    #feature_names and sample_names attrs
+    bunch['feature_names'] = list(f_indx) if f_indx.nlevels < 2 else list(f_indx.to_flat_index())
+    if samples_loc is None:
+        # default is the inner level
+        samples_loc = s_indx.nlevels - 1
+    bunch['sample_names'] = _find_lbl_from_loc(samples_loc, df, axis=axis)
+
+    # target and target_names
+    if labels_loc is not None:
+        labels = _find_lbl_from_loc(labels_loc, df, axis=axis)
+        bunch['sample_labels'] = labels
+        le = LabelEncoder()
+        le.fit(labels)
+        bunch['target_names'] = list(le.classes_)
+        bunch['classes'] = list(le.classes_)
+        bunch['target'] = le.transform(labels)
+
+    return bunch
 
 
 def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
@@ -12,7 +110,7 @@ def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
     metanames = cols.names
     if not labels:
         labels = ["no label"]
-    elif _is_string(labels):
+    elif utils._is_string(labels):
         labels = [labels]
     else:
         labels = list(labels)
