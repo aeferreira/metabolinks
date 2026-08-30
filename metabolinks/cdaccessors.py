@@ -3,15 +3,14 @@
    Two versions: 'cdl' assumes labeled data, 'cdf' assumes unlabeled data"""
 
 import pandas as pd
-
 from pandas_flavor import register_dataframe_accessor
 
-from .utils import _is_string
 from .dataio import create_multiindex_with_labels
+from .utils import _is_string
 
 
 @register_dataframe_accessor("cdl")
-class CDLAccessor(object):
+class CDLAccessor:
     """An accessor to Pandas DataFrame to interpret content as column organized, labeled data.
 
     This interpretation assumes that the **column** index stores the essential
@@ -143,11 +142,11 @@ class CDLAccessor(object):
     def info(self, all_data=False):
         """A dicionary of global counts or a DataFrame with info for each sample"""
         if all_data:
-            return dict(
-                samples=self.sample_count,
-                labels=self.label_count,
-                features=self.feature_count,
-            )
+            return {
+                "samples": self.sample_count,
+                "labels": self.label_count,
+                "features": self.feature_count,
+            }
         ls_table = [(sample, label) for (label, sample) in self._get_zip_labels_samples()]
         ls_table.append((self.sample_count, self.label_count))
         indx_strs = [map(str, range(self.sample_count))] + ["global"]
@@ -297,7 +296,7 @@ class CDLAccessor(object):
 
 
 @register_dataframe_accessor("cdf")
-class CDFAccessor(object):
+class CDFAccessor:
     """An accessor to Pandas DataFrame to interpret content as column organized flat (unlabeled) data.
 
     This interpretation assumes that the **column** index stores the sample names
@@ -390,9 +389,9 @@ class CDFAccessor(object):
 
     def info(self, all_data=False):
         if all_data:
-            return dict(samples=self.sample_count, features=self.feature_count)
+            return {"samples": self.sample_count, "features": self.feature_count}
         s_table = {"sample": list(self.samples)}
-        s_table["sample"].append((self.sample_count))
+        s_table["sample"].append(self.sample_count)
         indx_strs = [str(i) for i in range(self.sample_count)] + ["global"]
         return pd.DataFrame(s_table, index=indx_strs)
 
@@ -422,9 +421,8 @@ class CDFAccessor(object):
             col_indexer =  self._get_subset_data_indexer(sample=sample)
             df = self._df.loc[:, col_indexer]
         df = df.copy() if no_drop_na else df.dropna(how="all")
-        if isinstance(df, pd.DataFrame):
-            if len(df.columns.names) > 1:
-                df.columns = df.columns.remove_unused_levels()
+        if isinstance(df, pd.DataFrame) and len(df.columns.names) > 1:
+            df.columns = df.columns.remove_unused_levels()
         return df
 
     def take(self, **kwargs):

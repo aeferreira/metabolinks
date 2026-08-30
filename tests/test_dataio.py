@@ -1,10 +1,11 @@
-import pytest
+from io import StringIO
+
 import numpy as np
 import pandas as pd
-from io import StringIO
-from metabolinks import parse_data
+import pytest
+
+from metabolinks import datasets
 from metabolinks.dataio import gen_df, read_data_csv
-import metabolinks.datasets as datasets
 
 
 def test_gen_df():

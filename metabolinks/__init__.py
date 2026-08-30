@@ -1,18 +1,22 @@
-from .dataio import (read_data_from_xcel, read_data_csv, parse_data)
+# this registers "column-organized" data accessors
+from .cdaccessors import CDFAccessor, CDLAccessor, add_labels
+from .dataio import parse_data, read_data_csv, read_data_from_xcel
 from .datasets import get_data_path
 from .peak_alignment import align
 
-# this registers "column-organized" data accessors
-from .cdaccessors import (CDLAccessor, CDFAccessor, add_labels)
-
 __version__ = '0.80'
 
-__all__ = ["read_data_from_xcel",
-           "read_data_csv",
-           "parse_data",
-           "get_data_path",
-           "CDLAccessor",
+__all__ = [
            "CDFAccessor",
+           "CDLAccessor",
+           "__version__",
            "add_labels",
            "align",
-           "__version__",]
+           "get_data_path",
+           "parse_data",
+           "read_data_csv",
+           "read_data_from_xcel",
+]
+
+print("metabolinks was imported!!!")
+print("version:", __version__)

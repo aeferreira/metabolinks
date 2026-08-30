@@ -99,6 +99,7 @@ def composition_series(formulae, compositions = ('CHO', 'CHOS',
 
 if __name__ == '__main__':
     from io import StringIO
+
     from metabolinks import datasets
     from metabolinks.dataio import read_MassTRIX
 

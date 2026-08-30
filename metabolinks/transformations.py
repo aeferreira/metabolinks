@@ -19,17 +19,17 @@
    the whole DataFrame.
 """
 
-from typing import Optional, List, Union
 
 import numpy as np
 import pandas as pd
 import pandas.api.types as ptypes
-
 from sklearn.base import BaseEstimator, TransformerMixin
+
 #from sklearn.feature_selection._base import SelectorMixin
 from sklearn.utils.validation import check_is_fitted
 
 from metabolinks.utils import _is_string
+
 
 # ---------- util functions
 def _ensure_ncols(X: pd.DataFrame, n_cols: int) -> None:
@@ -38,10 +38,9 @@ def _ensure_ncols(X: pd.DataFrame, n_cols: int) -> None:
         raise ValueError(msg)
 
 def _to_dataframe(X):
-    if not isinstance(X, pd.DataFrame):
-        if hasattr(X, 'shape'):
-            cols = [str(c) for c in range(X.shape[1])]
-            X = pd.DataFrame(X, columns=cols)
+    if not isinstance(X, pd.DataFrame) and hasattr(X, 'shape'):
+        cols = [str(c) for c in range(X.shape[1])]
+        X = pd.DataFrame(X, columns=cols)
     if not isinstance(X, pd.DataFrame):
         raise TypeError(
             f"X should be a pandas DataFrame or a compatible data structure. Found a {type(X)}."
@@ -98,7 +97,7 @@ class LODImputer(TransformerMixin, BaseEstimator):
         if self.fraction <= 0:
             raise ValueError("fraction must be a positive number")
             
-    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+    def fit(self, X: pd.DataFrame, y: pd.Series | None = None):
         """
         Learn the value of the fraction of the minimum of the data.
         Parameters
@@ -391,9 +390,9 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         method: str = 'total',
-        feature: Union[str, float, None] = None,
-        ref_sample: Union[str, float, None] = None,
-        fold: Union[str, float] = 1.0,
+        feature: str | float | None = None,
+        ref_sample: str | float | None = None,
+        fold: str | float = 1.0,
     ) -> None:
 
         self.method = method
@@ -401,7 +400,7 @@ class SampleNormalizer(BaseEstimator, TransformerMixin):
         self.feature = feature
         self.fold = fold
 
-    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+    def fit(self, X: pd.DataFrame, y: pd.Series | None = None):
         """
         Checks that input is a dataframe.
         Parameters
@@ -532,7 +531,7 @@ class DropFeatures(BaseEstimator, TransformerMixin):
         Fit to data, then transform it.
     """
 
-    def __init__(self, features_to_drop: List[Union[str, int]]):
+    def __init__(self, features_to_drop: list[str| int]):
 
         if not isinstance(features_to_drop, list) or len(features_to_drop) == 0:
             raise ValueError(
@@ -731,10 +730,10 @@ class GLogTransformer(BaseEstimator, TransformerMixin):
         Fit to data, then transform it.
     """
 
-    def __init__(self, lamb: float = None,) -> None:
+    def __init__(self, lamb: float | None = None,) -> None:
         self.lamb = lamb
 
-    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+    def fit(self, X: pd.DataFrame, y: pd.Series | None = None):
         """
         This transformer does not learn parameters.
         Select the numerical variables and determines whether the logarithm
@@ -866,7 +865,7 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         self.method = method
         self.mean_center = mean_center
 
-    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None):
+    def fit(self, X: pd.DataFrame, y: pd.Series | None = None):
         """
         Checks that input is a dataframe, does not learn any parameters except input shape.
         Parameters

@@ -24,7 +24,7 @@ Installing
 ==========
 
 ``Metabolinks`` is distributed on PyPI_ and can be installed with pip on
-a Python 3.8+ installation::
+a Python 3.12+ installation::
 
    pip install metabolinks
 
@@ -41,7 +41,7 @@ One of these two products is highly recommended:
 
 The formal requirements are:
 
-- Python 3.8 or above
+- Python 3.12 or above
 - ``setuptools``, ``pip``, ``requests``, ``six``, ``pandas-flavor`` and ``pytest``
 
 and, from the Python scientific ecossystem:

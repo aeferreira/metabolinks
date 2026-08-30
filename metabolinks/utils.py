@@ -4,8 +4,8 @@
    - simple format of h:m:s from seconds
 """
 
-from __future__ import print_function, absolute_import
-from six import string_types, integer_types
+from six import integer_types, string_types
+
 
 def get_filename_using_tk(filetypes=[("TSV","*.tsv")]):
     """Choose a filename using Tk"""
@@ -13,7 +13,7 @@ def get_filename_using_tk(filetypes=[("TSV","*.tsv")]):
     root = tk.Tk()
     root.withdraw()
     fname = tk.filedialog.askopenfilename(filetypes=filetypes )
-    print('Selected file {}'.format(fname))
+    print(f'Selected file {fname}')
     return fname
 
 
@@ -28,7 +28,7 @@ def _is_string(a):
 
 
 def _is_number(a):
-    return isinstance(a, float) or isinstance(a, integer_types)
+    return isinstance(a, (float, integer_types))
 
 def _is_int(a):
     return isinstance(a, integer_types)

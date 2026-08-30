@@ -1,16 +1,14 @@
 from collections import OrderedDict
 
-import pandas as pd
 import numpy as np
-
-from sklearn.utils import Bunch
+import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from metabolinks import utils
-# from .utils import _is_string
+from sklearn.utils import Bunch
 
-def _find_lbl_from_loc(loc, df, axis=0):
-    if loc is None:
-        return None
+from metabolinks import utils
+
+
+def _find_lbl_from_loc(loc, df, axis=0) -> list:
     indx = df.index if axis == 0 else df.columns
     if utils._is_int(loc):
         return list(indx.get_level_values(loc))
@@ -46,7 +44,7 @@ def parse_data(df, desc='',
     when only data description is needed.
 
     Arguments: 
-    
+
     `labels_loc` indicate the location of the sample in the df:
 
     - If an int, the corresponding multindex level is used as labels.
@@ -74,7 +72,7 @@ def parse_data(df, desc='',
         f_indx = df.columns
         axis = 0
     bunch = Bunch()
-    
+
     # data attr
     if copy_data:
         bunch['data'] = df.transpose() if samples_in_cols else df.copy()
@@ -104,7 +102,7 @@ def parse_data(df, desc='',
     return bunch
 
 
-def create_multiindex_with_labels(df, labels=["no label"], level_name="label"):
+def create_multiindex_with_labels(df, labels=("no label"), level_name="label"):
     cols = df.columns
     n = len(cols)
     metanames = cols.names
@@ -192,7 +190,7 @@ def read_data_from_xcel(
                     res.columns = res.columns.droplevel(drop_header_levels)
 
         if verbose:
-            print('\n- {} tables found in sheet "{}":'.format(len(results), sheetname))
+            print(f'\n- {len(results)} tables found in sheet "{sheetname}":')
             for table in results:
                 size = len(table)
                 if has_labels:

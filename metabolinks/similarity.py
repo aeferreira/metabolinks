@@ -7,6 +7,7 @@ import pandas as pd
 
 from metabolinks import datasets
 
+
 def mz_similarity(dataset, has_labels=False):
     """Compute counts and Jaccard index by samples."""
     if has_labels:
@@ -261,6 +262,6 @@ if __name__ == "__main__":
 
     print('\n----------- Features for Venn diagram')
 
-    venn = compute_Venn_features(samples, 'S1 S2 S3'.split())
+    venn = compute_Venn_features(samples, ['S1', 'S2', 'S3'])
     for t in venn:
-        print(f'{str(t):>20} --> {list(venn[t])}')
+        print(f'{t!s:>20} --> {list(venn[t])}')

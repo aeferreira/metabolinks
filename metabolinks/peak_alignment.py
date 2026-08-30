@@ -5,6 +5,7 @@ import pandas as pd
 
 from metabolinks.utils import s2HMS
 
+
 def group_peaks_hca_median(df, ppmtol=1.0):
     reltol = ppmtol * 1.0e-6
 
@@ -16,7 +17,7 @@ def group_peaks_hca_median(df, ppmtol=1.0):
 
     # fill list with original peaks
     for i in range(len(df)):
-        samples.append(set([df.loc[i, '_sample']]))
+        samples.append({df.loc[i, '_sample']})
         masses.append([df.loc[i, 'm/z']])
         centroids.append(df.loc[i, 'm/z'])
 
@@ -324,8 +325,8 @@ def align(inputs, ppmtol=1.0, min_samples=1,
         alignment_desc = alignment_desc[where_keep]
 
     if verbose:
-        print('  Done, {} groups found'.format(n_non_discarded))
-        print('Elapsed time: {}\n'.format(s2HMS(time.time() - start_time)))
+        print(f'  Done, {n_non_discarded} groups found')
+        print(f'Elapsed time: {s2HMS(time.time() - start_time)}\n')
         # print(result.info())
 
         if min_samples > 1:
@@ -348,14 +349,14 @@ def alignment_summary(alignment_desc, ppmtol):
         lines=['Sample coverage of features']
         cov_items = alignment_desc['# features'].value_counts().sort_index().items()
         for n, c in cov_items:
-            lines.append('{:5d} features in {} samples'.format(c, n))
+            lines.append(f'{c:5d} features in {n} samples')
         res.append('\n'.join(lines))
         lines = ['m/z range (ppm) distribution']
         range_hist = np.histogram(alignment_desc['m/z range (ppm)'].values, bins=10, range=(0.0, ppmtol))
         bins = range_hist[1]
         counts = range_hist[0]
         for i, c in enumerate(counts):
-            lines.append('  [{:3.1f},{:3.1f}[ : {}'.format(bins[i], bins[i+1], c))
+            lines.append(f'  [{bins[i]:3.1f},{bins[i+1]:3.1f}[ : {c}')
         res.append('\n'.join(lines))
         hist_high = bins[-1]
         excess_ranges = alignment_desc[alignment_desc['m/z range (ppm)'] > hist_high]
@@ -364,7 +365,7 @@ def alignment_summary(alignment_desc, ppmtol):
             res.append('Peaks with m/z range in excess of tolerance')
             res.append(str(excess_ranges))
         else:
-            res.append('  > {:<7.1f} : {}'.format(hist_high, n_excess))
+            res.append(f'  > {hist_high:<7.1f} : {n_excess}')
         return '\n'.join(res)
 
 
@@ -448,13 +449,14 @@ if __name__ == '__main__':
         print('\n--- Result: --------------------')
         print(aligned.head(30))
         results_sheets[d] = aligned
-        results_sheets['groups {}'.format(d)] = desc
+        results_sheets[f'groups {d}'] = desc
         print('+++++++++++++++++++++++++++++')
 
     ofname = data_folder / "outputs" / out_fname
 
     print(f'\n------ Saving results in Excel file {ofname.name}...')
     with pd.ExcelWriter(ofname) as writer:
-        for sname in results_sheets:
-            results_sheets[sname].to_excel(writer, sheet_name=sname)
+        for sname, sheet in results_sheets.items():
+            sheet[sname].to_excel(writer, sheet_name=sname)
     print('\n Done!')
+

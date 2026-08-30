@@ -7,7 +7,8 @@ name = "metabolinks"
 dynamic = ["version"]
 description = "A set of tools for high-resolution MS metabolomics data analysis"
 readme = "README.rst"
-requires-python = ">=3.8"
+# This project follows https://scientific-python.org/specs/spec-0000/
+requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE", "AUTHORS.md", "CITATION.cff"]
 authors = [
@@ -17,7 +18,7 @@ keywords = [
     'Metabolomics', 
     'Mass Spectrometry', 
     'Data Analysis', 
-    'Ultra-high resolution MS']
+    'Extreme-resolution MS']
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -27,30 +28,45 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
     'requests',
-    'numpy', 
+    'numpy>=2.0', 
     'pandas>=2.0',
     'xlrd',
     'xlsxwriter',
     'openpyxl',
     'pandas-flavor',
-    'matplotlib>=2.0',
+    'matplotlib>=3.0',
     "scipy",
     "scikit-learn>=1.0"
 ]
 
-[project.optional-dependencies]
-test = ["pytest"]
-
 [project.urls]
-Homepage = 'https://github.com/aeferreira/metabolinks'
+Homepage = "https://github.com/aeferreira/metabolinks"
+"Repository" = "https://github.com/aeferreira/metabolinks"
+
+[tool.hatch.version]
+path = "metabolinks/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["metabolinks"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "metabolinks",
+  "README.rst",
+  "LICENSE",
+  "pyproject.toml",
+  "AUTHORS.md",
+  "CITATION.cff",
+]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.12", "3.13", "3.14"]

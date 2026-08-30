@@ -8,9 +8,11 @@
    (`classes` and `target_names` are identical)."""
 
 from abc import ABCMeta, abstractmethod
-import pandas as pd
 from io import StringIO
 from pathlib import Path
+
+import pandas as pd
+
 from .dataio import parse_data
 
 
@@ -104,7 +106,7 @@ class DataSetFactory:
         """
 
         if name not in cls.registry:
-            raise AttributeError('Data set {} is not available'.format(name))
+            raise AttributeError(f'Data set {name} is not available')
 
 
         dataset_class = cls.registry[name]
@@ -263,8 +265,10 @@ raw_mass	peak_height	corrected_mass	npossible	KEGG_mass	ppm	KEGG_cid	KEGG_formul
 
 
 if __name__ == '__main__':
-    from pandas.testing import assert_frame_equal
     import tempfile
+
+    from pandas.testing import assert_frame_equal
+
     def report_dataset(dataset):
         print(dataset.DESCR)
         print(dataset.data)

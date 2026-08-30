@@ -1,0 +1,84 @@
+[workspace]
+channels = ["conda-forge"]
+name = "metabolinks"
+platforms =  ["linux-64", "osx-arm64", "osx-64", "win-64"]
+preview = ["pixi-build"]
+
+[tasks]
+check = { cmd = ["python", "-c", "import metabolinks; print(metabolinks.__version__)"], description = "Check if metabolinks exist." }
+
+[dependencies]
+python = "*"
+requests="*"
+numpy = ">=2.0"
+pandas = ">=2.0"
+xlrd = "*"
+xlsxwriter = "*"
+openpyxl = "*"
+pandas-flavor = "*"
+matplotlib = ">=3.0"
+scipy = "*"
+scikit-learn = ">=1.0"
+metabolinks = {path = "."}
+
+
+[package]
+name = "metabolinks"
+version = "0.80"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.*", channels = ["https://prefix.dev/conda-forge"]}
+
+[package.host-dependencies]
+python = "3.14.*"
+hatchling = "*"
+virtualenv = "<21.0"
+
+[package.build.config]
+noarch = true
+
+[package.run-dependencies]
+    requests="*"
+    numpy = ">=2.0"
+    pandas = ">=2.0"
+    xlrd = "*"
+    xlsxwriter = "*"
+    openpyxl = "*"
+    pandas-flavor = "*"
+    matplotlib = ">=3.0"
+    scipy = "*"
+    scikit-learn = ">=1.0"
+
+
+[feature.tools.dependencies]
+pytest = "*"
+virtualenv = "<21.0"
+hatch = ">=1.7.0,<1.13"
+twine = ">=7.0.0,<8"
+jupyter = ">=1.1.1,<2"
+ipython = ">=9.16.1,<10"
+
+[environments.tools]
+features = ["tools"]
+
+[feature.tools.tasks]
+build = "hatch build"
+clean = "hatch clean"
+
+[feature.test.dependencies]
+pytest = "*"
+
+[feature.test.tasks]
+test = "pytest tests"
+
+[environments.test-py314]
+dependencies = { python = "3.14.*" }
+features = ["test"]
+
+[environments.test-py312]
+dependencies = { python = "3.12.*" }
+features = ["test"]
+
+[environments.test-py313]
+dependencies = { python = "3.13.*" }
+features = ["test"]
